@@ -1,0 +1,29 @@
+# Môi trường ảo Python
+venv/
+env/
+ENV/
+.env
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# IDE config
+.vscode/
+.idea/
+
+# Large raw json downloads in data/ (nếu muốn tránh push file json nặng lên GitHub)
+data/gossipcop/HR.json
+data/gossipcop/HF.json
+data/gossipcop/MR.json
+data/gossipcop/MF.json
+
+# Checkpoints & weights
+*.pt
+*.bin
+*.safetensors
+checkpoint-*/
+runs/
