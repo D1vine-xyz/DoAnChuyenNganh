@@ -1,0 +1,158 @@
+[
+  {
+    "name": "LIAR dataset",
+    "url": "https://github.com/tfs4/liar_dataset",
+    "description": "12.8K phát biểu ngắn từ PolitiFact; nguồn văn bản ngắn do người viết.",
+    "table": 1
+  },
+  {
+    "name": "LIAR dataset – bản tham khảo",
+    "url": "https://github.com/nishitpatel01/Fake_News_Detection/blob/master/liar_dataset/README",
+    "description": "Mô tả cấu trúc TSV: ID, label, statement, subject, speaker, context.",
+    "table": 1
+  },
+  {
+    "name": "FakeNewsNet / GossipCop",
+    "url": "https://github.com/KaiDMML/FakeNewsNet",
+    "description": "Nguồn bài báo GossipCop phục vụ kịch bản long article.",
+    "table": 1
+  },
+  {
+    "name": "GossipCop++ / PolitiFact++",
+    "url": "https://github.com/mbzuai-nlp/Fakenews-dataset",
+    "description": "Biến thể GossipCop/PolitiFact đã lọc title/description, phù hợp nghiên cứu AI-text detection.",
+    "table": 1
+  },
+  {
+    "name": "TOEFL–ChatGPT corpus",
+    "url": "https://github.com/rexshijaku/chatgpt-generated-text-detection-corpus",
+    "description": "126 chủ đề; bài luận người viết và bài luận ChatGPT, tương ứng 126 human + 126 ChatGPT.",
+    "table": 1
+  },
+  {
+    "name": "README TOEFL–ChatGPT corpus",
+    "url": "https://github.com/rexshijaku/chatgpt-generated-text-detection-corpus/blob/main/README.md",
+    "description": "Mô tả cách trích human essays và sinh ChatGPT essays qua API.",
+    "table": 1
+  },
+  {
+    "name": "SemEval-2024 Task 8",
+    "url": "https://github.com/mbzuai-nlp/SemEval2024-task8",
+    "description": "Benchmark đa miền, đa generator, đa ngôn ngữ; cung cấp dữ liệu và baseline.",
+    "table": 2
+  },
+  {
+    "name": "M4 dataset",
+    "url": "https://github.com/mbzuai-nlp/M4",
+    "description": "Dataset gốc của SemEval-2024 Task 8.",
+    "table": 2
+  },
+  {
+    "name": "MAGE",
+    "url": "https://github.com/yafuly/MAGE",
+    "description": "Benchmark AI-text detection in the wild; Longformer được báo cáo mạnh.",
+    "table": 2
+  },
+  {
+    "name": "Awesome papers on LLM detection",
+    "url": "https://github.com/xianjun-yang/awesome_papers_on_llms_detection",
+    "description": "Danh mục bài báo, benchmark, gồm M4GT-Bench.",
+    "table": 2
+  },
+  {
+    "name": "HC3",
+    "url": "https://huggingface.co/datasets/Hello-SimpleAI/HC3",
+    "description": "Dataset ChatGPT vs Human tiếng Anh/Trung; dùng cho augmentation hoặc pretraining.",
+    "table": 2
+  },
+  {
+    "name": "SemEval-2024 Task 8 trên Hugging Face",
+    "url": "https://huggingface.co/datasets/d0rj/SemEval2024-task8",
+    "description": "Bản mirror dataset M4/SemEval.",
+    "table": 2
+  },
+  {
+    "name": "LIAR trên Hugging Face",
+    "url": "https://huggingface.co/datasets/ucsbnlp/liar",
+    "description": "Tải LIAR qua Hugging Face.",
+    "table": 2
+  },
+  {
+    "name": "LIAR – bản khác trên Hugging Face",
+    "url": "https://huggingface.co/datasets/ucsbai/liar",
+    "description": "Bản dataset LIAR khác trên Hugging Face.",
+    "table": 2
+  },
+  {
+    "name": "Ensemble-Based-AI-Generated-Text-Detection",
+    "url": "https://github.com/ShushantaTUD/Ensemble-Based-AI-Generated-Text-Detection",
+    "description": "Mã nguồn ensemble các pretrained encoder cho AI-text detection.",
+    "table": 3
+  },
+  {
+    "name": "PAN CLEF 2025 paper",
+    "url": "https://ceur-ws.org/Vol-4038/paper_315.pdf",
+    "description": "Ensemble frozen pretrained encoders; tinh chỉnh 6 encoder và 6 chiến lược ensemble.",
+    "table": 3
+  },
+  {
+    "name": "Multirepresentation Stacked Ensemble",
+    "url": "https://onlinelibrary.wiley.com/doi/10.1155/int/3992539",
+    "description": "Stacked ensemble kết hợp Transformer embedding, semantic contrastive features và meta-features.",
+    "table": 3
+  },
+  {
+    "name": "DeepPavlov at SemEval-2024 Task 8",
+    "url": "https://aclanthology.org/anthology-files/anthology-files/pdf/semeval/2024.semeval-1.257.pdf",
+    "description": "Nghiên cứu dùng RoBERTa và các PLM trên M4.",
+    "table": 3
+  },
+  {
+    "name": "TrustAI at SemEval-2024 Task 8",
+    "url": "https://arxiv.org/pdf/2403.16592.pdf",
+    "description": "Phân tích toàn diện các phương pháp phát hiện văn bản máy sinh.",
+    "table": 3
+  },
+  {
+    "name": "Team QUST at SemEval-2024 Task 8",
+    "url": "https://arxiv.org/html/2402.11934",
+    "description": "Stacking DeBERTa/RoBERTa với MPU; phân tích short/long text.",
+    "table": 3
+  },
+  {
+    "name": "GenAI Content Detection Task 1",
+    "url": "https://export.arxiv.org/pdf/2501.11012",
+    "description": "Benchmark English/multilingual AI-content detection; nhắc đến HC3.",
+    "table": 3
+  },
+  {
+    "name": "SemEval-2024 Task 8 proceedings",
+    "url": "https://aclanthology.org/2024.semeval-1.85.pdf",
+    "description": "Tổng quan kết quả và phương pháp các đội thi.",
+    "table": 3
+  },
+  {
+    "name": "SemEval-2024 Tasks",
+    "url": "https://semeval.github.io/SemEval2024/tasks.html",
+    "description": "Trang chính thức mô tả Task 8.",
+    "table": 3
+  },
+  {
+    "name": "LIAR paper – ACL Anthology",
+    "url": "https://aclanthology.org/P17-2067/",
+    "description": "Bài báo gốc của LIAR, Wang 2017.",
+    "table": 4
+  },
+  {
+    "name": "MAGE paper",
+    "url": "https://arxiv.org/html/2305.13242v3",
+    "description": "Machine-generated Text Detection in the Wild.",
+    "table": 4
+  },
+  {
+    "name": "Fake news detectors biased against LLM text",
+    "url": "https://github.com/JinyanSu1/Fakenews-dataset",
+    "description": "Nghiên cứu GossipCop++/PolitiFact++ và độ chệch của fake-news detectors với văn bản LLM.",
+    "table": 4
+  }
+]
