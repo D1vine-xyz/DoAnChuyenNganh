@@ -9,21 +9,37 @@ if hasattr(sys.stdout, "reconfigure"):
 # Tạo thư mục 'data' để chứa các file nếu nó chưa tồn tại
 os.makedirs("data", exist_ok=True)
 
+LIAR_COLUMNS = [
+    'id', 'label', 'statement', 'subject', 'speaker', 'job_title',
+    'state_info', 'party_affiliation', 'barely_true_cnt', 'false_cnt',
+    'half_true_cnt', 'mostly_true_cnt', 'pants_on_fire_cnt', 'context'
+]
+
 # Link trực tiếp đến các file dữ liệu LIAR trên Github
-url_train = "https://raw.githubusercontent.com/tfs4/liar_dataset/master/train.tsv"
-url_test = "https://raw.githubusercontent.com/tfs4/liar_dataset/master/test.tsv"
-url_valid = "https://raw.githubusercontent.com/tfs4/liar_dataset/master/valid.tsv"
+urls = {
+    "data/liar_train.csv": "https://raw.githubusercontent.com/tfs4/liar_dataset/master/train.tsv",
+    "data/liar_test.csv": "https://raw.githubusercontent.com/tfs4/liar_dataset/master/test.tsv",
+    "data/liar_valid.csv": "https://raw.githubusercontent.com/tfs4/liar_dataset/master/valid.tsv"
+}
 
-print("Đang kết nối và tải dữ liệu LIAR từ Github...")
+def main():
+    print("=" * 60)
+    print("BẮT ĐẦU TẢI DỮ LIỆU LIAR DATASET TỪ GITHUB")
+    print("=" * 60)
 
-# Đọc file bằng thư viện pandas (dữ liệu gốc dùng dấu tab để phân tách - '\t')
-train_df = pd.read_csv(url_train, sep='\t', header=None)
-test_df = pd.read_csv(url_test, sep='\t', header=None)
-valid_df = pd.read_csv(url_valid, sep='\t', header=None)
+    for output_file, url in urls.items():
+        print(f"[*] Đang tải: {output_file} từ {url} ...")
+        try:
+            df = pd.read_csv(url, sep='\t', header=None, names=LIAR_COLUMNS, on_bad_lines='skip')
+            df.to_csv(output_file, index=False, encoding="utf-8")
+            print(f"    [v] Đã lưu {len(df):,} dòng vào '{output_file}'")
+        except Exception as e:
+            print(f"    [!] Lỗi khi tải {output_file}: {e}")
+            sys.exit(1)
 
-# Chuyển đổi và lưu thành file .csv vào thư mục 'data' vừa tạo
-train_df.to_csv("data/liar_train.csv", index=False)
-test_df.to_csv("data/liar_test.csv", index=False)
-valid_df.to_csv("data/liar_valid.csv", index=False)
+    print("\n" + "=" * 60)
+    print("🎉 Tải dữ liệu LIAR thành công! Các file đã được lưu trong thư mục 'data'.")
+    print("=" * 60)
 
-print("🎉 Tải dữ liệu LIAR thành công! Các file đã được lưu trong thư mục 'data'.")
+if __name__ == "__main__":
+    main()

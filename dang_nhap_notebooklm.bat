@@ -4,6 +4,6 @@ echo ====================================================
 echo   DANG NHAP GOOGLE CHO NOTEBOOKLM MCP
 echo ====================================================
 echo.
-echo Đang mở trình duyệt đăng nhập Google...
-node c:\DoAn\save_state.mjs
+echo Dang mo trinh duyet dang nhap Google...
+node "%~dp0save_state.mjs"
 pause

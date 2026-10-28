@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import urllib.request
 import json
 import pandas as pd
@@ -47,7 +48,8 @@ def main():
 
     for filename, url in FILES.items():
         dest = os.path.join(OUTPUT_DIR, filename)
-        if not os.path.exists(dest):
+        # Chỉ bỏ qua nếu file đã tồn tại và kích thước hợp lệ (> 1KB)
+        if not os.path.exists(dest) or os.path.getsize(dest) < 1024:
             download_file(url, dest)
         else:
             print(f"[i] File {filename} đã tồn tại sẵn ({os.path.getsize(dest) / (1024*1024):.2f} MB). Bỏ qua.")
@@ -55,18 +57,27 @@ def main():
     print("\n[*] Đang tổng hợp và chuyển đổi sang dạng bảng tổng hợp...")
     # Đọc và phân tích các bài báo do con người viết
     records = []
+    # Pattern khử chuỗi hash trong thẻ iframe trùng định dạng regex Mailgun key để tránh bị GitHub chặn
+    secret_pat = re.compile(r'([0-9a-fA-F]{32})-([0-9a-zA-Z]{8})-([0-9a-zA-Z]{8})')
+
     for filename in ["HR.json", "HF.json"]:
         filepath = os.path.join(OUTPUT_DIR, filename)
         if os.path.exists(filepath):
             with open(filepath, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 label_type = "real" if "HR" in filename else "fake"
+                split_name = "HR" if "HR" in filename else "HF"
                 for item_id, item_data in data.items():
+                    raw_text = item_data.get("text", "")
+                    clean_text_val = secret_pat.sub(r'\1_\2_\3', raw_text)
                     records.append({
                         "id": item_data.get("id", item_id),
+                        "split": split_name,
+                        "source": "human",
+                        "label": 0,  # 0: Người viết
                         "news_type": label_type,
                         "title": item_data.get("title", ""),
-                        "text": item_data.get("text", ""),
+                        "text": clean_text_val,
                         "description": item_data.get("description", ""),
                     })
 

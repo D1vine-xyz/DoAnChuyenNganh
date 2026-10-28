@@ -1,53 +1,95 @@
 import sys
-import pandas as pd
+import os
 import re
+import pandas as pd
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
+LIAR_COLUMNS = [
+    'id', 'label', 'statement', 'subject', 'speaker', 'job_title',
+    'state_info', 'party_affiliation', 'barely_true_cnt', 'false_cnt',
+    'half_true_cnt', 'mostly_true_cnt', 'pants_on_fire_cnt', 'context'
+]
+
 def clean_text(text):
-    if str(text) == 'nan' or text is None:
+    if text is None or pd.isna(text) or str(text).strip() == "" or str(text) == 'nan':
         return ""
     text = str(text)
-    
+
     # Xóa các đường link (hyperlinks)
     text = re.sub(r'http\S+|www\S+|https\S+', '', text, flags=re.MULTILINE)
-    
-    # Xóa các ký tự đặc biệt, chỉ giữ lại chữ cái, chữ số và khoảng trắng cơ bản
+
+    # Xóa các ký tự đặc biệt, chỉ giữ lại chữ cái, chữ số và khoảng trắng cơ bản cùng dấu chấm
     text = re.sub(r'[^\w\s\.]', '', text)
-    
+
     # Xóa khoảng trắng thừa và các dấu xuống dòng liên tiếp
     text = re.sub(r'\s+', ' ', text)
-    
+
     # Trả về văn bản đã viết thường (lowercase) và cắt khoảng trắng 2 đầu
     return text.strip().lower()
 
-print("Đang đọc dữ liệu thô từ thư mục 'data'...")
-# Đọc file LIAR (Hôm qua bạn tải về, cột nội dung văn bản nằm ở vị trí số 2)
-df_train = pd.read_csv("data/liar_train.csv")
-df_test = pd.read_csv("data/liar_test.csv")
-df_valid = pd.read_csv("data/liar_valid.csv")
+def get_statement_column(df):
+    """Xác định cột chứa nội dung phát biểu ('statement', '2', hoặc cột index 2)."""
+    if 'statement' in df.columns:
+        return 'statement'
+    if '2' in df.columns:
+        return '2'
+    if 2 in df.columns:
+        return 2
+    if len(df.columns) > 2:
+        return df.columns[2]
+    raise ValueError("Không tìm thấy cột văn bản trong dữ liệu LIAR!")
 
-print("Đang tiến hành làm sạch các ký tự rác, link, và chuẩn hóa dấu câu...")
-# Áp dụng hàm clean_text cho cột '2' (cột chứa nội dung)
-df_train['2'] = df_train['2'].apply(clean_text)
-df_test['2'] = df_test['2'].apply(clean_text)
-df_valid['2'] = df_valid['2'].apply(clean_text)
+def process_file(file_path, output_path):
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Không tìm thấy file {file_path}! Vui lòng chạy download_liar.py trước.")
 
-print("Đang lọc bỏ các câu bị trùng lặp và các câu quá ngắn...")
-# Xóa các dòng bị trùng lặp nội dung
-df_train = df_train.drop_duplicates(subset=['2'])
-df_test = df_test.drop_duplicates(subset=['2'])
-df_valid = df_valid.drop_duplicates(subset=['2'])
+    df = pd.read_csv(file_path)
+    initial_len = len(df)
 
-# Lọc giữ lại những hàng mà văn bản có độ dài từ 4 từ trở lên (loại bỏ các câu quá ngắn)
-df_train = df_train[df_train['2'].str.split().str.len() >= 4]
-df_test = df_test[df_test['2'].str.split().str.len() >= 4]
-df_valid = df_valid[df_valid['2'].str.split().str.len() >= 4]
+    # Nếu file dùng cột số 0, 1, 2... thì chuẩn hóa tên cột theo chuẩn LIAR
+    stmt_col = get_statement_column(df)
+    if stmt_col != 'statement' and len(df.columns) == len(LIAR_COLUMNS):
+        df.columns = LIAR_COLUMNS
+        stmt_col = 'statement'
 
-# Lưu thành các file mới đã được làm sạch
-df_train.to_csv("data/liar_train_cleaned.csv", index=False)
-df_test.to_csv("data/liar_test_cleaned.csv", index=False)
-df_valid.to_csv("data/liar_valid_cleaned.csv", index=False)
+    # Đảm bảo vẫn có alias cột '2' để tương thích ngược 100% với các script cũ
+    df['statement'] = df[stmt_col].apply(clean_text)
+    df['2'] = df['statement']
 
-print("Hoàn tất! Đã lưu 3 file '..._cleaned.csv' vào thư mục data.")
+    # Xóa trùng lặp
+    df = df.drop_duplicates(subset=['statement'])
+    after_dedup = len(df)
+
+    # Lọc câu quá ngắn (< 4 từ)
+    df = df[df['statement'].str.split().str.len() >= 4].copy()
+    final_len = len(df)
+
+    # Lưu kết quả
+    df.to_csv(output_path, index=False, encoding='utf-8')
+    return initial_len, after_dedup, final_len
+
+def main():
+    print("=" * 60)
+    print("BẮT ĐẦU TIỀN XỬ LÝ & LÀM SẠCH DỮ LIỆU LIAR")
+    print("=" * 60)
+
+    files = [
+        ("data/liar_train.csv", "data/liar_train_cleaned.csv", "Train"),
+        ("data/liar_test.csv", "data/liar_test_cleaned.csv", "Test"),
+        ("data/liar_valid.csv", "data/liar_valid_cleaned.csv", "Valid"),
+    ]
+
+    for raw_path, clean_path, split_name in files:
+        print(f"[*] Đang xử lý tập {split_name} ({raw_path})...")
+        init, dedup, final = process_file(raw_path, clean_path)
+        print(f"    -> Ban đầu: {init:,} dòng | Sau lọc trùng: {dedup:,} | Sau lọc câu ngắn: {final:,} dòng")
+        print(f"    [v] Đã lưu: {clean_path}")
+
+    print("\n" + "=" * 60)
+    print("🎉 Hoàn tất! Đã lưu toàn bộ 3 file '..._cleaned.csv' vào thư mục data.")
+    print("=" * 60)
+
+if __name__ == "__main__":
+    main()

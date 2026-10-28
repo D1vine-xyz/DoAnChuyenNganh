@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import urllib.request
 import json
 import pandas as pd
@@ -26,22 +27,25 @@ def fetch_text(url: str) -> str:
         return resp.read().decode("utf-8", errors="replace")
 
 def parse_questions(text: str) -> dict:
-    """Trích xuất danh sách câu hỏi đề bài TOEFL từ file questions.txt"""
+    """Trích xuất danh sách câu hỏi đề bài TOEFL từ file questions.txt.
+    Hỗ trợ cả định dạng số thứ tự dạng '1.' hoặc '1)'."""
     questions = {}
     current_id = None
     current_lines = []
 
     for line in text.splitlines():
         line_stripped = line.strip()
-        if line_stripped and line_stripped[0].isdigit():
-            parts = line_stripped.split(".", 1)
-            if parts[0].isdigit() and len(parts) > 1:
-                if current_id is not None:
-                    questions[current_id] = " ".join(current_lines).strip()
-                current_id = int(parts[0])
-                current_lines = [parts[1].strip()]
-                continue
-        if current_id is not None and line_stripped:
+        if not line_stripped:
+            continue
+
+        # Khớp định dạng: 2) Câu hỏi... hoặc 2. Câu hỏi...
+        match = re.match(r"^(\d+)[\.\)]\s*(.*)", line_stripped)
+        if match:
+            if current_id is not None:
+                questions[current_id] = " ".join(current_lines).strip()
+            current_id = int(match.group(1))
+            current_lines = [match.group(2).strip()]
+        elif current_id is not None:
             current_lines.append(line_stripped)
 
     if current_id is not None:
@@ -51,7 +55,11 @@ def parse_questions(text: str) -> dict:
 
 def download_file_content(item):
     name, download_url, source = item
-    essay_id = int(name.replace(".txt", ""))
+    try:
+        essay_id = int(name.replace(".txt", ""))
+    except ValueError:
+        return (None, source, None, f"Tên file không hợp lệ: {name}")
+
     try:
         content = fetch_text(download_url)
         return (essay_id, source, content.strip(), None)

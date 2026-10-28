@@ -1,8 +1,11 @@
 import { pathToFileURL } from 'url';
+import path from 'path';
 
 process.env.NOTEBOOKLM_BROWSER_CHANNEL = "chromium";
 
-const modUrl = pathToFileURL('C:/Users/ACER/AppData/Roaming/npm/node_modules/notebooklm-mcp/dist/auth/auth-manager.js').href;
+const appData = process.env.APPDATA || "C:\\Users\\ACER\\AppData\\Roaming";
+const authManagerPath = path.join(appData, "npm", "node_modules", "notebooklm-mcp", "dist", "auth", "auth-manager.js");
+const modUrl = pathToFileURL(authManagerPath).href;
 const { AuthManager } = await import(modUrl);
 
 const auth = new AuthManager();
