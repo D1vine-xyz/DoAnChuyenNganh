@@ -1,6 +1,6 @@
 # BÁO CÁO TIẾN ĐỘ TUẦN 1 - ĐỒ ÁN CHUYÊN NGÀNH (CHỦ ĐỀ 6)
 **Đề tài:** Nghiên cứu phát hiện văn bản do LLM sinh sử dụng mô hình kết hợp (Ensemble PLMs: BERT, RoBERTa, Longformer)
-**Thời gian thực hiện:** Giai đoạn 1 (Ngày 1 - Ngày 4)
+**Thời gian thực hiện:** Giai đoạn 1 (Ngày 1 - Ngày 5)
 
 ---
 
@@ -55,18 +55,34 @@
   * Cấu trúc chuẩn hóa: `essay_id`, `label` (0: Người, 1: AI), `source`, `word_count`, `prompt_question`, `text`.
 * **Kỹ thuật Prompt Engineering cho tin tức dài GossipCop (`generate_fake_gossipcop.py`):**
   * Thiết kế Prompt chuyên biệt cho văn bản dài dạng báo chí, yêu cầu giữ nguyên sự thật, độ dài và phong cách báo chí chuyên nghiệp, không thêm bớt thông tin.
-  * Sử dụng Gemini 3.5 Flash Lite với cơ chế resume tự động và chống chạm rate limit.
   * Sinh thành công **20/20 bài báo dài đối sánh song song Người - AI** (Số từ trung bình: Người 479.6 từ, AI 309.8 từ), lưu tại: `data/gossipcop_paired_sample.csv`.
 
 ---
 
-## 2. BẢNG MẪU KẾT QUẢ ĐỐI SÁNH TIN DÀI GOSSIPCOP (Trích từ `gossipcop_paired_sample.csv`)
+### Ngày 5 (29/10/2026): Gắn nhãn Phân loại nhị phân & Hợp nhất tập dữ liệu Huấn luyện hoàn chỉnh
+* **Kịch bản Hợp nhất & Gắn nhãn (`merge_datasets.py`):**
+  * Xây dựng module tự động đọc và gộp dữ liệu từ tất cả các nguồn (GossipCop tin dài, LIAR tin ngắn, các mẫu sinh bởi Gemini).
+  * Gắn nhãn nhị phân chuẩn xác: `label = 0` (Văn bản con người viết) và `label = 1` (Văn bản do AI sinh ra).
+  * Lọc trùng lặp văn bản và tiến hành trộn ngẫu nhiên (*shuffle*) với `random_state=42` để bảo đảm tính khách quan và khả năng tái lập cho mô hình học sâu.
+* **Bộ dữ liệu Huấn luyện hoàn chỉnh (`data/final_train_dataset.csv`):**
+  * **Tổng số mẫu:** **19,148 mẫu** (0 giá trị Null).
+  * **Phân bố nhãn:**
+    * 👤 Nhãn 0 (Người thật viết - Human): **10,938 mẫu** (57.1%).
+    * 🤖 Nhãn 1 (Mô hình AI sinh - Machine): **8,210 mẫu** (42.9%).
+  * **Phân bố theo thể loại:** Tin tức dài (`long_news`): 19,108 bài; Phát biểu ngắn (`short_statement`): 40 câu.
+  * **Độ dài từ trung bình:** Văn bản người 515.4 từ; Văn bản AI 301.6 từ.
 
-| Tiêu đề bài báo | Bản gốc Người viết (Human - Label 0) | Bản sinh do AI Paraphrase (Machine - Label 1) |
-| :--- | :--- | :--- |
-| **Kim & Kanye Install At-Home Panic Room After Paris Robbery** | *kim kardashian and kanye west are pulling out all the stops to keep their family safe after the reality stars shocking paris robbery...* (95 từ) | *Media figures Kim Kardashian and Kanye West are deploying extraordinary security measures to safeguard their household following the harrowing robbery in Paris...* (112 từ) |
-| **£1.4million spent renovating Prince Harry and Meghan's rumoured home** | *prince harry and meghan currently live at kensington palaces nottingham cottage but should they choose to move to apartments 8 and 9...* (405 từ) | *Prince Harry and Meghan Markle presently reside at Kensington Palace's Nottingham Cottage; however, substantial taxpayer-funded renovations totaling £1.4 million...* (313 từ) |
-| **Why Princess Charlotte Never Wears Pants** | *princess charlotte may be a modern royal but that doesnt mean she and her family dont adhere to a few longstanding traditions...* (163 từ) | *While Princess Charlotte represents a modern era for the British monarchy, her family continues to uphold several enduring customs...* (152 từ) |
+---
+
+## 2. BẢNG MẪU KẾT QUẢ ĐỐI SÁNH TRÍCH TỪ TẬP HUẤN LUYỆN (Trích `final_train_dataset.csv`)
+
+| Thể loại | Nhãn | Nguồn | Văn bản mẫu (Trích xuất) |
+| :--- | :---: | :---: | :--- |
+| `long_news` | **0** (Người) | GossipCop Human | *prince harry and meghan markle are taking their relationship to the next level by spending the holidays together in london...* |
+| `long_news` | **1** (AI) | GossipCop Machine | *prince harry and meghan markle celebrate their first christmas together as a couple with a festive celebration at kensington palace...* |
+| `long_news` | **1** (AI) | Gemini Paraphrase | *Media figures Kim Kardashian and Kanye West are deploying extraordinary security measures to safeguard their household following the harrowing robbery in Paris...* |
+| `short_statement` | **0** (Người) | LIAR Human | *says the annies list political group supports thirdtrimester abortions on demand.* |
+| `short_statement` | **1** (AI) | Gemini Paraphrase | *States that the political group Annie's List supports third-trimester abortions on demand.* |
 
 ---
 
@@ -74,14 +90,15 @@
 
 | Tên file dữ liệu | Số dòng / bài | Số cột | Mô tả dữ liệu | Trạng thái |
 | :--- | :---: | :---: | :--- | :---: |
-| [`data/liar_train_cleaned.csv`](file:///c:/DoAn/data/liar_train_cleaned.csv) | 10,198 | 15 | Phát biểu ngắn người viết (Tập Train) | Đã làm sạch |
-| [`data/liar_test_cleaned.csv`](file:///c:/DoAn/data/liar_test_cleaned.csv) | 1,260 | 15 | Phát biểu ngắn người viết (Tập Test) | Đã làm sạch |
-| [`data/liar_valid_cleaned.csv`](file:///c:/DoAn/data/liar_valid_cleaned.csv) | 1,282 | 15 | Phát biểu ngắn người viết (Tập Validation) | Đã làm sạch |
-| [`data/gossipcop_cleaned.csv`](file:///c:/DoAn/data/gossipcop_cleaned.csv) | 19,088 | 8 | Bài báo dài (10,918 Người + 8,170 Máy) | Đầy đủ nhãn |
-| [`data/toefl/toefl_essays.csv`](file:///c:/DoAn/data/toefl/toefl_essays.csv) | 252 | 6 | Bài luận TOEFL kiểm thử miền mới (126 Người + 126 AI) | Đầy đủ đề bài |
-| [`data/toefl_dataset.csv`](file:///c:/DoAn/data/toefl_dataset.csv) | 252 | 6 | Bảng gom dữ liệu TOEFL chuẩn hóa Ngày 4 | Đã hoàn tất |
-| [`data/liar_train_paired_sample.csv`](file:///c:/DoAn/data/liar_train_paired_sample.csv) | 20 | 6 | Cặp tin ngắn đối sánh Người vs AI (Gemini sinh) | Đã hoàn tất |
-| [`data/gossipcop_paired_sample.csv`](file:///c:/DoAn/data/gossipcop_paired_sample.csv) | 20 | 10 | Cặp tin dài đối sánh Người vs AI (Gemini sinh) | Đã hoàn tất |
+| [`data/final_train_dataset.csv`](file:///c:/DoAn/data/final_train_dataset.csv) | **19,148** | **6** | **Tập dữ liệu huấn luyện tổng hợp hoàn chỉnh (Người & Máy)** | **Đã hoàn tất (Ngày 5)** |
+| [`data/toefl_dataset.csv`](file:///c:/DoAn/data/toefl_dataset.csv) | **252** | **6** | **Tập kiểm thử độc lập miền mới (Unseen Domain: 126 Người + 126 AI)** | **Đã hoàn tất (Ngày 4)** |
+| [`data/gossipcop_cleaned.csv`](file:///c:/DoAn/data/gossipcop_cleaned.csv) | 19,088 | 8 | Bài báo dài đã làm sạch (10,918 Người + 8,170 Máy) | Đầy đủ nhãn |
+| [`data/gossipcop_paired_sample.csv`](file:///c:/DoAn/data/gossipcop_paired_sample.csv) | 20 | 10 | Cặp tin dài đối sánh Người vs AI (Gemini sinh Ngày 4) | Đã hoàn tất |
+| [`data/liar_train_cleaned.csv`](file:///c:/DoAn/data/liar_train_cleaned.csv) | 10,198 | 15 | Phát biểu ngắn người viết (Tập Train gốc LIAR) | Đã làm sạch |
+| [`data/liar_test_cleaned.csv`](file:///c:/DoAn/data/liar_test_cleaned.csv) | 1,260 | 15 | Phát biểu ngắn người viết (Tập Test gốc LIAR) | Đã làm sạch |
+| [`data/liar_valid_cleaned.csv`](file:///c:/DoAn/data/liar_valid_cleaned.csv) | 1,282 | 15 | Phát biểu ngắn người viết (Tập Validation gốc LIAR) | Đã làm sạch |
+| [`data/liar_train_paired_sample.csv`](file:///c:/DoAn/data/liar_train_paired_sample.csv) | 20 | 6 | Cặp tin ngắn đối sánh Người vs AI (Gemini sinh Ngày 3) | Đã hoàn tất |
+| [`data/toefl/toefl_essays.csv`](file:///c:/DoAn/data/toefl/toefl_essays.csv) | 252 | 6 | Bài luận TOEFL kèm câu hỏi đề bài và thống kê từ | Đã hoàn tất |
 
 ---
 
@@ -92,7 +109,6 @@
 ---
 
 ## 5. DỰ KIẾN KẾ HOẠCH CÁC NGÀY TIẾP THEO
-* **Ngày 5:** Chuẩn bị và làm giàu tập dữ liệu kiểm thử đa miền (Cross-domain evaluation).
-* **Ngày 6:** Gắn nhãn thống nhất (Labeling) và gộp toàn bộ dữ liệu thành dataset đồng nhất.
-* **Ngày 7:** Tokenize bằng thư viện Transformers (Hugging Face) và chia tập Train/Valid/Test (70% - 15% - 15%).
-* **Ngày 8 trở đi:** Bắt đầu nạp mô hình PLM đầu tiên (`bert-base-uncased`) với hàm mất mát Binary Cross-Entropy (BCE Loss).
+* **Ngày 6 (30/10/2026):** Tokenize dữ liệu bằng Hugging Face Tokenizers và chia tập Train/Valid/Test chuẩn (70% - 15% - 15%).
+* **Ngày 7 (31/10/2026):** Thiết lập DataLoader, Padding/Truncation và kiểm tra phân phối độ dài token cho cả 3 mô hình (BERT, RoBERTa, Longformer).
+* **Ngày 8 trở đi (01/11/2026):** Bước vào Giai đoạn 2: Nạp mô hình PLM đầu tiên (`bert-base-uncased`), cấu hình hàm mất mát Binary Cross-Entropy (BCE Loss) và bắt đầu huấn luyện.
