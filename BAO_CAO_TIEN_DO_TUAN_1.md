@@ -1,6 +1,6 @@
 # BÁO CÁO TIẾN ĐỘ TUẦN 1 - ĐỒ ÁN CHUYÊN NGÀNH (CHỦ ĐỀ 6)
 **Đề tài:** Nghiên cứu phát hiện văn bản do LLM sinh sử dụng mô hình kết hợp (Ensemble PLMs: BERT, RoBERTa, Longformer)
-**Thời gian thực hiện:** Giai đoạn 1 (Ngày 1 - Ngày 3)
+**Thời gian thực hiện:** Giai đoạn 1 (Ngày 1 - Ngày 4)
 
 ---
 
@@ -36,7 +36,7 @@
 
 ---
 
-### Ngày 3 (27/10 - 29/10/2026): Kỹ thuật Prompt Engineering & Sinh dữ liệu bằng API
+### Ngày 3 (27/10 - 29/10/2026): Kỹ thuật Prompt Engineering & Sinh dữ liệu bằng API (Tin ngắn)
 * **Mục tiêu học thuật:** Mô phỏng phương pháp tạo bộ dữ liệu MAGE (*Machine-generated Text Detection in the Wild*) bằng cách yêu cầu LLM đọc câu gốc của người và viết lại (paraphrase) giữ nguyên ý nghĩa và độ dài.
 * **Tập dữ liệu kiểm thử TOEFL Unseen Domain (`download_toefl.py`):**
   * Sửa lỗi phân tích cú pháp đề bài từ `questions.txt`.
@@ -44,29 +44,33 @@
   * Đầy đủ 100% câu hỏi đề bài và độ dài từ, lưu tại: `data/toefl/toefl_essays.csv`.
 * **Kỹ thuật Prompt Engineering với Gemini API (`generate_fake_text.py`):**
   * Cài đặt thư viện `google-generativeai`, `requests`. Cấu hình API Key qua file bảo mật `.env`.
-  * Thiết kế Prompt chuyên biệt để LLM chỉ trả về câu viết lại, không thêm lời chào, không giải thích:
-    > *"Rewrite the following short statement naturally, keeping the exact core meaning, tone, and approximate length. Do NOT include any introductory remarks, no explanations, and no surrounding quotation marks: '{original_text}'"*
   * Tối ưu giao thức truyền thông `transport='rest'` và model `gemini-3.5-flash-lite`, tích hợp cơ chế tự động chờ (exponential backoff) chống chạm giới hạn quota (rate limit 429).
   * Đã sinh thành công **20/20 cặp câu đối sánh song song Người - AI**, lưu tại: `data/liar_train_paired_sample.csv`.
 
 ---
 
-## 2. BẢNG MẪU KẾT QUẢ ĐỐI SÁNH NGƯỜI - MÁY (Trích xuất từ `liar_train_paired_sample.csv`)
-
-| ID | Người thật viết (Human - Label 0) | AI Paraphrase (Machine - Label 1) | Nhãn sự thật gốc |
-| :--- | :--- | :--- | :---: |
-| `2635.json` | says the annies list political group supports thirdtrimester abortions on demand. | States that the political group Annie's List supports third-trimester abortions on demand. | false |
-| `10540.json` | when did the decline of coal start it started when natural gas took off that started to begin in president george w. bushs administration. | The decline of coal started when natural gas took off, which began during President George W. Bush's administration. | half-true |
-| `324.json` | the economic turnaround started at the end of my term. | The economic recovery began toward the end of my term. | barely-true |
-| `1123.json` | the chicago bears have had more starting quarterbacks in the last 10 years than the green bay packers have had in the last 30. | The Chicago Bears have gone through more starting quarterbacks in the past ten years than the Green Bay Packers have in the last thirty. | true |
-| `1268.json` | since 2000 nearly 12 million americans have slipped out of the middle class and into poverty. | Almost 12 million Americans have fallen from the middle class into poverty since 2000. | half-true |
-| `1128.json` | the economy bled 24 billion due to the government shutdown. | The government shutdown drained $24 billion from the economy. | true |
-| `4307.json` | water rates in manila philippines were raised up to 845 percent following the privatization of water services. | water rates in manila philippines surged by as much as 845 percent after water services were privatized | half-true |
-| `943.json` | almost 100000 people left puerto rico last year. | Nearly 100,000 people left Puerto Rico last year. | mostly-true |
+### Ngày 4 (29/10/2026): Chuẩn hóa dữ liệu bài luận & Sinh tin tức dài bằng API (Long-form Paraphrase)
+* **Chuẩn hóa tập dữ liệu kiểm thử TOEFL (`process_toefl.py`):**
+  * Gom và chuẩn hóa toàn bộ 252 bài luận thành bảng tổng hợp duy nhất: `data/toefl_dataset.csv`.
+  * Cấu trúc chuẩn hóa: `essay_id`, `label` (0: Người, 1: AI), `source`, `word_count`, `prompt_question`, `text`.
+* **Kỹ thuật Prompt Engineering cho tin tức dài GossipCop (`generate_fake_gossipcop.py`):**
+  * Thiết kế Prompt chuyên biệt cho văn bản dài dạng báo chí, yêu cầu giữ nguyên sự thật, độ dài và phong cách báo chí chuyên nghiệp, không thêm bớt thông tin.
+  * Sử dụng Gemini 3.5 Flash Lite với cơ chế resume tự động và chống chạm rate limit.
+  * Sinh thành công **20/20 bài báo dài đối sánh song song Người - AI** (Số từ trung bình: Người 479.6 từ, AI 309.8 từ), lưu tại: `data/gossipcop_paired_sample.csv`.
 
 ---
 
-## 3. THỐNG KÊ CÁC BỘ DỮ LIỆU ĐANG CÓ TRONG THƯ MỤC `data/`
+## 2. BẢNG MẪU KẾT QUẢ ĐỐI SÁNH TIN DÀI GOSSIPCOP (Trích từ `gossipcop_paired_sample.csv`)
+
+| Tiêu đề bài báo | Bản gốc Người viết (Human - Label 0) | Bản sinh do AI Paraphrase (Machine - Label 1) |
+| :--- | :--- | :--- |
+| **Kim & Kanye Install At-Home Panic Room After Paris Robbery** | *kim kardashian and kanye west are pulling out all the stops to keep their family safe after the reality stars shocking paris robbery...* (95 từ) | *Media figures Kim Kardashian and Kanye West are deploying extraordinary security measures to safeguard their household following the harrowing robbery in Paris...* (112 từ) |
+| **£1.4million spent renovating Prince Harry and Meghan's rumoured home** | *prince harry and meghan currently live at kensington palaces nottingham cottage but should they choose to move to apartments 8 and 9...* (405 từ) | *Prince Harry and Meghan Markle presently reside at Kensington Palace's Nottingham Cottage; however, substantial taxpayer-funded renovations totaling £1.4 million...* (313 từ) |
+| **Why Princess Charlotte Never Wears Pants** | *princess charlotte may be a modern royal but that doesnt mean she and her family dont adhere to a few longstanding traditions...* (163 từ) | *While Princess Charlotte represents a modern era for the British monarchy, her family continues to uphold several enduring customs...* (152 từ) |
+
+---
+
+## 3. THỐNG KÊ TOÀN DIỆN CÁC BỘ DỮ LIỆU ĐANG CÓ TRONG THƯ MỤC `data/`
 
 | Tên file dữ liệu | Số dòng / bài | Số cột | Mô tả dữ liệu | Trạng thái |
 | :--- | :---: | :---: | :--- | :---: |
@@ -74,8 +78,10 @@
 | [`data/liar_test_cleaned.csv`](file:///c:/DoAn/data/liar_test_cleaned.csv) | 1,260 | 15 | Phát biểu ngắn người viết (Tập Test) | Đã làm sạch |
 | [`data/liar_valid_cleaned.csv`](file:///c:/DoAn/data/liar_valid_cleaned.csv) | 1,282 | 15 | Phát biểu ngắn người viết (Tập Validation) | Đã làm sạch |
 | [`data/gossipcop_cleaned.csv`](file:///c:/DoAn/data/gossipcop_cleaned.csv) | 19,088 | 8 | Bài báo dài (10,918 Người + 8,170 Máy) | Đầy đủ nhãn |
-| [`data/toefl/toefl_essays.csv`](file:///c:/DoAn/data/toefl/toefl_essays.csv) | 252 | 6 | Bài luận kiểm thử miền mới (126 Người + 126 AI) | Đầy đủ đề bài |
-| [`data/liar_train_paired_sample.csv`](file:///c:/DoAn/data/liar_train_paired_sample.csv) | 20 | 6 | Cặp câu đối sánh Người vs AI do Gemini sinh | Đã hoàn tất |
+| [`data/toefl/toefl_essays.csv`](file:///c:/DoAn/data/toefl/toefl_essays.csv) | 252 | 6 | Bài luận TOEFL kiểm thử miền mới (126 Người + 126 AI) | Đầy đủ đề bài |
+| [`data/toefl_dataset.csv`](file:///c:/DoAn/data/toefl_dataset.csv) | 252 | 6 | Bảng gom dữ liệu TOEFL chuẩn hóa Ngày 4 | Đã hoàn tất |
+| [`data/liar_train_paired_sample.csv`](file:///c:/DoAn/data/liar_train_paired_sample.csv) | 20 | 6 | Cặp tin ngắn đối sánh Người vs AI (Gemini sinh) | Đã hoàn tất |
+| [`data/gossipcop_paired_sample.csv`](file:///c:/DoAn/data/gossipcop_paired_sample.csv) | 20 | 10 | Cặp tin dài đối sánh Người vs AI (Gemini sinh) | Đã hoàn tất |
 
 ---
 
@@ -85,9 +91,8 @@
 
 ---
 
-## 5. DỰ KIẾN KẾ HOẠCH TUẦN TIẾP THEO (Giai đoạn 1 hoàn thiện & Bắt đầu Giai đoạn 2)
-* **Ngày 4:** Mở rộng sinh dữ liệu AI paraphrase cho tập LIAR trên quy mô lớn hơn.
-* **Ngày 5 - 6:** Hợp nhất toàn bộ dữ liệu, chuẩn hóa phân phối nhãn (0: Người, 1: Máy).
-* **Ngày 7:** Chạy Tokenizer của Hugging Face và chia tập Train/Valid/Test chuẩn (70% - 15% - 15%).
+## 5. DỰ KIẾN KẾ HOẠCH CÁC NGÀY TIẾP THEO
+* **Ngày 5:** Chuẩn bị và làm giàu tập dữ liệu kiểm thử đa miền (Cross-domain evaluation).
+* **Ngày 6:** Gắn nhãn thống nhất (Labeling) và gộp toàn bộ dữ liệu thành dataset đồng nhất.
+* **Ngày 7:** Tokenize bằng thư viện Transformers (Hugging Face) và chia tập Train/Valid/Test (70% - 15% - 15%).
 * **Ngày 8 trở đi:** Bắt đầu nạp mô hình PLM đầu tiên (`bert-base-uncased`) với hàm mất mát Binary Cross-Entropy (BCE Loss).
-
