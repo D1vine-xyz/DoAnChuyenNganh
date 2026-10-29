@@ -12,3 +12,4 @@ requests>=2.34.0
 
 # AI APIs & LLM Generation
 google-generativeai>=0.8.6
+python-dotenv>=1.0.0
