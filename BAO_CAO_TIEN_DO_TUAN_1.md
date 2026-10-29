@@ -74,6 +74,28 @@
 
 ---
 
+### Ngày 6 (30/10/2026): Phân chia tập dữ liệu chuẩn (Train/Val/Test Split) & Khảo sát Tokenization cho Ensemble Backbones
+* **Phân chia dữ liệu phân tầng chống rò rỉ (`split_data.py`):**
+  * Sử dụng kỹ thuật **Stratified Split** kết hợp 2 chiều: `label` (0/1) và `text_type` (`long_news`/`short_statement`), bảo đảm tính đại diện của mọi nhóm mẫu.
+  * Tỷ lệ phân chia chuẩn khoa học: **70% Train** - **15% Validation** - **15% Test (In-domain)**. Cố định `random_state=42`.
+  * **Kiểm định rò rỉ dữ liệu (No Data Leakage):** Xác thực giao thoa tập hợp văn bản:
+    $$\text{Train} \cap \text{Val} = \emptyset, \quad \text{Train} \cap \text{Test} = \emptyset, \quad \text{Val} \cap \text{Test} = \emptyset$$
+  * **Kết quả phân chia:**
+    * **Train set:** **13,403 mẫu** (Người: 7,656 - 57.1%, AI: 5,747 - 42.9%) lưu tại [`data/train.csv`](file:///c:/DoAn/data/train.csv).
+    * **Validation set:** **2,872 mẫu** (Người: 1,641 - 57.1%, AI: 1,231 - 42.9%) lưu tại [`data/val.csv`](file:///c:/DoAn/data/val.csv).
+    * **Test set (In-domain):** **2,873 mẫu** (Người: 1,641 - 57.1%, AI: 1,232 - 42.9%) lưu tại [`data/test.csv`](file:///c:/DoAn/data/test.csv).
+    * **Test set (Unseen Domain):** **252 bài luận** giữ độc lập tại [`data/toefl_dataset.csv`](file:///c:/DoAn/data/toefl_dataset.csv).
+* **Khảo sát Tokenization cho 3 mô hình nền tảng (`explore_tokenizers.py`):**
+  * Tải và nạp thành công 3 bộ Hugging Face Fast Tokenizers: `bert-base-uncased` (WordPiece, vocab 30,522), `roberta-base` (BPE, vocab 50,265), `allenai/longformer-base-4096` (BPE, vocab 50,265).
+  * Chạy tính toán phân phối độ dài token trên toàn bộ 13,403 mẫu huấn luyện:
+    * **BERT:** Độ dài trung bình **500.3 tokens**, trung vị **353 tokens**, 75.1% văn bản nằm gọn dưới ngưỡng 512 tokens.
+    * **RoBERTa:** Độ dài trung bình **519.5 tokens**, trung vị **365 tokens**, 73.0% văn bản nằm gọn dưới ngưỡng 512 tokens.
+    * **Longformer:** Với khả năng hỗ trợ tới 4,096 tokens, tại ngưỡng 1,024 tokens bao phủ **92.2%** và tại ngưỡng 2,048 tokens bao phủ **97.6%** dữ liệu trọn vẹn.
+  * **Luận cứ khoa học quan trọng:** Xác nhận thực nghiệm rằng khoảng 25% - 27% bài báo vượt quá giới hạn 512 tokens của BERT/RoBERTa. Việc tích hợp **Longformer** vào kiến trúc Ensemble là hoàn toàn cần thiết để nắm bắt ngữ cảnh toàn bài mà không bị mất mát thông tin do truncation.
+  * Toàn bộ báo cáo số liệu chi tiết được lưu tại [`data/token_length_stats.json`](file:///c:/DoAn/data/token_length_stats.json).
+
+---
+
 ## 2. BẢNG MẪU KẾT QUẢ ĐỐI SÁNH TRÍCH TỪ TẬP HUẤN LUYỆN (Trích `final_train_dataset.csv`)
 
 | Thể loại | Nhãn | Nguồn | Văn bản mẫu (Trích xuất) |
@@ -90,8 +112,12 @@
 
 | Tên file dữ liệu | Số dòng / bài | Số cột | Mô tả dữ liệu | Trạng thái |
 | :--- | :---: | :---: | :--- | :---: |
-| [`data/final_train_dataset.csv`](file:///c:/DoAn/data/final_train_dataset.csv) | **19,148** | **6** | **Tập dữ liệu huấn luyện tổng hợp hoàn chỉnh (Người & Máy)** | **Đã hoàn tất (Ngày 5)** |
+| [`data/train.csv`](file:///c:/DoAn/data/train.csv) | **13,403** | **6** | **Tập dữ liệu huấn luyện chính thức (70% - Stratified)** | **Đã hoàn tất (Ngày 6)** |
+| [`data/val.csv`](file:///c:/DoAn/data/val.csv) | **2,872** | **6** | **Tập kiểm tra chọn lọc mô hình / Early Stopping (15%)** | **Đã hoàn tất (Ngày 6)** |
+| [`data/test.csv`](file:///c:/DoAn/data/test.csv) | **2,873** | **6** | **Tập kiểm thử nội miền In-domain (15%)** | **Đã hoàn tất (Ngày 6)** |
 | [`data/toefl_dataset.csv`](file:///c:/DoAn/data/toefl_dataset.csv) | **252** | **6** | **Tập kiểm thử độc lập miền mới (Unseen Domain: 126 Người + 126 AI)** | **Đã hoàn tất (Ngày 4)** |
+| [`data/token_length_stats.json`](file:///c:/DoAn/data/token_length_stats.json) | File JSON | - | Báo cáo chi tiết phân phối token BERT, RoBERTa, Longformer | **Đã hoàn tất (Ngày 6)** |
+| [`data/final_train_dataset.csv`](file:///c:/DoAn/data/final_train_dataset.csv) | 19,148 | 6 | Tập dữ liệu huấn luyện tổng hợp hoàn chỉnh (Gốc) | Đã hoàn tất (Ngày 5) |
 | [`data/gossipcop_cleaned.csv`](file:///c:/DoAn/data/gossipcop_cleaned.csv) | 19,088 | 8 | Bài báo dài đã làm sạch (10,918 Người + 8,170 Máy) | Đầy đủ nhãn |
 | [`data/gossipcop_paired_sample.csv`](file:///c:/DoAn/data/gossipcop_paired_sample.csv) | 20 | 10 | Cặp tin dài đối sánh Người vs AI (Gemini sinh Ngày 4) | Đã hoàn tất |
 | [`data/liar_train_cleaned.csv`](file:///c:/DoAn/data/liar_train_cleaned.csv) | 10,198 | 15 | Phát biểu ngắn người viết (Tập Train gốc LIAR) | Đã làm sạch |
@@ -109,6 +135,5 @@
 ---
 
 ## 5. DỰ KIẾN KẾ HOẠCH CÁC NGÀY TIẾP THEO
-* **Ngày 6 (30/10/2026):** Tokenize dữ liệu bằng Hugging Face Tokenizers và chia tập Train/Valid/Test chuẩn (70% - 15% - 15%).
-* **Ngày 7 (31/10/2026):** Thiết lập DataLoader, Padding/Truncation và kiểm tra phân phối độ dài token cho cả 3 mô hình (BERT, RoBERTa, Longformer).
-* **Ngày 8 trở đi (01/11/2026):** Bước vào Giai đoạn 2: Nạp mô hình PLM đầu tiên (`bert-base-uncased`), cấu hình hàm mất mát Binary Cross-Entropy (BCE Loss) và bắt đầu huấn luyện.
+* **Ngày 7 (31/10/2026):** Xây dựng PyTorch `Dataset` & `DataLoader` tùy chỉnh cho 3 mô hình, tối ưu hóa cơ chế Dynamic Padding / Truncation và cấu hình huấn luyện batch chuẩn bị cho Tuần 2.
+* **Ngày 8 trở đi (01/11/2026):** Bước vào Giai đoạn 2: Nạp mô hình PLM đầu tiên (`bert-base-uncased`), cấu hình hàm mất mát Binary Cross-Entropy (BCE Loss) và bắt đầu quá trình huấn luyện thực nghiệm (Fine-tuning).

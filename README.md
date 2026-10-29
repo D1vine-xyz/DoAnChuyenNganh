@@ -9,8 +9,12 @@
 ```text
 DoAnChuyenNganh/
 ├── data/
-│   ├── final_train_dataset.csv       # Tập dữ liệu huấn luyện hoàn chỉnh (19,148 mẫu)
+│   ├── train.csv                     # Tập huấn luyện chính thức 70% (13,403 mẫu)
+│   ├── val.csv                       # Tập kiểm tra lựa chọn mô hình 15% (2,872 mẫu)
+│   ├── test.csv                      # Tập kiểm thử nội miền 15% (2,873 mẫu)
 │   ├── toefl_dataset.csv             # Tập kiểm thử miền mới Unseen Domain (252 bài luận)
+│   ├── token_length_stats.json       # Báo cáo thống kê độ dài token (BERT, RoBERTa, Longformer)
+│   ├── final_train_dataset.csv       # Tập dữ liệu tổng hợp hoàn chỉnh (19,148 mẫu)
 │   ├── gossipcop_cleaned.csv         # Dữ liệu tin tức dài GossipCop đã làm sạch
 │   ├── gossipcop_paired_sample.csv   # Mẫu 20 bài báo đối sánh Người vs AI (Gemini)
 │   ├── liar_train_cleaned.csv        # Dữ liệu phát biểu ngắn LIAR (Train sạch)
@@ -27,13 +31,15 @@ DoAnChuyenNganh/
 ├── generate_fake_text.py              # Sinh văn bản ngắn AI paraphrase qua Gemini API
 ├── generate_fake_gossipcop.py         # Sinh văn bản tin dài AI paraphrase qua Gemini API
 ├── merge_datasets.py                  # Hợp nhất toàn bộ dữ liệu & gán nhãn nhị phân (0/1)
+├── split_data.py                      # Phân chia dữ liệu phân tầng (Train 70% - Val 15% - Test 15%)
+├── explore_tokenizers.py              # Khảo sát phân phối token BERT, RoBERTa, Longformer
 │
 ├── auth_setup.mjs                     # Cấu hình đăng nhập cho MCP NotebookLM
 ├── save_state.mjs                     # Lưu trữ phiên làm việc và cookies NotebookLM
 ├── query_notebooklm.mjs               # Truy vấn tài liệu trực tiếp từ NotebookLM
 ├── dang_nhap_notebooklm.bat           # Script khởi động đăng nhập nhanh NotebookLM
 │
-├── BAO_CAO_TIEN_DO_TUAN_1.md          # Báo cáo tiến độ chi tiết từ Ngày 1 đến Ngày 5
+├── BAO_CAO_TIEN_DO_TUAN_1.md          # Báo cáo tiến độ chi tiết từ Ngày 1 đến Ngày 6
 ├── requirements.txt                   # Danh mục thư viện Python yêu cầu
 ├── .env.example                       # Mẫu cấu hình biến môi trường
 └── README.md                          # Giới thiệu & Hướng dẫn sử dụng
@@ -81,6 +87,12 @@ python process_toefl.py
 
 # 4. Hợp nhất thành tập dữ liệu huấn luyện hoàn chỉnh
 python merge_datasets.py
+
+# 5. Phân chia tập Train (70%), Val (15%), Test (15%) phân tầng
+python split_data.py
+
+# 6. Khảo sát Tokenization cho BERT, RoBERTa, Longformer
+python explore_tokenizers.py
 ```
 
 ---
@@ -89,14 +101,16 @@ python merge_datasets.py
 
 | Bộ dữ liệu | Số lượng mẫu | Phân bố nhãn | Mục đích sử dụng |
 | :--- | :---: | :---: | :--- |
-| **`final_train_dataset.csv`** | **19,148** | Người: 10,938 (57.1%)<br>Máy: 8,210 (42.9%) | Huấn luyện và đánh giá chéo mô hình Ensemble PLMs |
+| **`train.csv`** | **13,403** | Người: 7,656 (57.1%)<br>Máy: 5,747 (42.9%) | Huấn luyện và fine-tune các PLMs (BERT, RoBERTa, Longformer) |
+| **`val.csv`** | **2,872** | Người: 1,641 (57.1%)<br>Máy: 1,231 (42.9%) | Lựa chọn checkpoint tối ưu, Early Stopping, tìm ngưỡng threshold |
+| **`test.csv`** | **2,873** | Người: 1,641 (57.1%)<br>Máy: 1,232 (42.9%) | Đánh giá hiệu năng nội miền (In-domain Test) |
 | **`toefl_dataset.csv`** | **252** | Người: 126 (50.0%)<br>ChatGPT: 126 (50.0%) | Đánh giá khả năng tổng quát hóa trên miền mới (Unseen Domain) |
 
 ---
 
 ## 📈 Lộ trình triển khai 40 ngày
 
-* **Tuần 1 (Ngày 1 - 7):** Thu thập, tiền xử lý, sinh dữ liệu Prompt Engineering, gán nhãn nhị phân và chia tập Train/Valid/Test.
+* **Tuần 1 (Ngày 1 - 7):** Thu thập, tiền xử lý, sinh dữ liệu Prompt Engineering, gán nhãn nhị phân, chia tập Train/Valid/Test và khảo sát Tokenizer.
 * **Tuần 2 - 3 (Ngày 8 - 21):** Fine-tune các mô hình nền tảng (BERT, RoBERTa, Longformer) với hàm mất mát BCE Loss và xây dựng kiến trúc Ensemble.
 * **Tuần 4 (Ngày 22 - 28):** Đánh giá toàn diện trên các thang đo (Accuracy, F1-Score, AUC-ROC) và kiểm thử miền mới với TOEFL.
 * **Tuần 5 - 6 (Ngày 29 - 40):** Triển khai Backend API bằng FastAPI và xây dựng tiện ích trình duyệt (Chrome Extension).
