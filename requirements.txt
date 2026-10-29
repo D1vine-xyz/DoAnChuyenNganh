@@ -1,0 +1,14 @@
+# Core Deep Learning & NLP
+torch>=2.14.0
+transformers>=5.20.0
+datasets>=5.1.0
+scikit-learn>=1.9.0
+
+# Data Processing & Utilities
+pandas>=3.1.0
+numpy>=2.5.0
+tqdm>=4.70.0
+requests>=2.34.0
+
+# AI APIs & LLM Generation
+google-generativeai>=0.8.6
