@@ -1,7 +1,6 @@
 import { pathToFileURL } from "url";
 import path from "path";
 import fs from "fs/promises";
-import { existsSync } from "fs";
 
 const appData = process.env.APPDATA || "C:\\Users\\ACER\\AppData\\Roaming";
 const localAppData = process.env.LOCALAPPDATA || "C:\\Users\\ACER\\AppData\\Local";
@@ -21,7 +20,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 console.log("====================================================");
 console.log("  NOTEBOOKLM MCP - SMART LOGIN & STATE SAVER");
 console.log("====================================================");
-console.log("Dang khoi dong trinh duyet voi ho so hien tai...");
+console.log("Dang khoi dong trinh duyet...");
 
 try {
   await fs.mkdir(browserStateDir, { recursive: true });
@@ -41,33 +40,39 @@ try {
   const pages = context.pages();
   const page = pages.length > 0 ? pages[0] : await context.newPage();
 
-  console.log("Dang mo trang dang nhap NotebookLM...");
-  const loginUrl = "https://notebook.google.com/login?continue=https://notebooklm.google.com/notebook/dc714098-32b3-4287-8ccb-6ec5f242adad";
-  await page.goto(loginUrl, { timeout: 60000 });
+  console.log("Dang mo trang NotebookLM...");
+  const loginUrl = "https://notebooklm.google.com/notebook/dc714098-32b3-4287-8ccb-6ec5f242adad";
+  await page.goto(loginUrl, { timeout: 60000 }).catch(() => {});
 
   console.log("====================================================");
   console.log("👉 VUI LONG DANG NHAP GOOGLE TREN CUA SO TRINH DUYET");
-  console.log("👉 Khi da vao NotebookLM, ban co the:");
-  console.log("   1. BAM NUT XANH LA 'BAM VAO DAY DE LUU' o giua tren cung trinh duyet");
-  console.log("   2. HOAC GO PHIM ENTER TAI TERMINAL NAY DE LUU NGAY");
+  console.log("👉 Khi dang nhap thanh cong, trinh duyet se TU DONG LUU VA DONG!");
+  console.log("   (Hoac ban co the go ENTER tai day bat cu luc nao de luu)");
   console.log("====================================================");
 
-  const maxAttempts = 300; // 5 minutes
-  let saved = false;
   let forceSave = false;
-
   try {
     process.stdin.resume();
     process.stdin.on("data", () => {
-      console.log("\n⚡ Nhan tin hieu ENTER! Dang luu phien ngay lap tuc...");
+      console.log("\n⚡ Nhan tin hieu ENTER! Dang luu phien ngay...");
       forceSave = true;
     });
   } catch (e) {}
 
+  const maxAttempts = 300; // 5 minutes
+  let saved = false;
+
   for (let i = 0; i < maxAttempts; i++) {
     const allPages = context.pages();
     const cookies = await context.cookies().catch(() => []);
-    const hasSid = cookies.some(c => c.name === "SID" || c.name === "__Secure-1PSID" || c.name === "__Secure-OSID");
+    const hasSid = cookies.some(c => 
+      c.name === "SID" || 
+      c.name === "__Secure-1PSID" || 
+      c.name === "__Secure-3PSID" || 
+      c.name === "__Secure-OSID" ||
+      c.name === "HSID" ||
+      c.name === "SSID"
+    );
 
     let activeNotebookPage = null;
     let anyNotebookUrl = "";
@@ -75,7 +80,18 @@ try {
     for (const p of allPages) {
       try {
         const u = p.url();
-        if ((u.includes("notebooklm.google.com") || u.includes("notebook.google.com")) && !u.includes("accounts.google.com") && !u.includes("/trynow")) {
+        const t = (await p.title().catch(() => "")).toLowerCase();
+        const isNb = u.includes("notebooklm.google") || 
+                     u.includes("notebook.google") || 
+                     u.includes("/notebook/") ||
+                     t.includes("notebooklm");
+        const isNotAuth = !u.includes("accounts.google.com") && !u.includes("/trynow");
+
+        if (isNb && isNotAuth) {
+          activeNotebookPage = p;
+          anyNotebookUrl = u;
+          break;
+        } else if (hasSid && isNotAuth && !u.startsWith("chrome://") && !u.startsWith("about:")) {
           activeNotebookPage = p;
           anyNotebookUrl = u;
           break;
@@ -96,7 +112,7 @@ try {
           if (document.getElementById("mcp-save-banner")) return;
           const div = document.createElement("div");
           div.id = "mcp-save-banner";
-          div.innerHTML = "👉 <b>BAM VAO DAY DE LUU PHIEN NOTEBOOKLM</b> 👈";
+          div.innerHTML = "👉 <b>BAM VAO DAY DE LUU PHIEN VA DONG TRINH DUYET</b> 👈";
           div.style.cssText = "position:fixed;top:15px;left:50%;transform:translateX(-50%);z-index:9999999;background:#16a34a;color:#fff;padding:12px 24px;font-size:16px;font-weight:bold;border-radius:30px;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,0.4);border:2px solid #fff;user-select:none;";
           div.onclick = () => {
             div.innerText = "⏳ DANG LUU COOKIES...";
@@ -121,15 +137,15 @@ try {
       } catch (e) {}
     }
 
-    const isNotebookLM = forceSave || clickedBanner || (hasSid && activeNotebookPage !== null) || (activeNotebookPage && activeNotebookPage.url().includes("/notebook/"));
+    const isSuccess = forceSave || clickedBanner || (hasSid && activeNotebookPage !== null);
 
-    if (isNotebookLM) {
+    if (isSuccess) {
       const targetPage = activeNotebookPage || (allPages.length > 0 ? allPages[0] : page);
       const title = await targetPage.title().catch(() => "");
-      console.log(`\n🎉 Da xac thuc thanh cong! (URL: ${anyNotebookUrl || (targetPage ? targetPage.url() : "")}, Title: ${title})`);
-      console.log("Dang luu trang thai xac thuc va cookies...");
+      console.log(`\n🎉 Da phat hien dang nhap thanh cong! (URL: ${anyNotebookUrl || targetPage.url()}, Title: ${title})`);
+      console.log("Dang luu trang thai xac thuc va cookies vao state.json...");
 
-      await sleep(3000);
+      await sleep(2000);
       await context.storageState({ path: stateFilePath });
 
       try {
@@ -144,17 +160,18 @@ try {
           });
           await fs.writeFile(sessionFilePath, sessionStorageData, { encoding: "utf-8" });
         }
-      } catch (err) { }
+      } catch (err) {}
 
       // Update file timestamp
       try {
         const now = new Date();
         await fs.utimes(stateFilePath, now, now);
-      } catch (err) { }
+      } catch (err) {}
 
       console.log("====================================================");
       console.log("✅ LUU THANH CONG: state.json va session.json!");
-      console.log(`Cookies luu duoc: ${cookies.length}`);
+      console.log(`Tong so cookies da luu: ${cookies.length}`);
+      console.log("Trinh duyet se tu dong dong ngay bay gio...");
       console.log("====================================================");
       saved = true;
       break;
@@ -163,17 +180,18 @@ try {
     if (i % 5 === 0 && i > 0) {
       const currentUrl = page ? page.url() : "";
       if (currentUrl.includes("accounts.google.com")) {
-        console.log(`[${i}s] Dang cho ban nhap Email/Password Google... (Hoac bam Enter de luu ngay)`);
+        console.log(`[${i}s] Dang cho dang nhap Google... (URL: accounts.google.com)`);
       } else {
-        console.log(`[${i}s] Dang cho... (URL: ${currentUrl.slice(0, 50)}) (Hoac bam Enter de luu ngay)`);
+        console.log(`[${i}s] Dang cho... (URL: ${currentUrl.slice(0, 50)}) (Cookies: ${cookies.length}, hasSid: ${hasSid})`);
       }
     }
     await sleep(1000);
   }
 
+  await sleep(1500);
   await context.close().catch(() => {});
   if (saved) {
-    console.log("Trinh duyet da dong an toan. Ban co the quay lai IDE!");
+    console.log("Trinh duyet da dong thanh cong. San sang su dung MCP!");
   } else {
     console.log("Het thoi gian cho dang nhap.");
   }
