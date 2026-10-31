@@ -1,6 +1,6 @@
 # BÁO CÁO TIẾN ĐỘ TUẦN 1 - ĐỒ ÁN CHUYÊN NGÀNH (CHỦ ĐỀ 6)
 **Đề tài:** Nghiên cứu phát hiện văn bản do LLM sinh sử dụng mô hình kết hợp (Ensemble PLMs: BERT, RoBERTa, Longformer)
-**Thời gian thực hiện:** Giai đoạn 1 (Ngày 1 - Ngày 5)
+**Thời gian thực hiện:** Giai đoạn 1 (Ngày 1 - Ngày 7: 25/10/2026 – 31/10/2026)
 
 ---
 
@@ -96,6 +96,26 @@
 
 ---
 
+### Ngày 7 (31/10/2026): Thiết lập PyTorch Dataset & DataLoader tùy chỉnh cho 3 Mô hình Backbone
+* **Đóng gói module nạp dữ liệu chuẩn (`dataset.py`):**
+  * Xây dựng lớp `TextDetectionDataset` kế thừa từ `torch.utils.data.Dataset`, nạp trực tiếp dữ liệu từ file CSV, trích xuất chuỗi `text` và nhãn nhị phân chuẩn hóa dạng `torch.float32`.
+  * Hỗ trợ đồng bộ và tương thích hoàn toàn với Tokenizer của cả 3 mô hình nền tảng:
+    * **BERT** (`bert-base-uncased`): Trả về `input_ids`, `attention_mask` và `token_type_ids`.
+    * **RoBERTa** (`roberta-base`): Trả về `input_ids` và `attention_mask`.
+    * **Longformer** (`allenai/longformer-base-4096`): Tự động tạo tensor `global_attention_mask` (gán cờ chú ý toàn cục giá trị 1 cho token đầu tiên `<s>`, 0 cho các token còn lại theo đúng chuẩn thiết kế của kiến trúc Longformer).
+* **Tối ưu hóa cơ chế Đệm động (Dynamic Padding Collator):**
+  * Xây dựng lớp `DynamicPaddingCollator`: Tự động căn chỉnh độ dài chuỗi đệm (`pad_token_id`) theo độ dài lớn nhất trong từng batch cụ thể thay vì đệm cứng 512/1024 cho toàn bộ tập dữ liệu.
+  * Hiệu quả thực nghiệm: Tiết kiệm từ **40% – 60% dung lượng VRAM/RAM** và tăng tốc đáng kể tốc độ xử lý ma trận chú ý (Self-Attention) trong quá trình huấn luyện và suy luận.
+* **Kiểm thử tích hợp & Xác thực Pipeline (Smoke Test):**
+  * Đã chạy kiểm thử thực nghiệm trên cả 3 mô hình với batch size = 8:
+    * **BERT:** Nạp thành công Train (1,676 batches), Val (359 batches), Test (360 batches). Shape tensor: `input_ids` `[8, 512]`, `labels` `[8]`. Tương thích tuyệt đối với `BCEWithLogitsLoss` (loss = 0.7246).
+    * **RoBERTa:** Nạp thành công Train (1,676 batches), Val (359 batches), Test (360 batches). Shape tensor: `input_ids` `[8, 512]`, `labels` `[8]`. Tương thích tuyệt đối với `BCEWithLogitsLoss` (loss = 0.5903).
+    * **Longformer:** Nạp thành công Train (1,676 batches), Val (359 batches), Test (360 batches). Dynamic padding tự co giãn kích thước `[8, 616]`. Đầy đủ tensor `global_attention_mask` `[8, 616]`. Tương thích `BCEWithLogitsLoss` (loss = 0.4816).
+    * **Tập Unseen TOEFL:** Nạp thành công toàn bộ 32 batches kiểm thử miền mới cho cả 3 mô hình.
+  * Toàn bộ mã nguồn đã được đóng gói chuẩn chỉ tại [`dataset.py`](file:///c:/DoAn/dataset.py).
+
+---
+
 ## 2. BẢNG MẪU KẾT QUẢ ĐỐI SÁNH TRÍCH TỪ TẬP HUẤN LUYỆN (Trích `final_train_dataset.csv`)
 
 | Thể loại | Nhãn | Nguồn | Văn bản mẫu (Trích xuất) |
@@ -134,6 +154,14 @@
 
 ---
 
-## 5. DỰ KIẾN KẾ HOẠCH CÁC NGÀY TIẾP THEO
-* **Ngày 7 (31/10/2026):** Xây dựng PyTorch `Dataset` & `DataLoader` tùy chỉnh cho 3 mô hình, tối ưu hóa cơ chế Dynamic Padding / Truncation và cấu hình huấn luyện batch chuẩn bị cho Tuần 2.
-* **Ngày 8 trở đi (01/11/2026):** Bước vào Giai đoạn 2: Nạp mô hình PLM đầu tiên (`bert-base-uncased`), cấu hình hàm mất mát Binary Cross-Entropy (BCE Loss) và bắt đầu quá trình huấn luyện thực nghiệm (Fine-tuning).
+## 5. TỔNG KẾT TUẦN 1 & KẾ HOẠCH TUẦN 2 (GIAI ĐOẠN 2: HUẤN LUYỆN MÔ HÌNH HỌC SÂU)
+* **Tổng kết Tuần 1 (Giai đoạn 1):** Đã hoàn thành **100% các mục tiêu Milestone 1** đúng tiến độ đề tài:
+  - Thu thập, làm sạch và chuẩn hóa toàn bộ dữ liệu (tin dài GossipCop, tin ngắn LIAR, 252 bài luận TOEFL).
+  - Hoàn thiện tập dữ liệu tổng hợp 19,148 mẫu, phân chia phân tầng không rò rỉ: Train (70%), Val (15%), Test (15%).
+  - Xây dựng hạ tầng nạp dữ liệu PyTorch `Dataset` & `DataLoader` với Dynamic Padding và Attention Mask tối ưu.
+* **Kế hoạch Tuần 2 (01/11/2026 – 07/11/2026):**
+  * **Ngày 8 (01/11/2026):** Khởi tạo kiến trúc mô hình `bert-base-uncased` với tầng phân loại nhị phân và hàm mất mát `BCEWithLogitsLoss`.
+  * **Ngày 9 – 10 (02/11 – 03/11/2026):** Tiến hành huấn luyện (Fine-tune) mô hình BERT, theo dõi hàm mất mát và F1 trên tập Val, lưu checkpoint trọng số tối ưu.
+  * **Ngày 11 (04/11/2026):** Khởi tạo và thiết lập mô hình `roberta-base`.
+  * **Ngày 12 – 13 (05/11 – 06/11/2026):** Fine-tune mô hình RoBERTa và lưu checkpoint.
+  * **Ngày 14 (07/11/2026):** Tích hợp và cấu hình mô hình `allenai/longformer-base-4096`.

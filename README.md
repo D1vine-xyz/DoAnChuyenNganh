@@ -33,13 +33,14 @@ DoAnChuyenNganh/
 ├── merge_datasets.py                  # Hợp nhất toàn bộ dữ liệu & gán nhãn nhị phân (0/1)
 ├── split_data.py                      # Phân chia dữ liệu phân tầng (Train 70% - Val 15% - Test 15%)
 ├── explore_tokenizers.py              # Khảo sát phân phối token BERT, RoBERTa, Longformer
+├── dataset.py                         # PyTorch Dataset, Dynamic Padding Collator & DataLoader
 │
 ├── auth_setup.mjs                     # Cấu hình đăng nhập cho MCP NotebookLM
 ├── save_state.mjs                     # Lưu trữ phiên làm việc và cookies NotebookLM
 ├── query_notebooklm.mjs               # Truy vấn tài liệu trực tiếp từ NotebookLM
 ├── dang_nhap_notebooklm.bat           # Script khởi động đăng nhập nhanh NotebookLM
 │
-├── BAO_CAO_TIEN_DO_TUAN_1.md          # Báo cáo tiến độ chi tiết từ Ngày 1 đến Ngày 6
+├── BAO_CAO_TIEN_DO_TUAN_1.md          # Báo cáo tiến độ chi tiết từ Ngày 1 đến Ngày 7 (Hoàn thành Tuần 1)
 ├── requirements.txt                   # Danh mục thư viện Python yêu cầu
 ├── .env.example                       # Mẫu cấu hình biến môi trường
 └── README.md                          # Giới thiệu & Hướng dẫn sử dụng
@@ -93,6 +94,9 @@ python split_data.py
 
 # 6. Khảo sát Tokenization cho BERT, RoBERTa, Longformer
 python explore_tokenizers.py
+
+# 7. Kiểm thử PyTorch Dataset & DataLoader Pipeline
+python dataset.py --model all
 ```
 
 ---
