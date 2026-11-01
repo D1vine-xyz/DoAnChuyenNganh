@@ -41,6 +41,10 @@ DoAnChuyenNganh/
 ├── dang_nhap_notebooklm.bat           # Script khởi động đăng nhập nhanh NotebookLM
 │
 ├── BAO_CAO_TIEN_DO_TUAN_1.md          # Báo cáo tiến độ chi tiết từ Ngày 1 đến Ngày 7 (Hoàn thành Tuần 1)
+├── kaggle_jobs/                       # Cấu hình huấn luyện mô hình từ xa trên Kaggle GPU
+│   └── train_bert/
+│       ├── kernel-metadata.json       # Cấu hình kernel Kaggle (GPU Tesla T4, Internet on)
+│       └── run_training.py            # Script tự động clone repo và điều phối huấn luyện
 ├── requirements.txt                   # Danh mục thư viện Python yêu cầu
 ├── .env.example                       # Mẫu cấu hình biến môi trường
 └── README.md                          # Giới thiệu & Hướng dẫn sử dụng
@@ -97,6 +101,19 @@ python explore_tokenizers.py
 
 # 7. Kiểm thử PyTorch Dataset & DataLoader Pipeline
 python dataset.py --model all
+```
+
+### 4. Huấn luyện mô hình từ xa trên Kaggle GPU (Tesla T4)
+Đẩy job huấn luyện lên Kaggle và kiểm tra tiến độ:
+```bash
+# 1. Đẩy code lên Kaggle chạy ngầm với GPU Tesla T4
+kaggle kernels push -p ./kaggle_jobs/train_bert
+
+# 2. Kiểm tra tiến độ
+kaggle kernels status quannguyenxx/do-an-train-bert
+
+# 3. Tải kết quả mô hình về máy sau khi hoàn tất
+kaggle kernels output quannguyenxx/do-an-train-bert -p ./output
 ```
 
 ---
