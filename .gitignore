@@ -27,3 +27,8 @@ data/gossipcop/MF.json
 *.safetensors
 checkpoint-*/
 runs/
+output/
+
+# Kaggle credentials
+kaggle.json
+.kaggle/
