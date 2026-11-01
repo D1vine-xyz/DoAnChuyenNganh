@@ -56,3 +56,4 @@ else:
     print("    File train_bert.py se duoc viet va dong bo o Ngay 8.")
 
 print("=" * 70)
+

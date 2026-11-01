@@ -29,6 +29,10 @@ checkpoint-*/
 runs/
 output/
 
+# Office temp files
+~$*.docx
+~$*.xlsx
+
 # Kaggle credentials
 kaggle.json
 .kaggle/

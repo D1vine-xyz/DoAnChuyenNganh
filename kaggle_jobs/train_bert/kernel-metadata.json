@@ -1,5 +1,5 @@
 {
-  "id": "YOUR_KAGGLE_USERNAME/do-an-train-bert",
+  "id": "quannguyenxx/do-an-train-bert",
   "title": "Do An Train BERT",
   "code_file": "run_training.py",
   "language": "python",
@@ -12,3 +12,4 @@
   "competition_sources": [],
   "kernel_sources": []
 }
+
