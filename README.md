@@ -129,6 +129,21 @@ kaggle kernels output quannguyenxx/do-an-train-bert -p ./output
 
 ---
 
+## 🏆 Kết quả Huấn luyện Mô hình Đơn lẻ (PLMs)
+
+### 1. BERT (`bert-base-uncased`) - Hoàn thành Ngày 8
+* **Môi trường**: Kaggle GPU Tesla T4 (15GB VRAM), PyTorch + CUDA, Mixed Precision FP16.
+* **Thời gian huấn luyện**: 20.19 phút (3 Epochs).
+* **Kết quả kiểm thử trên tập Test nội miền (`data/test.csv` - 2,873 mẫu)**:
+  * **Accuracy**: **95.86%**
+  * **F1-Score**: **95.04%**
+  * **Precision**: **97.77%**
+  * **Recall**: **92.45%**
+  * **AUC-ROC**: **98.05%**
+  * **Test Loss**: **0.1442**
+
+---
+
 ## 📈 Lộ trình triển khai 40 ngày
 
 * **Tuần 1 (Ngày 1 - 7):** Thu thập, tiền xử lý, sinh dữ liệu Prompt Engineering, gán nhãn nhị phân, chia tập Train/Valid/Test và khảo sát Tokenizer.

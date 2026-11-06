@@ -1,0 +1,182 @@
+[{"stream_name":"stdout","time":0.892820032,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":0.892857708,"data":"  KAGGLE REMOTE JOB: HUẤN LUYỆN MÔ HÌNH BERT (GPU ACCELERATED)\n"}
+,{"stream_name":"stdout","time":0.892869453,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":9.92659363,"data":"[*] Phiên bản PyTorch : 2.11.0+cu128\n"}
+,{"stream_name":"stdout","time":10.179005106,"data":"[*] CUDA Sẵn sàng     : True\n"}
+,{"stream_name":"stdout","time":10.228008413,"data":"[*] Tên GPU           : Tesla T4\n"}
+,{"stream_name":"stdout","time":10.228052375,"data":"[*] Bộ nhớ GPU        : 14.56 GB\n"}
+,{"stream_name":"stdout","time":10.228113151,"data":"[*] Đang tải mã nguồn từ GitHub: https://github.com/D1vine-xyz/DoAnChuyenNganh.git ...\n"}
+,{"stream_name":"stderr","time":10.26629367,"data":"Cloning into '/tmp/DoAnChuyenNganh'...\n"}
+,{"stream_name":"stderr","time":24.849535863,"data":"Updating files:  59% (28/47)\rUpdating files:  61% (29/47)\rUpdating files:  63% (30/47)\rUpdating files:  65% (31/47)\rUpdating files:  68% (32/47)\rUpdating files:  70% (33/47)\rUpdating files:  72% (34/47)\rUpdating files:  74% (35/47)\rUpdating files:  76% (36/47)\rUpdating files:  78% (37/47)\rUpdating files:  80% (38/47)\rUpdating files:  82% (39/47)\rUpdating files:  85% (40/47)\rUpdating files:  87% (41/47)\rUpdating files:  89% (42/47)\rUpdating files:  91% (43/47)\rUpdating files:  93% (44/47)\rUpdating files:  95% (45/47)\rUpdating files:  97% (46/47)\rUpdating files: 100% (47/47)\rUpdating files: 100% (47/47), done.\n"}
+,{"stream_name":"stdout","time":24.854304423,"data":"  [v] Sẵn sàng: data/train.csv\n"}
+,{"stream_name":"stdout","time":24.854338924,"data":"  [v] Sẵn sàng: data/val.csv\n"}
+,{"stream_name":"stdout","time":24.854344019,"data":"  [v] Sẵn sàng: data/test.csv\n"}
+,{"stream_name":"stdout","time":24.854348934,"data":"  [v] Sẵn sàng: dataset.py\n"}
+,{"stream_name":"stdout","time":24.854353582999998,"data":"  [v] Sẵn sàng: models.py\n"}
+,{"stream_name":"stdout","time":24.854358168,"data":"  [v] Sẵn sàng: train_bert.py\n"}
+,{"stream_name":"stdout","time":24.854430059,"data":"\n"}
+,{"stream_name":"stdout","time":24.854469081,"data":"[*] BẮT ĐẦU CHẠY HUẤN LUYỆN BERT VỚI MIXED PRECISION FP16...\n"}
+,{"stream_name":"stderr","time":54.008086157,"data":"Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.\n"}
+,{"stream_name":"stdout","time":58.054588955,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":58.054616297,"data":"  QUY TRÌNH HUẤN LUYỆN MÔ HÌNH NỀN TẢNG: BERT (BERT-BASE-UNCASED)\n"}
+,{"stream_name":"stdout","time":58.054622495,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":58.054626924,"data":"[*] Thiết bị sử dụng   : cuda\n"}
+,{"stream_name":"stdout","time":58.054631375,"data":"    - Tên GPU          : Tesla T4\n"}
+,{"stream_name":"stdout","time":58.054639322,"data":"    - Bộ nhớ GPU       : 14.56 GB\n"}
+,{"stream_name":"stdout","time":58.054655604,"data":"    - Mixed Precision  : True (FP16 Accelerated)\n"}
+,{"stream_name":"stdout","time":58.054661455,"data":"\n"}
+,{"stream_name":"stdout","time":58.054666435,"data":"[*] Đang nạp dữ liệu từ thư mục: data\n"}
+,{"stream_name":"stdout","time":58.054671602,"data":"  [v] Train Loader : 838 batches (13,403 mẫu)\n"}
+,{"stream_name":"stdout","time":58.054676384,"data":"  [v] Val Loader   : 180 batches (2,872 mẫu)\n"}
+,{"stream_name":"stdout","time":58.054751264,"data":"  [v] Test Loader  : 180 batches (2,873 mẫu)\n"}
+,{"stream_name":"stdout","time":58.054757519,"data":"\n"}
+,{"stream_name":"stdout","time":58.054772573,"data":"[*] Đang khởi tạo kiến trúc BERTTextClassifier...\n"}
+,{"stream_name":"stderr","time":58.127901697,"data":"\rLoading weights:   0%|          | 0/199 [00:00\u003c?, ?it/s]\rLoading weights: 100%|██████████| 199/199 [00:00\u003c00:00, 2728.13it/s]\n"}
+,{"stream_name":"stderr","time":58.146377631,"data":"[transformers] \u001b[1mBertModel LOAD REPORT\u001b[0m from: bert-base-uncased\n"}
+,{"stream_name":"stderr","time":58.146396763,"data":"Key                                        | Status     |  | \n"}
+,{"stream_name":"stderr","time":58.146401428,"data":"-------------------------------------------+------------+--+-\n"}
+,{"stream_name":"stderr","time":58.146405142,"data":"cls.seq_relationship.weight                | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":58.146437205,"data":"cls.seq_relationship.bias                  | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":58.146441842,"data":"cls.predictions.transform.dense.bias       | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":58.146446008,"data":"cls.predictions.bias                       | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":58.146449568,"data":"cls.predictions.transform.LayerNorm.bias   | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":58.146453401,"data":"cls.predictions.transform.LayerNorm.weight | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":58.14645725,"data":"cls.predictions.transform.dense.weight     | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":58.146460703,"data":"\n"}
+,{"stream_name":"stderr","time":58.146463873,"data":"Notes:\n"}
+,{"stream_name":"stderr","time":58.146467216,"data":"- UNEXPECTED:\tcan be ignored when loading from different task/architecture; not ok if you expect identical arch.\n"}
+,{"stream_name":"stderr","time":58.580926559,"data":"/tmp/DoAnChuyenNganh/train_bert.py:192: FutureWarning: `torch.cuda.amp.GradScaler(args...)` is deprecated. Please use `torch.amp.GradScaler('cuda', args...)` instead.\n"}
+,{"stream_name":"stderr","time":58.58095732,"data":"  scaler = torch.cuda.amp.GradScaler(enabled=use_fp16)\n"}
+,{"stream_name":"stderr","time":58.65655433,"data":"/tmp/DoAnChuyenNganh/train_bert.py:236: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.\n"}
+,{"stream_name":"stderr","time":58.656582795,"data":"  with torch.cuda.amp.autocast(enabled=use_fp16):\n"}
+,{"stream_name":"stderr","time":62.706012132,"data":"/tmp/DoAnChuyenNganh/train_bert.py:249: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate\n"}
+,{"stream_name":"stderr","time":62.706053302,"data":"  scheduler.step()\n"}
+,{"stream_name":"stderr","time":451.663465822,"data":"/tmp/DoAnChuyenNganh/train_bert.py:82: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.\n"}
+,{"stream_name":"stderr","time":451.663535996,"data":"  with torch.cuda.amp.autocast(enabled=use_fp16):\n"}
+,{"stream_name":"stderr","time":479.669300265,"data":"/tmp/DoAnChuyenNganh/train_bert.py:236: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.\n"}
+,{"stream_name":"stderr","time":479.669342904,"data":"  with torch.cuda.amp.autocast(enabled=use_fp16):\n"}
+,{"stream_name":"stderr","time":880.311602683,"data":"/tmp/DoAnChuyenNganh/train_bert.py:82: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.\n"}
+,{"stream_name":"stderr","time":880.311646252,"data":"  with torch.cuda.amp.autocast(enabled=use_fp16):\n"}
+,{"stream_name":"stderr","time":907.787549265,"data":"/tmp/DoAnChuyenNganh/train_bert.py:236: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.\n"}
+,{"stream_name":"stderr","time":907.787595214,"data":"  with torch.cuda.amp.autocast(enabled=use_fp16):\n"}
+,{"stream_name":"stderr","time":1304.62322267,"data":"/tmp/DoAnChuyenNganh/train_bert.py:82: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.\n"}
+,{"stream_name":"stderr","time":1304.623267864,"data":"  with torch.cuda.amp.autocast(enabled=use_fp16):\n"}
+,{"stream_name":"stderr","time":1332.754225574,"data":"/tmp/DoAnChuyenNganh/train_bert.py:82: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.\n"}
+,{"stream_name":"stderr","time":1332.754273306,"data":"  with torch.cuda.amp.autocast(enabled=use_fp16):\n"}
+,{"stream_name":"stdout","time":1360.349844114,"data":"  [v] Tổng tham số : 109,483,009 (Trainable: 109,483,009)\n"}
+,{"stream_name":"stdout","time":1360.349905707,"data":"\n"}
+,{"stream_name":"stdout","time":1360.349913577,"data":"[*] Thông số Huấn luyện:\n"}
+,{"stream_name":"stdout","time":1360.349918987,"data":"  - Epochs               : 3\n"}
+,{"stream_name":"stdout","time":1360.349923886,"data":"  - Batch Size           : 16\n"}
+,{"stream_name":"stdout","time":1360.349928728,"data":"  - Learning Rate        : 2e-05\n"}
+,{"stream_name":"stdout","time":1360.349933983,"data":"  - Weight Decay         : 0.01\n"}
+,{"stream_name":"stdout","time":1360.349944826,"data":"  - Warmup Steps         : 251 / 2514 (10%)\n"}
+,{"stream_name":"stdout","time":1360.349948733,"data":"  - Max Grad Norm        : 1.0\n"}
+,{"stream_name":"stdout","time":1360.349952058,"data":"  - Thư mục lưu kết quả  : /kaggle/working\n"}
+,{"stream_name":"stdout","time":1360.349955516,"data":"\n"}
+,{"stream_name":"stdout","time":1360.349958828,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":1360.349962365,"data":"  BẮT ĐẦU HUẤN LUYỆN (EPOCHS LOOP)\n"}
+,{"stream_name":"stdout","time":1360.349966042,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":1360.349969678,"data":"\n"}
+,{"stream_name":"stdout","time":1360.349989304,"data":"\u003e\u003e\u003e Epoch 1/3\n"}
+,{"stream_name":"stdout","time":1360.349996433,"data":"-------------------------------------------------------\n"}
+,{"stream_name":"stdout","time":1360.350002614,"data":"  Batch [ 100/838] | Loss: 0.6095 | LR: 7.97e-06 | Thời gian: 44.1s\n"}
+,{"stream_name":"stdout","time":1360.350008535,"data":"  Batch [ 200/838] | Loss: 0.0061 | LR: 1.59e-05 | Thời gian: 87.0s\n"}
+,{"stream_name":"stdout","time":1360.350014069,"data":"  Batch [ 300/838] | Loss: 0.3373 | LR: 1.96e-05 | Thời gian: 132.8s\n"}
+,{"stream_name":"stdout","time":1360.350019991,"data":"  Batch [ 400/838] | Loss: 0.6281 | LR: 1.87e-05 | Thời gian: 182.5s\n"}
+,{"stream_name":"stdout","time":1360.350025684,"data":"  Batch [ 500/838] | Loss: 0.1673 | LR: 1.78e-05 | Thời gian: 230.2s\n"}
+,{"stream_name":"stdout","time":1360.350046286,"data":"  Batch [ 600/838] | Loss: 0.2539 | LR: 1.69e-05 | Thời gian: 278.7s\n"}
+,{"stream_name":"stdout","time":1360.350050168,"data":"  Batch [ 700/838] | Loss: 0.0255 | LR: 1.60e-05 | Thời gian: 326.8s\n"}
+,{"stream_name":"stdout","time":1360.350054081,"data":"  Batch [ 800/838] | Loss: 0.0036 | LR: 1.51e-05 | Thời gian: 374.9s\n"}
+,{"stream_name":"stdout","time":1360.350058102,"data":"  Batch [ 838/838] | Loss: 0.5932 | LR: 1.48e-05 | Thời gian: 393.1s\n"}
+,{"stream_name":"stdout","time":1360.350062364,"data":"\n"}
+,{"stream_name":"stdout","time":1360.350066234,"data":"[*] Đang đánh giá Validation Epoch 1...\n"}
+,{"stream_name":"stdout","time":1360.350070652,"data":"  + Train Loss    : 0.2626\n"}
+,{"stream_name":"stdout","time":1360.350075284,"data":"  + Val Loss      : 0.1351\n"}
+,{"stream_name":"stdout","time":1360.350079215,"data":"  + Val Accuracy  : 95.65%\n"}
+,{"stream_name":"stdout","time":1360.350083456,"data":"  + Val Precision : 97.92%\n"}
+,{"stream_name":"stdout","time":1360.350087821,"data":"  + Val Recall    : 91.80%\n"}
+,{"stream_name":"stdout","time":1360.350091761,"data":"  + Val F1-Score  : 94.76%\n"}
+,{"stream_name":"stdout","time":1360.350096188,"data":"  + Val AUC-ROC   : 98.37%\n"}
+,{"stream_name":"stdout","time":1360.350100539,"data":"  + Thời gian     : 393.1 giây\n"}
+,{"stream_name":"stdout","time":1360.350105235,"data":"  🎉 F1-Score cao nhất mới (94.76%)! Đang lưu checkpoint...\n"}
+,{"stream_name":"stdout","time":1360.350109405,"data":"  [v] Đã lưu model tại: /kaggle/working/bert_best.pt\n"}
+,{"stream_name":"stdout","time":1360.350113533,"data":"\n"}
+,{"stream_name":"stdout","time":1360.350117651,"data":"\u003e\u003e\u003e Epoch 2/3\n"}
+,{"stream_name":"stdout","time":1360.350121813,"data":"-------------------------------------------------------\n"}
+,{"stream_name":"stdout","time":1360.350126161,"data":"  Batch [ 100/838] | Loss: 0.2744 | LR: 1.39e-05 | Thời gian: 48.3s\n"}
+,{"stream_name":"stdout","time":1360.350130482,"data":"  Batch [ 200/838] | Loss: 0.0047 | LR: 1.30e-05 | Thời gian: 96.1s\n"}
+,{"stream_name":"stdout","time":1360.350135157,"data":"  Batch [ 300/838] | Loss: 0.0367 | LR: 1.22e-05 | Thời gian: 143.5s\n"}
+,{"stream_name":"stdout","time":1360.35013921,"data":"  Batch [ 400/838] | Loss: 0.3862 | LR: 1.13e-05 | Thời gian: 191.4s\n"}
+,{"stream_name":"stdout","time":1360.350145493,"data":"  Batch [ 500/838] | Loss: 0.0024 | LR: 1.04e-05 | Thời gian: 239.4s\n"}
+,{"stream_name":"stdout","time":1360.350150032,"data":"  Batch [ 600/838] | Loss: 0.2966 | LR: 9.51e-06 | Thời gian: 287.3s\n"}
+,{"stream_name":"stdout","time":1360.350154497,"data":"  Batch [ 700/838] | Loss: 0.0192 | LR: 8.63e-06 | Thời gian: 334.8s\n"}
+,{"stream_name":"stdout","time":1360.350158728,"data":"  Batch [ 800/838] | Loss: 0.0646 | LR: 7.74e-06 | Thời gian: 382.6s\n"}
+,{"stream_name":"stdout","time":1360.350163124,"data":"  Batch [ 838/838] | Loss: 0.0119 | LR: 7.41e-06 | Thời gian: 400.6s\n"}
+,{"stream_name":"stdout","time":1360.350167792,"data":"\n"}
+,{"stream_name":"stdout","time":1360.350171471,"data":"[*] Đang đánh giá Validation Epoch 2...\n"}
+,{"stream_name":"stdout","time":1360.350175592,"data":"  + Train Loss    : 0.1385\n"}
+,{"stream_name":"stdout","time":1360.350179389,"data":"  + Val Loss      : 0.4006\n"}
+,{"stream_name":"stdout","time":1360.350183053,"data":"  + Val Accuracy  : 91.33%\n"}
+,{"stream_name":"stdout","time":1360.350186766,"data":"  + Val Precision : 85.68%\n"}
+,{"stream_name":"stdout","time":1360.350190529,"data":"  + Val Recall    : 95.78%\n"}
+,{"stream_name":"stdout","time":1360.350194278,"data":"  + Val F1-Score  : 90.45%\n"}
+,{"stream_name":"stdout","time":1360.350230389,"data":"  + Val AUC-ROC   : 97.52%\n"}
+,{"stream_name":"stdout","time":1360.350238764,"data":"  + Thời gian     : 400.6 giây\n"}
+,{"stream_name":"stdout","time":1360.35024284,"data":"\n"}
+,{"stream_name":"stdout","time":1360.350246536,"data":"\u003e\u003e\u003e Epoch 3/3\n"}
+,{"stream_name":"stdout","time":1360.350250404,"data":"-------------------------------------------------------\n"}
+,{"stream_name":"stdout","time":1360.35025433,"data":"  Batch [ 100/838] | Loss: 0.3322 | LR: 6.52e-06 | Thời gian: 47.5s\n"}
+,{"stream_name":"stdout","time":1360.350258292,"data":"  Batch [ 200/838] | Loss: 0.0046 | LR: 5.64e-06 | Thời gian: 94.7s\n"}
+,{"stream_name":"stdout","time":1360.350262198,"data":"  Batch [ 300/838] | Loss: 0.0022 | LR: 4.75e-06 | Thời gian: 141.9s\n"}
+,{"stream_name":"stdout","time":1360.350266145,"data":"  Batch [ 400/838] | Loss: 0.0070 | LR: 3.87e-06 | Thời gian: 189.2s\n"}
+,{"stream_name":"stdout","time":1360.350270236,"data":"  Batch [ 500/838] | Loss: 0.0115 | LR: 2.99e-06 | Thời gian: 236.5s\n"}
+,{"stream_name":"stdout","time":1360.35027421,"data":"  Batch [ 600/838] | Loss: 0.0018 | LR: 2.10e-06 | Thời gian: 283.9s\n"}
+,{"stream_name":"stdout","time":1360.350280087,"data":"  Batch [ 700/838] | Loss: 0.0020 | LR: 1.22e-06 | Thời gian: 331.3s\n"}
+,{"stream_name":"stdout","time":1360.350287964,"data":"  Batch [ 800/838] | Loss: 0.2087 | LR: 3.36e-07 | Thời gian: 379.0s\n"}
+,{"stream_name":"stdout","time":1360.350290647,"data":"  Batch [ 838/838] | Loss: 0.0025 | LR: 0.00e+00 | Thời gian: 396.8s\n"}
+,{"stream_name":"stdout","time":1360.350293353,"data":"\n"}
+,{"stream_name":"stdout","time":1360.350295858,"data":"[*] Đang đánh giá Validation Epoch 3...\n"}
+,{"stream_name":"stdout","time":1360.350298616,"data":"  + Train Loss    : 0.0929\n"}
+,{"stream_name":"stdout","time":1360.350301152,"data":"  + Val Loss      : 0.3125\n"}
+,{"stream_name":"stdout","time":1360.350303715,"data":"  + Val Accuracy  : 93.94%\n"}
+,{"stream_name":"stdout","time":1360.350306285,"data":"  + Val Precision : 91.45%\n"}
+,{"stream_name":"stdout","time":1360.35030892,"data":"  + Val Recall    : 94.72%\n"}
+,{"stream_name":"stdout","time":1360.350311461,"data":"  + Val F1-Score  : 93.06%\n"}
+,{"stream_name":"stdout","time":1360.350314008,"data":"  + Val AUC-ROC   : 97.76%\n"}
+,{"stream_name":"stdout","time":1360.350316591,"data":"  + Thời gian     : 396.8 giây\n"}
+,{"stream_name":"stdout","time":1360.350336784,"data":"\n"}
+,{"stream_name":"stdout","time":1360.350341228,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":1360.350345704,"data":"  HOÀN TẤT HUẤN LUYỆN TRONG 21.23 PHÚT!\n"}
+,{"stream_name":"stdout","time":1360.350350032,"data":"  F1-Score tốt nhất trên Validation: 94.76%\n"}
+,{"stream_name":"stdout","time":1360.350354884,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":1360.350359429,"data":"[*] Đã lưu lịch sử huấn luyện: /kaggle/working/training_log.csv\n"}
+,{"stream_name":"stdout","time":1360.350363758,"data":"[*] Đã lưu Tokenizer tại: /kaggle/working/tokenizer_bert\n"}
+,{"stream_name":"stdout","time":1360.35036778,"data":"\n"}
+,{"stream_name":"stdout","time":1360.350371421,"data":"[*] Đang nạp Checkpoint tốt nhất để đánh giá trên tập Test (In-domain)...\n"}
+,{"stream_name":"stdout","time":1360.350375735,"data":"\n"}
+,{"stream_name":"stdout","time":1360.350380266,"data":"=======================================================\n"}
+,{"stream_name":"stdout","time":1360.350384195,"data":"  KẾT QUẢ ĐÁNH GIÁ TRÊN TẬP TEST NỘI MIỀN (IN-DOMAIN)\n"}
+,{"stream_name":"stdout","time":1360.350393233,"data":"=======================================================\n"}
+,{"stream_name":"stdout","time":1360.350397347,"data":"  - Test Loss      : 0.1442\n"}
+,{"stream_name":"stdout","time":1360.350401236,"data":"  - Test Accuracy  : 95.86%\n"}
+,{"stream_name":"stdout","time":1360.350405125,"data":"  - Test Precision : 97.77%\n"}
+,{"stream_name":"stdout","time":1360.350408908,"data":"  - Test Recall    : 92.45%\n"}
+,{"stream_name":"stdout","time":1360.350412795,"data":"  - Test F1-Score  : 95.04%\n"}
+,{"stream_name":"stdout","time":1360.350435085,"data":"  - Test AUC-ROC   : 98.05%\n"}
+,{"stream_name":"stdout","time":1360.350440389,"data":"=======================================================\n"}
+,{"stream_name":"stdout","time":1360.350445004,"data":"[*] Đã lưu kết quả kiểm thử: /kaggle/working/bert_test_results.json\n"}
+,{"stream_name":"stdout","time":1364.858522643,"data":"\n"}
+,{"stream_name":"stdout","time":1364.858575859,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":1364.85858261,"data":"  [v] HUẤN LUYỆN THÀNH CÔNG VÀ HOÀN TẤT TRÊN KAGGLE GPU!\n"}
+,{"stream_name":"stdout","time":1364.858588385,"data":"  - Model Checkpoint : /kaggle/working/bert_best.pt\n"}
+,{"stream_name":"stdout","time":1364.858593157,"data":"  - Training Log     : /kaggle/working/training_log.csv\n"}
+,{"stream_name":"stdout","time":1364.858597522,"data":"  - Test Evaluation  : /kaggle/working/bert_test_results.json\n"}
+,{"stream_name":"stdout","time":1364.858601702,"data":"===========================================================================\n"}
+,{"stream_name":"stderr","time":1367.571271053,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":1367.571299266,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":1367.851712045,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":1367.851740023,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":1368.711483304,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":1369.814907912,"data":"[NbConvertApp] Writing 284899 bytes to __results__.html\n"}
+]
