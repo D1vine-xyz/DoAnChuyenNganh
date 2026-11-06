@@ -301,13 +301,11 @@ def train_bert(args):
             print(f"  🎉 F1-Score cao nhất mới ({best_val_f1*100:.2f}%)! Đang lưu checkpoint...")
             torch.save(
                 {
-                    "epoch": epoch,
+                    "epoch": int(epoch),
                     "model_state_dict": model.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                    "val_f1": best_val_f1,
-                    "val_auc": val_metrics["auc"],
-                    "val_accuracy": val_metrics["accuracy"],
-                    "args": vars(args),
+                    "val_f1": float(best_val_f1),
+                    "val_auc": float(val_metrics["auc"]),
+                    "val_accuracy": float(val_metrics["accuracy"]),
                 },
                 best_checkpoint_path,
             )
@@ -333,7 +331,7 @@ def train_bert(args):
     # 10. Đánh giá độc lập trên tập Test (In-domain)
     if os.path.exists(best_checkpoint_path):
         print("\n[*] Đang nạp Checkpoint tốt nhất để đánh giá trên tập Test (In-domain)...")
-        checkpoint = torch.load(best_checkpoint_path, map_location=device)
+        checkpoint = torch.load(best_checkpoint_path, map_location=device, weights_only=False)
         model.load_state_dict(checkpoint["model_state_dict"])
         test_metrics = evaluate(model, test_loader, criterion, device, use_fp16=use_fp16, max_batches=max_eval_batches)
 
