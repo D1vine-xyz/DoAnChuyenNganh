@@ -79,7 +79,7 @@ def evaluate(
 
             labels = batch["labels"].to(device)
 
-            with torch.amp.autocast(device_type=device.type, enabled=use_fp16):
+            with torch.cuda.amp.autocast(enabled=use_fp16):
                 logits = model(
                     input_ids=input_ids,
                     attention_mask=attention_mask,
@@ -189,7 +189,7 @@ def train_bert(args):
     criterion = nn.BCEWithLogitsLoss()
 
     # Khởi tạo GradScaler cho Mixed Precision FP16
-    scaler = torch.amp.GradScaler(device_type=device.type, enabled=use_fp16)
+    scaler = torch.cuda.amp.GradScaler(enabled=use_fp16)
 
     print(f"\n[*] Thông số Huấn luyện:")
     print(f"  - Epochs               : {args.epochs}")
@@ -233,7 +233,7 @@ def train_bert(args):
 
             optimizer.zero_grad()
 
-            with torch.amp.autocast(device_type=device.type, enabled=use_fp16):
+            with torch.cuda.amp.autocast(enabled=use_fp16):
                 logits = model(
                     input_ids=input_ids,
                     attention_mask=attention_mask,
