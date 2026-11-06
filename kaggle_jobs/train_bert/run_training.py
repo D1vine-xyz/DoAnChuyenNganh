@@ -3,57 +3,74 @@ import sys
 import subprocess
 import shutil
 
-print("=" * 70)
-print("  KAGGLE REMOTE JOB: HUAN LUYEN MO HINH BERT (GPU ACCELERATED)")
-print("=" * 70)
+print("=" * 75)
+print("  KAGGLE REMOTE JOB: HUẤN LUYỆN MÔ HÌNH BERT (GPU ACCELERATED)")
+print("=" * 75)
 
-# 1. Kiem tra GPU tren Kaggle
+# 1. Kiểm tra GPU CUDA trên máy chủ Kaggle
 try:
     import torch
-    print(f"[*] PyTorch Version : {torch.__version__}")
-    print(f"[*] CUDA Available  : {torch.cuda.is_available()}")
+    print(f"[*] Phiên bản PyTorch : {torch.__version__}")
+    print(f"[*] CUDA Sẵn sàng     : {torch.cuda.is_available()}")
     if torch.cuda.is_available():
-        print(f"[*] GPU Device Name : {torch.cuda.get_device_name(0)}")
-        print(f"[*] GPU Memory      : {torch.cuda.get_device_properties(0).total_memory / (1024**3):.2f} GB")
+        print(f"[*] Tên GPU           : {torch.cuda.get_device_name(0)}")
+        print(f"[*] Bộ nhớ GPU        : {torch.cuda.get_device_properties(0).total_memory / (1024**3):.2f} GB")
     else:
-        print("[!] CANH BAO: Khong tim thay GPU! Hay bat enable_gpu: true trong metadata.")
+        print("[!] CẢNH BÁO: Không tìm thấy GPU! Kiểm tra 'enable_gpu: true' trong kernel-metadata.json.")
 except Exception as e:
-    print(f"[!] Loi kiem tra GPU: {e}")
+    print(f"[!] Lỗi kiểm tra GPU: {e}")
 
-# 2. Clone ma nguon va du lieu tu GitHub ve Kaggle
+# 2. Clone mã nguồn từ GitHub vào thư mục tạm /tmp để giữ sạch Kaggle Output
 REPO_URL = "https://github.com/D1vine-xyz/DoAnChuyenNganh.git"
-REPO_DIR = "DoAnChuyenNganh"
+CLONE_DIR = "/tmp/DoAnChuyenNganh"
 
-if os.path.exists(REPO_DIR):
-    print(f"[*] Thu muc {REPO_DIR} da ton tai, cap nhat git pull...")
-    subprocess.run(["git", "-C", REPO_DIR, "pull"], check=False)
+if os.path.exists(CLONE_DIR):
+    print(f"[*] Thư mục mã nguồn {CLONE_DIR} đã tồn tại, cập nhật git pull...")
+    subprocess.run(["git", "-C", CLONE_DIR, "pull"], check=False)
 else:
-    print(f"[*] Dang clone repo tu GitHub: {REPO_URL} ...")
-    subprocess.run(["git", "clone", "--depth", "1", REPO_URL], check=True)
+    print(f"[*] Đang tải mã nguồn từ GitHub: {REPO_URL} ...")
+    subprocess.run(["git", "clone", "--depth", "1", REPO_URL, CLONE_DIR], check=True)
 
-# 3. Chuyen vao thu muc du an
-os.chdir(REPO_DIR)
-sys.path.append(os.getcwd())
+# 3. Chuyển vào thư mục dự án
+os.chdir(CLONE_DIR)
+sys.path.insert(0, CLONE_DIR)
 
-# 4. Kiem tra tinh san sang cua du lieu
-required_files = ["data/train.csv", "data/val.csv", "data/test.csv", "dataset.py"]
+# 4. Kiểm tra sự sẵn sàng của dữ liệu
+required_files = ["data/train.csv", "data/val.csv", "data/test.csv", "dataset.py", "models.py", "train_bert.py"]
 for f in required_files:
     if os.path.exists(f):
-        print(f"  [v] Da san sang: {f}")
+        print(f"  [v] Sẵn sàng: {f}")
     else:
-        print(f"  [X] Thieu file: {f}")
+        print(f"  [X] Thiếu file: {f}")
 
-# 5. Huong dan khoi chay train_bert.py (se thuc hien o Ngay 8)
-if os.path.exists("train_bert.py"):
-    print("\n[*] Bat dau chay train_bert.py tren GPU Kaggle...")
-    # Luu model checkpoint truc tiep vao /kaggle/working de tai ve
-    output_dir = "/kaggle/working/output"
-    os.makedirs(output_dir, exist_ok=True)
-    subprocess.run([sys.executable, "train_bert.py", "--output_dir", output_dir], check=True)
-    print(f"\n[v] Hoan tat! File ket qua duoc luu tai: {output_dir}")
+# 5. Thiết lập thư mục Output trên Kaggle (/kaggle/working)
+OUTPUT_DIR = "/kaggle/working"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+# 6. Khởi động huấn luyện BERT
+print("\n[*] BẮT ĐẦU CHẠY HUẤN LUYỆN BERT VỚI MIXED PRECISION FP16...")
+train_cmd = [
+    sys.executable,
+    "train_bert.py",
+    "--data_dir", "data",
+    "--output_dir", OUTPUT_DIR,
+    "--epochs", "3",
+    "--batch_size", "16",
+    "--lr", "2e-5",
+    "--weight_decay", "0.01",
+    "--warmup_ratio", "0.1",
+    "--seed", "42",
+    "--fp16"
+]
+
+result = subprocess.run(train_cmd)
+if result.returncode == 0:
+    print("\n" + "=" * 75)
+    print("  [v] HUẤN LUYỆN THÀNH CÔNG VÀ HOÀN TẤT TRÊN KAGGLE GPU!")
+    print(f"  - Model Checkpoint : {OUTPUT_DIR}/bert_best.pt")
+    print(f"  - Training Log     : {OUTPUT_DIR}/training_log.csv")
+    print(f"  - Test Evaluation  : {OUTPUT_DIR}/bert_test_results.json")
+    print("=" * 75)
 else:
-    print("\n[i] Moi truong Kaggle GPU da san sang 100%!")
-    print("    File train_bert.py se duoc viet va dong bo o Ngay 8.")
-
-print("=" * 70)
-
+    print(f"\n[!] Tiến trình huấn luyện gặp lỗi (Return code: {result.returncode})")
+    sys.exit(result.returncode)
