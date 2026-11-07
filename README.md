@@ -142,6 +142,17 @@ kaggle kernels output quannguyenxx/do-an-train-bert -p ./output
   * **AUC-ROC**: **98.05%**
   * **Test Loss**: **0.1442**
 
+### 2. RoBERTa (`roberta-base`) - Hoàn thành Ngày 9
+* **Môi trường**: Kaggle GPU Tesla T4 (15GB VRAM), PyTorch + CUDA, Mixed Precision FP16.
+* **Thời gian huấn luyện**: 18.6 phút (3 Epochs).
+* **Kết quả kiểm thử trên tập Test nội miền (`data/test.csv` - 2,873 mẫu)**:
+  * **Accuracy**: **95.02%**
+  * **F1-Score**: **94.17%**
+  * **Precision**: **94.59%**
+  * **Recall**: **93.75%** (Vượt trội hơn BERT: 93.75% vs 92.45%)
+  * **AUC-ROC**: **98.40%** (Vượt trội hơn BERT: 98.40% vs 98.05%)
+  * **Test Loss**: **0.2057**
+
 ---
 
 ## 📈 Lộ trình triển khai 40 ngày
