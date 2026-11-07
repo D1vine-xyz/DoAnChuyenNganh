@@ -28,7 +28,7 @@ data/gossipcop/MF.json
 checkpoint-*/
 runs/
 output/*.pt
-output/tokenizer_bert/
+output/tokenizer_*/
 
 # Office temp files
 ~$*.docx
