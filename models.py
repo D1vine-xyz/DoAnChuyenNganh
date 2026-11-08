@@ -154,6 +154,11 @@ class LongformerTextClassifier(nn.Module):
         global_attention_mask: Optional[torch.Tensor] = None,
         **kwargs,
     ) -> torch.Tensor:
+        # Nếu chưa cung cấp global_attention_mask, mặc định gán global attention cho token đầu tiên <s>
+        if global_attention_mask is None and input_ids is not None:
+            global_attention_mask = torch.zeros_like(input_ids)
+            global_attention_mask[:, 0] = 1
+
         outputs = self.longformer(
             input_ids=input_ids,
             attention_mask=attention_mask,
