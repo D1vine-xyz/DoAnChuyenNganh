@@ -1,0 +1,209 @@
+[{"stream_name":"stdout","time":0.571136272,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":0.571178116,"data":"  KAGGLE REMOTE JOB: HUẤN LUYỆN MÔ HÌNH LONGFORMER (GPU ACCELERATED)\n"}
+,{"stream_name":"stdout","time":0.571183758,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":7.045555923,"data":"[*] Phiên bản PyTorch : 2.11.0+cu130\n"}
+,{"stream_name":"stdout","time":7.29717715,"data":"[*] CUDA Sẵn sàng     : True\n"}
+,{"stream_name":"stdout","time":7.330973023,"data":"[*] Tên GPU           : Tesla T4\n"}
+,{"stream_name":"stdout","time":7.331001941,"data":"[*] Bộ nhớ GPU        : 14.56 GB\n"}
+,{"stream_name":"stdout","time":7.331018372,"data":"[*] Đang tải mã nguồn từ GitHub: https://github.com/D1vine-xyz/DoAnChuyenNganh.git ...\n"}
+,{"stream_name":"stderr","time":7.367303534,"data":"Cloning into '/tmp/DoAnChuyenNganh'...\n"}
+,{"stream_name":"stderr","time":22.192090865,"data":"Updating files:  47% (28/59)\rUpdating files:  49% (29/59)\rUpdating files:  50% (30/59)\rUpdating files:  52% (31/59)\rUpdating files:  54% (32/59)\rUpdating files:  55% (33/59)\rUpdating files:  57% (34/59)\rUpdating files:  59% (35/59)\rUpdating files:  61% (36/59)\rUpdating files:  62% (37/59)\rUpdating files:  64% (38/59)\rUpdating files:  66% (39/59)\rUpdating files:  67% (40/59)\rUpdating files:  69% (41/59)\rUpdating files:  71% (42/59)\rUpdating files:  72% (43/59)\rUpdating files:  74% (44/59)\rUpdating files:  76% (45/59)\rUpdating files:  77% (46/59)\rUpdating files:  79% (47/59)\rUpdating files:  81% (48/59)\rUpdating files:  83% (49/59)\rUpdating files:  84% (50/59)\rUpdating files:  86% (51/59)\rUpdating files:  88% (52/59)\rUpdating files:  89% (53/59)\rUpdating files:  91% (54/59)\rUpdating files:  93% (55/59)\rUpdating files:  94% (56/59)\rUpdating files:  96% (57/59)\rUpdating files:  98% (58/59)\rUpdating files: 100% (59/59)\rUpdating files: 100% (59/59), done.\n"}
+,{"stream_name":"stdout","time":22.197738197,"data":"  [v] Sẵn sàng: data/train.csv\n"}
+,{"stream_name":"stdout","time":22.197759255,"data":"  [v] Sẵn sàng: data/val.csv\n"}
+,{"stream_name":"stdout","time":22.197764878,"data":"  [v] Sẵn sàng: data/test.csv\n"}
+,{"stream_name":"stdout","time":22.197776188,"data":"  [v] Sẵn sàng: dataset.py\n"}
+,{"stream_name":"stdout","time":22.197795642,"data":"  [v] Sẵn sàng: models.py\n"}
+,{"stream_name":"stdout","time":22.197801319,"data":"  [v] Sẵn sàng: train_longformer.py\n"}
+,{"stream_name":"stdout","time":22.197827791,"data":"\n"}
+,{"stream_name":"stdout","time":22.197838721,"data":"[*] BẮT ĐẦU CHẠY HUẤN LUYỆN LONGFORMER (MAX_LENGTH=1024, BATCH=4, ACCUM=4)...\n"}
+,{"stream_name":"stderr","time":44.363324719,"data":"Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.\n"}
+,{"stream_name":"stdout","time":51.221979156,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":51.222021668,"data":"  QUY TRÌNH HUẤN LUYỆN MÔ HÌNH NỀN TẢNG: LONGFORMER (LONGFORMER-BASE-4096)\n"}
+,{"stream_name":"stdout","time":51.222029088,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":51.222034999,"data":"[*] Thiết bị sử dụng   : cuda\n"}
+,{"stream_name":"stdout","time":51.222040602,"data":"    - Tên GPU          : Tesla T4\n"}
+,{"stream_name":"stdout","time":51.222046233,"data":"    - Bộ nhớ GPU       : 14.56 GB\n"}
+,{"stream_name":"stdout","time":51.222051152,"data":"    - Mixed Precision  : True (FP16 Accelerated)\n"}
+,{"stream_name":"stdout","time":51.22206685,"data":"\n"}
+,{"stream_name":"stdout","time":51.222070858,"data":"[*] Đang nạp dữ liệu từ thư mục: data\n"}
+,{"stream_name":"stdout","time":51.222074841,"data":"[*] Độ dài token tối đa (max_length): 1024\n"}
+,{"stream_name":"stdout","time":51.222079503,"data":"  [v] Train Loader : 3351 batches (13,403 mẫu)\n"}
+,{"stream_name":"stdout","time":51.222083918,"data":"  [v] Val Loader   : 718 batches (2,872 mẫu)\n"}
+,{"stream_name":"stdout","time":51.222088352,"data":"  [v] Test Loader  : 719 batches (2,873 mẫu)\n"}
+,{"stream_name":"stdout","time":51.2220931,"data":"\n"}
+,{"stream_name":"stdout","time":51.222097287,"data":"[*] Đang khởi tạo kiến trúc LongformerTextClassifier...\n"}
+,{"stream_name":"stderr","time":51.257332707,"data":"\rLoading weights:   0%|          | 0/271 [00:00\u003c?, ?it/s]\rLoading weights: 100%|██████████| 271/271 [00:00\u003c00:00, 7840.79it/s]\n"}
+,{"stream_name":"stderr","time":51.273202898,"data":"[transformers] \u001b[1mLongformerModel LOAD REPORT\u001b[0m from: allenai/longformer-base-4096\n"}
+,{"stream_name":"stderr","time":51.273222996,"data":"Key                       | Status     |  | \n"}
+,{"stream_name":"stderr","time":51.27322802,"data":"--------------------------+------------+--+-\n"}
+,{"stream_name":"stderr","time":51.273232202,"data":"lm_head.decoder.weight    | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":51.273236425,"data":"lm_head.layer_norm.weight | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":51.273240233,"data":"lm_head.dense.weight      | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":51.273244259,"data":"lm_head.bias              | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":51.273247934,"data":"lm_head.dense.bias        | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":51.273264902,"data":"lm_head.layer_norm.bias   | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":51.27327178,"data":"\n"}
+,{"stream_name":"stderr","time":51.273275807,"data":"Notes:\n"}
+,{"stream_name":"stderr","time":51.273280008,"data":"- UNEXPECTED:\tcan be ignored when loading from different task/architecture; not ok if you expect identical arch.\n"}
+,{"stream_name":"stderr","time":52.065361736,"data":"/tmp/DoAnChuyenNganh/train_longformer.py:198: FutureWarning: `torch.cuda.amp.GradScaler(args...)` is deprecated. Please use `torch.amp.GradScaler('cuda', args...)` instead.\n"}
+,{"stream_name":"stderr","time":52.06542321,"data":"  scaler = torch.cuda.amp.GradScaler(enabled=use_fp16)\n"}
+,{"stream_name":"stderr","time":52.120172672,"data":"/tmp/DoAnChuyenNganh/train_longformer.py:245: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.\n"}
+,{"stream_name":"stderr","time":52.120241409,"data":"  with torch.cuda.amp.autocast(enabled=use_fp16):\n"}
+,{"stream_name":"stderr","time":52.167237759,"data":"[transformers] Input ids are automatically padded to be a multiple of `config.attention_window`: 512\n"}
+,{"stream_name":"stderr","time":58.495951935,"data":"/tmp/DoAnChuyenNganh/train_longformer.py:267: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate\n"}
+,{"stream_name":"stderr","time":58.495998299,"data":"  scheduler.step()\n"}
+,{"stream_name":"stderr","time":2367.704541539,"data":"/tmp/DoAnChuyenNganh/train_longformer.py:85: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.\n"}
+,{"stream_name":"stderr","time":2367.704621548,"data":"  with torch.cuda.amp.autocast(enabled=use_fp16):\n"}
+,{"stream_name":"stderr","time":2516.16581634,"data":"/tmp/DoAnChuyenNganh/train_longformer.py:245: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.\n"}
+,{"stream_name":"stderr","time":2516.165853894,"data":"  with torch.cuda.amp.autocast(enabled=use_fp16):\n"}
+,{"stream_name":"stderr","time":4823.017445347,"data":"/tmp/DoAnChuyenNganh/train_longformer.py:85: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.\n"}
+,{"stream_name":"stderr","time":4823.017499187,"data":"  with torch.cuda.amp.autocast(enabled=use_fp16):\n"}
+,{"stream_name":"stderr","time":4970.300442271,"data":"/tmp/DoAnChuyenNganh/train_longformer.py:245: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.\n"}
+,{"stream_name":"stderr","time":4970.30049691,"data":"  with torch.cuda.amp.autocast(enabled=use_fp16):\n"}
+,{"stream_name":"stderr","time":7278.427417271,"data":"/tmp/DoAnChuyenNganh/train_longformer.py:85: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.\n"}
+,{"stream_name":"stderr","time":7278.427492382,"data":"  with torch.cuda.amp.autocast(enabled=use_fp16):\n"}
+,{"stream_name":"stderr","time":7426.69269656,"data":"/tmp/DoAnChuyenNganh/train_longformer.py:85: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.\n"}
+,{"stream_name":"stderr","time":7426.692742204,"data":"  with torch.cuda.amp.autocast(enabled=use_fp16):\n"}
+,{"stream_name":"stdout","time":7575.241680149,"data":"  [v] Tổng tham số : 148,660,225 (Trainable: 148,660,225)\n"}
+,{"stream_name":"stdout","time":7575.241745017,"data":"\n"}
+,{"stream_name":"stdout","time":7575.241752071,"data":"[*] Thông số Huấn luyện Longformer:\n"}
+,{"stream_name":"stdout","time":7575.241757139,"data":"  - Epochs                     : 3\n"}
+,{"stream_name":"stdout","time":7575.241762856,"data":"  - Micro Batch Size           : 4\n"}
+,{"stream_name":"stdout","time":7575.241768317,"data":"  - Grad Accumulation Steps    : 4\n"}
+,{"stream_name":"stdout","time":7575.241773128,"data":"  - Effective Batch Size       : 16 (Đồng bộ với BERT và RoBERTa)\n"}
+,{"stream_name":"stdout","time":7575.241778583,"data":"  - Learning Rate              : 3e-05\n"}
+,{"stream_name":"stdout","time":7575.241783658,"data":"  - Weight Decay               : 0.01\n"}
+,{"stream_name":"stdout","time":7575.241788792,"data":"  - Total Optimizer Steps      : 2514 (Warmup: 251 steps - 10%)\n"}
+,{"stream_name":"stdout","time":7575.241793532,"data":"  - Max Grad Norm              : 1.0\n"}
+,{"stream_name":"stdout","time":7575.241798283,"data":"  - Thư mục lưu kết quả        : /kaggle/working\n"}
+,{"stream_name":"stdout","time":7575.241803207,"data":"\n"}
+,{"stream_name":"stdout","time":7575.241808065,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":7575.241813097,"data":"  BẮT ĐẦU HUẤN LUYỆN LONGFORMER (EPOCHS LOOP)\n"}
+,{"stream_name":"stdout","time":7575.241817739,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":7575.24182237,"data":"\n"}
+,{"stream_name":"stdout","time":7575.241826741,"data":"\u003e\u003e\u003e Epoch 1/3\n"}
+,{"stream_name":"stdout","time":7575.241857271,"data":"-------------------------------------------------------\n"}
+,{"stream_name":"stdout","time":7575.241860611,"data":"  Batch [ 200/3351] | Loss: 0.7190 | LR: 5.98e-06 | Thời gian: 139.2s\n"}
+,{"stream_name":"stdout","time":7575.241863089,"data":"  Batch [ 400/3351] | Loss: 0.3554 | LR: 1.20e-05 | Thời gian: 279.0s\n"}
+,{"stream_name":"stdout","time":7575.241865551,"data":"  Batch [ 600/3351] | Loss: 0.6433 | LR: 1.79e-05 | Thời gian: 416.8s\n"}
+,{"stream_name":"stdout","time":7575.241867925,"data":"  Batch [ 800/3351] | Loss: 0.0002 | LR: 2.39e-05 | Thời gian: 556.9s\n"}
+,{"stream_name":"stdout","time":7575.241870305,"data":"  Batch [1000/3351] | Loss: 0.8239 | LR: 2.99e-05 | Thời gian: 692.6s\n"}
+,{"stream_name":"stdout","time":7575.241872728,"data":"  Batch [1200/3351] | Loss: 1.5285 | LR: 2.94e-05 | Thời gian: 830.6s\n"}
+,{"stream_name":"stdout","time":7575.241875116,"data":"  Batch [1400/3351] | Loss: 0.0694 | LR: 2.87e-05 | Thời gian: 967.9s\n"}
+,{"stream_name":"stdout","time":7575.241877553,"data":"  Batch [1600/3351] | Loss: 0.0747 | LR: 2.80e-05 | Thời gian: 1108.4s\n"}
+,{"stream_name":"stdout","time":7575.241879965,"data":"  Batch [1800/3351] | Loss: 0.0272 | LR: 2.74e-05 | Thời gian: 1248.1s\n"}
+,{"stream_name":"stdout","time":7575.241882407,"data":"  Batch [2000/3351] | Loss: 0.0504 | LR: 2.67e-05 | Thời gian: 1382.8s\n"}
+,{"stream_name":"stdout","time":7575.241884779,"data":"  Batch [2200/3351] | Loss: 0.0002 | LR: 2.60e-05 | Thời gian: 1519.8s\n"}
+,{"stream_name":"stdout","time":7575.241887198,"data":"  Batch [2400/3351] | Loss: 0.0307 | LR: 2.54e-05 | Thời gian: 1661.3s\n"}
+,{"stream_name":"stdout","time":7575.241889563,"data":"  Batch [2600/3351] | Loss: 0.2190 | LR: 2.47e-05 | Thời gian: 1798.1s\n"}
+,{"stream_name":"stdout","time":7575.241891929,"data":"  Batch [2800/3351] | Loss: 0.0218 | LR: 2.40e-05 | Thời gian: 1935.6s\n"}
+,{"stream_name":"stdout","time":7575.241894317,"data":"  Batch [3000/3351] | Loss: 1.1694 | LR: 2.34e-05 | Thời gian: 2075.3s\n"}
+,{"stream_name":"stdout","time":7575.241896679,"data":"  Batch [3200/3351] | Loss: 0.0039 | LR: 2.27e-05 | Thời gian: 2212.5s\n"}
+,{"stream_name":"stdout","time":7575.24189909,"data":"  Batch [3351/3351] | Loss: 0.5905 | LR: 2.22e-05 | Thời gian: 2315.6s\n"}
+,{"stream_name":"stdout","time":7575.241901471,"data":"\n"}
+,{"stream_name":"stdout","time":7575.241905875,"data":"[*] Đang đánh giá Validation Epoch 1...\n"}
+,{"stream_name":"stdout","time":7575.241908503,"data":"  + Train Loss    : 0.2991\n"}
+,{"stream_name":"stdout","time":7575.241910945,"data":"  + Val Loss      : 0.1320\n"}
+,{"stream_name":"stdout","time":7575.241913233,"data":"  + Val Accuracy  : 96.38%\n"}
+,{"stream_name":"stdout","time":7575.241915611,"data":"  + Val Precision : 98.20%\n"}
+,{"stream_name":"stdout","time":7575.241917946,"data":"  + Val Recall    : 93.26%\n"}
+,{"stream_name":"stdout","time":7575.241920304,"data":"  + Val F1-Score  : 95.67%\n"}
+,{"stream_name":"stdout","time":7575.241922581,"data":"  + Val AUC-ROC   : 98.56%\n"}
+,{"stream_name":"stdout","time":7575.241924885,"data":"  + Thời gian     : 2315.6 giây\n"}
+,{"stream_name":"stdout","time":7575.241927317,"data":"  🎉 F1-Score cao nhất mới (95.67%)! Đang lưu checkpoint...\n"}
+,{"stream_name":"stdout","time":7575.241929881,"data":"  [v] Đã lưu model tại: /kaggle/working/longformer_best.pt\n"}
+,{"stream_name":"stdout","time":7575.241932283,"data":"\n"}
+,{"stream_name":"stdout","time":7575.241934479,"data":"\u003e\u003e\u003e Epoch 2/3\n"}
+,{"stream_name":"stdout","time":7575.241936935,"data":"-------------------------------------------------------\n"}
+,{"stream_name":"stdout","time":7575.241942795,"data":"  Batch [ 200/3351] | Loss: 1.9739 | LR: 2.16e-05 | Thời gian: 139.2s\n"}
+,{"stream_name":"stdout","time":7575.241945474,"data":"  Batch [ 400/3351] | Loss: 0.5807 | LR: 2.09e-05 | Thời gian: 274.9s\n"}
+,{"stream_name":"stdout","time":7575.241947949,"data":"  Batch [ 600/3351] | Loss: 2.2931 | LR: 2.02e-05 | Thời gian: 414.1s\n"}
+,{"stream_name":"stdout","time":7575.241950325,"data":"  Batch [ 800/3351] | Loss: 0.0032 | LR: 1.96e-05 | Thời gian: 555.4s\n"}
+,{"stream_name":"stdout","time":7575.241952728,"data":"  Batch [1000/3351] | Loss: 0.0019 | LR: 1.89e-05 | Thời gian: 692.3s\n"}
+,{"stream_name":"stdout","time":7575.241955081,"data":"  Batch [1200/3351] | Loss: 0.0070 | LR: 1.82e-05 | Thời gian: 828.2s\n"}
+,{"stream_name":"stdout","time":7575.241957456,"data":"  Batch [1400/3351] | Loss: 0.4993 | LR: 1.76e-05 | Thời gian: 966.2s\n"}
+,{"stream_name":"stdout","time":7575.241959801,"data":"  Batch [1600/3351] | Loss: 0.0064 | LR: 1.69e-05 | Thời gian: 1103.8s\n"}
+,{"stream_name":"stdout","time":7575.241962205,"data":"  Batch [1800/3351] | Loss: 0.0674 | LR: 1.63e-05 | Thời gian: 1242.6s\n"}
+,{"stream_name":"stdout","time":7575.241964645,"data":"  Batch [2000/3351] | Loss: 0.0050 | LR: 1.56e-05 | Thời gian: 1378.8s\n"}
+,{"stream_name":"stdout","time":7575.241967035,"data":"  Batch [2200/3351] | Loss: 0.0311 | LR: 1.49e-05 | Thời gian: 1518.4s\n"}
+,{"stream_name":"stdout","time":7575.241969469,"data":"  Batch [2400/3351] | Loss: 0.8022 | LR: 1.43e-05 | Thời gian: 1654.7s\n"}
+,{"stream_name":"stdout","time":7575.241971873,"data":"  Batch [2600/3351] | Loss: 0.0012 | LR: 1.36e-05 | Thời gian: 1791.5s\n"}
+,{"stream_name":"stdout","time":7575.241974231,"data":"  Batch [2800/3351] | Loss: 0.0025 | LR: 1.29e-05 | Thời gian: 1927.2s\n"}
+,{"stream_name":"stdout","time":7575.241976615,"data":"  Batch [3000/3351] | Loss: 0.0098 | LR: 1.23e-05 | Thời gian: 2064.5s\n"}
+,{"stream_name":"stdout","time":7575.241978967,"data":"  Batch [3200/3351] | Loss: 1.1762 | LR: 1.16e-05 | Thời gian: 2205.1s\n"}
+,{"stream_name":"stdout","time":7575.241981343,"data":"  Batch [3351/3351] | Loss: 0.0200 | LR: 1.11e-05 | Thời gian: 2306.9s\n"}
+,{"stream_name":"stdout","time":7575.241983709,"data":"\n"}
+,{"stream_name":"stdout","time":7575.241985944,"data":"[*] Đang đánh giá Validation Epoch 2...\n"}
+,{"stream_name":"stdout","time":7575.241988277,"data":"  + Train Loss    : 0.1629\n"}
+,{"stream_name":"stdout","time":7575.241990599,"data":"  + Val Loss      : 0.4874\n"}
+,{"stream_name":"stdout","time":7575.241992887,"data":"  + Val Accuracy  : 89.17%\n"}
+,{"stream_name":"stdout","time":7575.241995181,"data":"  + Val Precision : 81.64%\n"}
+,{"stream_name":"stdout","time":7575.241997429,"data":"  + Val Recall    : 96.43%\n"}
+,{"stream_name":"stdout","time":7575.241999723,"data":"  + Val F1-Score  : 88.42%\n"}
+,{"stream_name":"stdout","time":7575.24200199,"data":"  + Val AUC-ROC   : 98.23%\n"}
+,{"stream_name":"stdout","time":7575.242004283,"data":"  + Thời gian     : 2306.9 giây\n"}
+,{"stream_name":"stdout","time":7575.242006611,"data":"\n"}
+,{"stream_name":"stdout","time":7575.242008822,"data":"\u003e\u003e\u003e Epoch 3/3\n"}
+,{"stream_name":"stdout","time":7575.242011132,"data":"-------------------------------------------------------\n"}
+,{"stream_name":"stdout","time":7575.242013865,"data":"  Batch [ 200/3351] | Loss: 0.0144 | LR: 1.04e-05 | Thời gian: 137.6s\n"}
+,{"stream_name":"stdout","time":7575.242018771,"data":"  Batch [ 400/3351] | Loss: 0.0025 | LR: 9.78e-06 | Thời gian: 271.8s\n"}
+,{"stream_name":"stdout","time":7575.242021242,"data":"  Batch [ 600/3351] | Loss: 0.0013 | LR: 9.12e-06 | Thời gian: 408.6s\n"}
+,{"stream_name":"stdout","time":7575.242026604,"data":"  Batch [ 800/3351] | Loss: 0.0071 | LR: 8.46e-06 | Thời gian: 544.3s\n"}
+,{"stream_name":"stdout","time":7575.242029127,"data":"  Batch [1000/3351] | Loss: 0.0050 | LR: 7.79e-06 | Thời gian: 680.2s\n"}
+,{"stream_name":"stdout","time":7575.242042839,"data":"  Batch [1200/3351] | Loss: 0.0051 | LR: 7.13e-06 | Thời gian: 814.5s\n"}
+,{"stream_name":"stdout","time":7575.242045276,"data":"  Batch [1400/3351] | Loss: 0.0032 | LR: 6.47e-06 | Thời gian: 951.0s\n"}
+,{"stream_name":"stdout","time":7575.242047489,"data":"  Batch [1600/3351] | Loss: 0.0088 | LR: 5.81e-06 | Thời gian: 1091.7s\n"}
+,{"stream_name":"stdout","time":7575.242049733,"data":"  Batch [1800/3351] | Loss: 0.0006 | LR: 5.14e-06 | Thời gian: 1231.7s\n"}
+,{"stream_name":"stdout","time":7575.242052139,"data":"  Batch [2000/3351] | Loss: 0.0006 | LR: 4.48e-06 | Thời gian: 1373.1s\n"}
+,{"stream_name":"stdout","time":7575.242054424,"data":"  Batch [2200/3351] | Loss: 0.0068 | LR: 3.82e-06 | Thời gian: 1508.7s\n"}
+,{"stream_name":"stdout","time":7575.242056664,"data":"  Batch [2400/3351] | Loss: 0.0027 | LR: 3.16e-06 | Thời gian: 1648.4s\n"}
+,{"stream_name":"stdout","time":7575.242058897,"data":"  Batch [2600/3351] | Loss: 0.0804 | LR: 2.49e-06 | Thời gian: 1786.2s\n"}
+,{"stream_name":"stdout","time":7575.242061128,"data":"  Batch [2800/3351] | Loss: 0.0034 | LR: 1.83e-06 | Thời gian: 1925.2s\n"}
+,{"stream_name":"stdout","time":7575.242063352,"data":"  Batch [3000/3351] | Loss: 0.0027 | LR: 1.17e-06 | Thời gian: 2065.0s\n"}
+,{"stream_name":"stdout","time":7575.242065589,"data":"  Batch [3200/3351] | Loss: 0.0071 | LR: 5.04e-07 | Thời gian: 2204.6s\n"}
+,{"stream_name":"stdout","time":7575.242067819,"data":"  Batch [3351/3351] | Loss: 0.0022 | LR: 0.00e+00 | Thời gian: 2308.1s\n"}
+,{"stream_name":"stdout","time":7575.242070097,"data":"\n"}
+,{"stream_name":"stdout","time":7575.242072181,"data":"[*] Đang đánh giá Validation Epoch 3...\n"}
+,{"stream_name":"stdout","time":7575.242092212,"data":"  + Train Loss    : 0.1088\n"}
+,{"stream_name":"stdout","time":7575.242094624,"data":"  + Val Loss      : 0.2789\n"}
+,{"stream_name":"stdout","time":7575.242096932,"data":"  + Val Accuracy  : 94.43%\n"}
+,{"stream_name":"stdout","time":7575.242099225,"data":"  + Val Precision : 92.13%\n"}
+,{"stream_name":"stdout","time":7575.242101499,"data":"  + Val Recall    : 95.13%\n"}
+,{"stream_name":"stdout","time":7575.242103787,"data":"  + Val F1-Score  : 93.61%\n"}
+,{"stream_name":"stdout","time":7575.242106065,"data":"  + Val AUC-ROC   : 98.37%\n"}
+,{"stream_name":"stdout","time":7575.242108369,"data":"  + Thời gian     : 2308.1 giây\n"}
+,{"stream_name":"stdout","time":7575.242110721,"data":"\n"}
+,{"stream_name":"stdout","time":7575.242112933,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":7575.242115372,"data":"  HOÀN TẤT HUẤN LUYỆN LONGFORMER TRONG 122.90 PHÚT!\n"}
+,{"stream_name":"stdout","time":7575.242117851,"data":"  F1-Score tốt nhất trên Validation: 95.67%\n"}
+,{"stream_name":"stdout","time":7575.242120327,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":7575.242122721,"data":"[*] Đã lưu lịch sử huấn luyện: /kaggle/working/training_log_longformer.csv\n"}
+,{"stream_name":"stdout","time":7575.242125377,"data":"[*] Đã lưu Tokenizer tại: /kaggle/working/tokenizer_longformer\n"}
+,{"stream_name":"stdout","time":7575.24212787,"data":"\n"}
+,{"stream_name":"stdout","time":7575.242130055,"data":"[*] Đang nạp Checkpoint tốt nhất để đánh giá trên tập Test (In-domain)...\n"}
+,{"stream_name":"stdout","time":7575.242135044,"data":"\n"}
+,{"stream_name":"stdout","time":7575.242137535,"data":"=======================================================\n"}
+,{"stream_name":"stdout","time":7575.242139923,"data":"  KẾT QUẢ ĐÁNH GIÁ LONGFORMER TRÊN TẬP TEST NỘI MIỀN (IN-DOMAIN)\n"}
+,{"stream_name":"stdout","time":7575.242142521,"data":"=======================================================\n"}
+,{"stream_name":"stdout","time":7575.242144917,"data":"  - Test Loss      : 0.1377\n"}
+,{"stream_name":"stdout","time":7575.242147269,"data":"  - Test Accuracy  : 96.45%\n"}
+,{"stream_name":"stdout","time":7575.242149585,"data":"  - Test Precision : 98.21%\n"}
+,{"stream_name":"stdout","time":7575.242152063,"data":"  - Test Recall    : 93.43%\n"}
+,{"stream_name":"stdout","time":7575.242154385,"data":"  - Test F1-Score  : 95.76%\n"}
+,{"stream_name":"stdout","time":7575.242156667,"data":"  - Test AUC-ROC   : 98.65%\n"}
+,{"stream_name":"stdout","time":7575.242158961,"data":"=======================================================\n"}
+,{"stream_name":"stdout","time":7575.242161342,"data":"[*] Đã lưu kết quả kiểm thử: /kaggle/working/longformer_test_results.json\n"}
+,{"stream_name":"stdout","time":7578.452197487,"data":"\n"}
+,{"stream_name":"stdout","time":7578.452230204,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":7578.452235282,"data":"  [v] HUẤN LUYỆN THÀNH CÔNG VÀ HOÀN TẤT LONGFORMER TRÊN KAGGLE GPU!\n"}
+,{"stream_name":"stdout","time":7578.452243285,"data":"  - Model Checkpoint : /kaggle/working/longformer_best.pt\n"}
+,{"stream_name":"stdout","time":7578.452245881,"data":"  - Training Log     : /kaggle/working/training_log_longformer.csv\n"}
+,{"stream_name":"stdout","time":7578.452248169,"data":"  - Test Evaluation  : /kaggle/working/longformer_test_results.json\n"}
+,{"stream_name":"stdout","time":7578.452250498,"data":"===========================================================================\n"}
+,{"stream_name":"stderr","time":7580.965269486,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":7580.965299254,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":7581.220191226,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":7581.220213833,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":7581.992971036,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":7582.92713947,"data":"[NbConvertApp] Writing 285319 bytes to __results__.html\n"}
+]

@@ -42,9 +42,13 @@ DoAnChuyenNganh/
 │
 ├── BAO_CAO_TIEN_DO_TUAN_1.md          # Báo cáo tiến độ chi tiết từ Ngày 1 đến Ngày 7 (Hoàn thành Tuần 1)
 ├── kaggle_jobs/                       # Cấu hình huấn luyện mô hình từ xa trên Kaggle GPU
-│   └── train_bert/
-│       ├── kernel-metadata.json       # Cấu hình kernel Kaggle (GPU Tesla T4, Internet on)
-│       └── run_training.py            # Script tự động clone repo và điều phối huấn luyện
+│   ├── train_bert/                    # Job Kaggle cho BERT (Tesla T4)
+│   ├── train_roberta/                 # Job Kaggle cho RoBERTa (Tesla T4)
+│   └── train_longformer/              # Job Kaggle cho Longformer (Tesla T4)
+├── train_bert.py                      # Pipeline huấn luyện mô hình BERT
+├── train_roberta.py                   # Pipeline huấn luyện mô hình RoBERTa
+├── train_longformer.py                # Pipeline huấn luyện mô hình Longformer (Context 1024)
+├── models.py                          # Định nghĩa kiến trúc PyTorch cho cả 3 PLMs
 ├── requirements.txt                   # Danh mục thư viện Python yêu cầu
 ├── .env.example                       # Mẫu cấu hình biến môi trường
 └── README.md                          # Giới thiệu & Hướng dẫn sử dụng
@@ -152,6 +156,35 @@ kaggle kernels output quannguyenxx/do-an-train-bert -p ./output
   * **Recall**: **93.75%** (Vượt trội hơn BERT: 93.75% vs 92.45%)
   * **AUC-ROC**: **98.40%** (Vượt trội hơn BERT: 98.40% vs 98.05%)
   * **Test Loss**: **0.2057**
+
+### 3. Longformer (`allenai/longformer-base-4096`) - Hoàn thành Ngày 10
+* **Môi trường**: Kaggle GPU Tesla T4 (15GB VRAM), PyTorch + CUDA, Mixed Precision FP16, Gradient Accumulation (micro-batch 4 x 4 = effective batch 16).
+* **Độ dài ngữ cảnh**: 1024 tokens (cơ chế Sliding Window kết hợp Global Attention tại token đầu).
+* **Kết quả kiểm thử trên tập Test nội miền (`data/test.csv` - 2,873 mẫu)**:
+  * **Accuracy**: **96.45%** (Vượt trội nhất trong cả 3 mô hình đơn lẻ)
+  * **F1-Score**: **95.76%** (Vượt trội nhất)
+  * **Precision**: **98.21%** (Chính xác cao nhất, cực kỳ hiếm khi bắt nhầm người viết)
+  * **Recall**: **93.43%**
+  * **AUC-ROC**: **98.65%** (Khả năng phân tách nhãn nhị phân tốt nhất)
+  * **Test Loss**: **0.1377** (Mất mát thấp nhất)
+
+---
+
+### 📊 Bảng Đối So Sánh 3 Mô Hình Nền Tảng (Base PLMs)
+
+| Chỉ số Đánh giá | BERT (`bert-base-uncased`) | RoBERTa (`roberta-base`) | Longformer (`longformer-base-4096`) | Nhận xét Khoa học |
+| :--- | :---: | :---: | :---: | :--- |
+| **Max Sequence Length** | 512 | 512 | **1024** | Longformer xử lý trọn vẹn văn bản tin tức dài |
+| **Số tham số (Params)** | 110 Triệu | 125 Triệu | 149 Triệu | Kiến trúc Sliding Window tối ưu $O(N)$ bộ nhớ |
+| **Test Accuracy** | 95.86% | 95.02% | **96.45%** | Longformer dẫn đầu về độ chính xác tổng thể |
+| **Test F1-Score** | 95.04% | 94.17% | **95.76%** | Longformer đạt điểm điều hòa F1 cao nhất |
+| **Test Precision** | 97.77% | 94.59% | **98.21%** | Longformer & BERT cực kỳ an toàn (ít False Positive) |
+| **Test Recall** | 92.45% | **93.75%** | 93.43% | RoBERTa nhạy nhất trong việc tóm bắt bài AI |
+| **Test AUC-ROC** | 98.05% | 98.40% | **98.65%** | Longformer đạt đường cong ROC tiệm cận hoàn hảo |
+| **Test Loss** | 0.1442 | 0.2057 | **0.1377** | Longformer hội tụ mượt mà và tổng quát hóa tốt nhất |
+
+> 💡 **Cơ sở khoa học cho Mô hình Kết hợp (Ensemble ở Ngày 11-12):**  
+> Mỗi mô hình đơn lẻ đều có thế mạnh riêng biệt: **BERT** có độ chính xác câu ngắn sắc bén, **RoBERTa** bắt trúng biến thể AI nhạy nhất (Recall cao nhất), và **Longformer** bao quát ngữ cảnh dài xuất sắc nhất (Precision, F1 và AUC cao nhất). Việc kết hợp cả 3 mô hình bằng Soft Voting và Meta-Classifier (Stacking) hứa hẹn sẽ đưa hiệu năng tổng thể vượt mốc 97% Accuracy!
 
 ---
 
