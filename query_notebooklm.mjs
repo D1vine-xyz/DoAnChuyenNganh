@@ -22,11 +22,15 @@ const sessionManager = new SessionManager(authManager);
 const library = new NotebookLibrary();
 const toolHandlers = new ToolHandlers(sessionManager, authManager, library);
 
+const userQuestion = process.argv.slice(2).join(" ").trim();
+const defaultQuestion = "Hãy đọc và tóm tắt chi tiết toàn bộ thông tin về lịch trình làm việc, các mốc thời gian (milestones), các giai đoạn thực hiện đề tài và nhiệm vụ hoặc sản phẩm cụ thể được đề cập trong các tài liệu nguồn của notebook này.";
+const question = userQuestion || defaultQuestion;
+
 try {
-  console.log("Đang gửi câu hỏi về lịch trình làm việc đến NotebookLM...");
+  console.log(`Đang gửi câu hỏi: "${question}"...`);
   const result = await toolHandlers.handleAskQuestion({
     notebook_id: "nghi-n-c-u-ph-t-hi-n-v-n-b-n-l",
-    question: "Hãy đọc và tóm tắt chi tiết toàn bộ thông tin về lịch trình làm việc, các mốc thời gian (milestones), các giai đoạn thực hiện đề tài và nhiệm vụ hoặc sản phẩm cụ thể được đề cập trong các tài liệu nguồn của notebook này.",
+    question: question,
     source_format: "footnotes"
   }, (msg) => {
     console.log(`[Tiến trình] ${msg}`);
