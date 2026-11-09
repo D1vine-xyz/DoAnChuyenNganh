@@ -1,0 +1,152 @@
+[{"stream_name":"stdout","time":0.93075509,"data":"================================================================================\n"}
+,{"stream_name":"stdout","time":0.930842836,"data":"  KAGGLE REMOTE JOB: THỰC NGHIỆM ĐÁNH GIÁ MÔ HÌNH HỌC KẾT HỢP (ENSEMBLE PLMs)\n"}
+,{"stream_name":"stdout","time":0.930852021,"data":"================================================================================\n"}
+,{"stream_name":"stdout","time":6.658536028,"data":"[*] Phiên bản PyTorch : 2.11.0+cpu\n"}
+,{"stream_name":"stdout","time":6.658656187,"data":"[*] CUDA Sẵn sàng     : False\n"}
+,{"stream_name":"stdout","time":6.658661094,"data":"[!] CẢNH BÁO: Không tìm thấy GPU! Kiểm tra 'enable_gpu: true'.\n"}
+,{"stream_name":"stdout","time":6.658664866,"data":"[*] Đang tải mã nguồn từ GitHub: https://github.com/D1vine-xyz/DoAnChuyenNganh.git ...\n"}
+,{"stream_name":"stderr","time":6.692168537,"data":"Cloning into '/tmp/DoAnChuyenNganh'...\n"}
+,{"stream_name":"stderr","time":22.620552187,"data":"Updating files:  23% (15/65)\rUpdating files:  24% (16/65)\rUpdating files:  26% (17/65)\rUpdating files:  27% (18/65)\rUpdating files:  29% (19/65)\rUpdating files:  30% (20/65)\rUpdating files:  32% (21/65)\rUpdating files:  33% (22/65)\rUpdating files:  35% (23/65)\rUpdating files:  36% (24/65)\rUpdating files:  38% (25/65)\rUpdating files:  40% (26/65)\rUpdating files:  41% (27/65)\rUpdating files:  43% (28/65)\rUpdating files:  44% (29/65)\rUpdating files:  46% (30/65)\rUpdating files:  47% (31/65)\rUpdating files:  49% (32/65)\rUpdating files:  50% (33/65)\rUpdating files:  52% (34/65)\rUpdating files:  53% (35/65)\rUpdating files:  55% (36/65)\rUpdating files:  56% (37/65)\rUpdating files:  58% (38/65)\rUpdating files:  60% (39/65)\rUpdating files:  61% (40/65)\rUpdating files:  63% (41/65)\rUpdating files:  64% (42/65)\rUpdating files:  66% (43/65)\rUpdating files:  67% (44/65)\rUpdating files:  69% (45/65)\rUpdating files:  70% (46/65)\rUpdating files:  72% (47/65)\rUpdating files:  73% (48/65)\rUpdating files:  75% (49/65)\rUpdating files:  76% (50/65)\rUpdating files:  78% (51/65)\rUpdating files:  80% (52/65)\rUpdating files:  81% (53/65)\rUpdating files:  83% (54/65)\rUpdating files:  84% (55/65)\rUpdating files:  86% (56/65)\rUpdating files:  87% (57/65)\rUpdating files:  89% (58/65)\rUpdating files:  90% (59/65)\rUpdating files:  92% (60/65)\rUpdating files:  93% (61/65)\rUpdating files:  95% (62/65)\rUpdating files:  96% (63/65)\rUpdating files:  98% (64/65)\rUpdating files: 100% (65/65)\rUpdating files: 100% (65/65), done.\n"}
+,{"stream_name":"stdout","time":22.753177549,"data":"  [v] Tìm thấy bert_best.pt tại: /kaggle/input/notebooks/quannguyenxx/do-an-train-bert/bert_best.pt\n"}
+,{"stream_name":"stdout","time":22.862898124,"data":"  [v] Tìm thấy roberta_best.pt tại: /kaggle/input/notebooks/quannguyenxx/do-an-train-roberta/roberta_best.pt\n"}
+,{"stream_name":"stdout","time":23.012308794,"data":"  [v] Tìm thấy longformer_best.pt tại: /kaggle/input/notebooks/quannguyenxx/do-an-train-longformer/longformer_best.pt\n"}
+,{"stream_name":"stdout","time":23.012341669,"data":"\n"}
+,{"stream_name":"stdout","time":23.012347319,"data":"[*] BẮT ĐẦU CHẠY THỰC NGHIỆM ĐÁNH GIÁ ENSEMBLE TRÊN TẬP VAL VÀ TEST...\n"}
+,{"stream_name":"stderr","time":53.886330956,"data":"Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.\n"}
+,{"stream_name":"stdout","time":62.847653435,"data":"================================================================================\n"}
+,{"stream_name":"stdout","time":62.847695337,"data":"  QUY TRÌNH THỰC NGHIỆM MÔ HÌNH HỌC KẾT HỢP (ENSEMBLE PLMs PIPELINE)\n"}
+,{"stream_name":"stdout","time":62.847713215,"data":"================================================================================\n"}
+,{"stream_name":"stdout","time":62.847750232,"data":"\n"}
+,{"stream_name":"stdout","time":62.847755417,"data":"[*] Đang nạp dữ liệu từ thư mục: data\n"}
+,{"stream_name":"stdout","time":62.847760393,"data":"  [v] Tập Validation : 2,872 mẫu\n"}
+,{"stream_name":"stdout","time":62.84778682,"data":"  [v] Tập Test       : 2,873 mẫu\n"}
+,{"stream_name":"stdout","time":62.847791788,"data":"[*] Tối ưu hóa CPU Multi-threading: 4 threads (Intel MKL/OpenMP).\n"}
+,{"stream_name":"stdout","time":62.847797038,"data":"[*] Khởi tạo EnsembleDetector trên thiết bị: cpu\n"}
+,{"stream_name":"stdout","time":62.847802224,"data":"[*] Đang nạp Tokenizers...\n"}
+,{"stream_name":"stdout","time":62.847807054,"data":"[*] Đang nạp trọng số BERT từ: /kaggle/input/notebooks/quannguyenxx/do-an-train-bert/bert_best.pt\n"}
+,{"stream_name":"stderr","time":62.947305104,"data":"\rLoading weights:   0%|          | 0/199 [00:00\u003c?, ?it/s]\rLoading weights: 100%|██████████| 199/199 [00:00\u003c00:00, 2006.30it/s]\n"}
+,{"stream_name":"stderr","time":62.97227852,"data":"[transformers] \u001b[1mBertModel LOAD REPORT\u001b[0m from: bert-base-uncased\n"}
+,{"stream_name":"stderr","time":62.972321057,"data":"Key                                        | Status     |  | \n"}
+,{"stream_name":"stderr","time":62.972327504,"data":"-------------------------------------------+------------+--+-\n"}
+,{"stream_name":"stderr","time":62.972332574,"data":"cls.predictions.transform.dense.weight     | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":62.972337451,"data":"cls.predictions.transform.dense.bias       | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":62.972342468,"data":"cls.predictions.transform.LayerNorm.weight | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":62.97234578,"data":"cls.seq_relationship.weight                | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":62.972349411,"data":"cls.seq_relationship.bias                  | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":62.972353673,"data":"cls.predictions.transform.LayerNorm.bias   | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":62.972358287,"data":"cls.predictions.bias                       | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":62.972361594,"data":"\n"}
+,{"stream_name":"stderr","time":62.972364473,"data":"Notes:\n"}
+,{"stream_name":"stderr","time":62.972367498,"data":"- UNEXPECTED:\tcan be ignored when loading from different task/architecture; not ok if you expect identical arch.\n"}
+,{"stream_name":"stdout","time":69.524329949,"data":"  [v] BERT sẵn sàng.\n"}
+,{"stream_name":"stdout","time":69.524371473,"data":"[*] Đang nạp trọng số RoBERTa từ: /kaggle/input/notebooks/quannguyenxx/do-an-train-roberta/roberta_best.pt\n"}
+,{"stream_name":"stderr","time":69.619156914,"data":"\rLoading weights:   0%|          | 0/197 [00:00\u003c?, ?it/s]\rLoading weights: 100%|██████████| 197/197 [00:00\u003c00:00, 2084.27it/s]\n"}
+,{"stream_name":"stderr","time":69.633000771,"data":"[transformers] \u001b[1mRobertaModel LOAD REPORT\u001b[0m from: roberta-base\n"}
+,{"stream_name":"stderr","time":69.633051435,"data":"Key                       | Status     | \n"}
+,{"stream_name":"stderr","time":69.633057777,"data":"--------------------------+------------+-\n"}
+,{"stream_name":"stderr","time":69.633062332,"data":"lm_head.bias              | UNEXPECTED | \n"}
+,{"stream_name":"stderr","time":69.633065466,"data":"lm_head.dense.bias        | UNEXPECTED | \n"}
+,{"stream_name":"stderr","time":69.633068504,"data":"lm_head.layer_norm.weight | UNEXPECTED | \n"}
+,{"stream_name":"stderr","time":69.633092532,"data":"lm_head.layer_norm.bias   | UNEXPECTED | \n"}
+,{"stream_name":"stderr","time":69.633095889,"data":"lm_head.dense.weight      | UNEXPECTED | \n"}
+,{"stream_name":"stderr","time":69.633098951,"data":"pooler.dense.weight       | MISSING    | \n"}
+,{"stream_name":"stderr","time":69.633101937,"data":"pooler.dense.bias         | MISSING    | \n"}
+,{"stream_name":"stderr","time":69.633104924,"data":"\n"}
+,{"stream_name":"stderr","time":69.633108118,"data":"Notes:\n"}
+,{"stream_name":"stderr","time":69.633111158,"data":"- UNEXPECTED:\tcan be ignored when loading from different task/architecture; not ok if you expect identical arch.\n"}
+,{"stream_name":"stderr","time":69.633114737,"data":"- MISSING:\tthose params were newly initialized because missing from the checkpoint. Consider training on your downstream task.\n"}
+,{"stream_name":"stdout","time":87.297821522,"data":"  [v] RoBERTa sẵn sàng.\n"}
+,{"stream_name":"stdout","time":87.29786823,"data":"[*] Đang nạp trọng số Longformer từ: /kaggle/input/notebooks/quannguyenxx/do-an-train-longformer/longformer_best.pt\n"}
+,{"stream_name":"stderr","time":87.32656521,"data":"\rLoading weights:   0%|          | 0/271 [00:00\u003c?, ?it/s]\rLoading weights: 100%|██████████| 271/271 [00:00\u003c00:00, 9501.35it/s]\n"}
+,{"stream_name":"stderr","time":87.333489492,"data":"[transformers] \u001b[1mLongformerModel LOAD REPORT\u001b[0m from: allenai/longformer-base-4096\n"}
+,{"stream_name":"stderr","time":87.333525792,"data":"Key                       | Status     |  | \n"}
+,{"stream_name":"stderr","time":87.333532769,"data":"--------------------------+------------+--+-\n"}
+,{"stream_name":"stderr","time":87.333538989,"data":"lm_head.bias              | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":87.333544816,"data":"lm_head.dense.bias        | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":87.333550714,"data":"lm_head.layer_norm.weight | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":87.333556847,"data":"lm_head.layer_norm.bias   | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":87.333562917,"data":"lm_head.decoder.weight    | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":87.333569015,"data":"lm_head.dense.weight      | UNEXPECTED |  | \n"}
+,{"stream_name":"stderr","time":87.333575174,"data":"\n"}
+,{"stream_name":"stderr","time":87.333580996,"data":"Notes:\n"}
+,{"stream_name":"stderr","time":87.333586956,"data":"- UNEXPECTED:\tcan be ignored when loading from different task/architecture; not ok if you expect identical arch.\n"}
+,{"stream_name":"stderr","time":91.718832454,"data":"/tmp/DoAnChuyenNganh/ensemble.py:168: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.\n"}
+,{"stream_name":"stderr","time":91.718871394,"data":"  with torch.cuda.amp.autocast(enabled=self.use_fp16):\n"}
+,{"stream_name":"stderr","time":106.283339909,"data":"/tmp/DoAnChuyenNganh/ensemble.py:189: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.\n"}
+,{"stream_name":"stderr","time":106.283382729,"data":"  with torch.cuda.amp.autocast(enabled=self.use_fp16):\n"}
+,{"stream_name":"stderr","time":120.904966847,"data":"/tmp/DoAnChuyenNganh/ensemble.py:212: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.\n"}
+,{"stream_name":"stderr","time":120.905038653,"data":"  with torch.cuda.amp.autocast(enabled=self.use_fp16):\n"}
+,{"stream_name":"stderr","time":743.549147778,"data":"[transformers] Input ids are automatically padded to be a multiple of `config.attention_window`: 512\n"}
+,{"stream_name":"stderr","time":16909.231653191,"data":"/tmp/DoAnChuyenNganh/ensemble.py:168: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.\n"}
+,{"stream_name":"stderr","time":16909.232110486,"data":"  with torch.cuda.amp.autocast(enabled=self.use_fp16):\n"}
+,{"stream_name":"stderr","time":16924.432082453,"data":"/tmp/DoAnChuyenNganh/ensemble.py:189: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.\n"}
+,{"stream_name":"stderr","time":16924.432129791,"data":"  with torch.cuda.amp.autocast(enabled=self.use_fp16):\n"}
+,{"stream_name":"stderr","time":16939.757730076,"data":"/tmp/DoAnChuyenNganh/ensemble.py:212: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.\n"}
+,{"stream_name":"stderr","time":16939.757847367,"data":"  with torch.cuda.amp.autocast(enabled=self.use_fp16):\n"}
+,{"stream_name":"stdout","time":33597.417444006,"data":"  [v] Longformer sẵn sàng.\n"}
+,{"stream_name":"stdout","time":33597.417656663,"data":"\n"}
+,{"stream_name":"stdout","time":33597.417663138,"data":"------------------------------------------------------------\n"}
+,{"stream_name":"stdout","time":33597.417667339,"data":"  GIAI ĐOẠN 1: TRÍCH XUẤT VÀ TỐI ƯU TRÊN TẬP VALIDATION\n"}
+,{"stream_name":"stdout","time":33597.417671826,"data":"------------------------------------------------------------\n"}
+,{"stream_name":"stdout","time":33597.417675468,"data":"[*] Bắt đầu trích xuất dự đoán trên 2,872 mẫu (180 batches)...\n"}
+,{"stream_name":"stdout","time":33597.417679463,"data":"  Batch [  25/180] (  400/2872) | 2429.0s\n"}
+,{"stream_name":"stdout","time":33597.417683036,"data":"  Batch [  50/180] (  800/2872) | 4747.7s\n"}
+,{"stream_name":"stdout","time":33597.417686698,"data":"  Batch [  75/180] ( 1200/2872) | 7080.3s\n"}
+,{"stream_name":"stdout","time":33597.417690536,"data":"  Batch [ 100/180] ( 1600/2872) | 9406.8s\n"}
+,{"stream_name":"stdout","time":33597.417694104,"data":"  Batch [ 125/180] ( 2000/2872) | 11723.0s\n"}
+,{"stream_name":"stdout","time":33597.417697652,"data":"  Batch [ 150/180] ( 2400/2872) | 14080.7s\n"}
+,{"stream_name":"stdout","time":33597.417701289,"data":"  Batch [ 175/180] ( 2800/2872) | 16403.5s\n"}
+,{"stream_name":"stdout","time":33597.417704824,"data":"  Batch [ 180/180] ( 2872/2872) | 16818.1s\n"}
+,{"stream_name":"stdout","time":33597.417708481,"data":"[*] Đang tối ưu hóa trọng số Weighted Soft Voting trên tập Validation...\n"}
+,{"stream_name":"stdout","time":33597.417712499,"data":"  [v] Trọng số tối ưu tìm được:\n"}
+,{"stream_name":"stdout","time":33597.41771648,"data":"      - BERT       : 0.3396\n"}
+,{"stream_name":"stdout","time":33597.417720316,"data":"      - RoBERTa    : 0.1738\n"}
+,{"stream_name":"stdout","time":33597.417723923,"data":"      - Longformer : 0.4865\n"}
+,{"stream_name":"stdout","time":33597.417727468,"data":"[*] Đang huấn luyện Meta-Classifier Stacking (Logistic Regression)...\n"}
+,{"stream_name":"stdout","time":33597.417731363,"data":"  [v] Hệ số Meta-Learner Coefs: [3.05713561 1.58161297 3.34929462] | Intercept: -3.3984\n"}
+,{"stream_name":"stdout","time":33597.41773519,"data":"\n"}
+,{"stream_name":"stdout","time":33597.417738661,"data":"------------------------------------------------------------\n"}
+,{"stream_name":"stdout","time":33597.417742444,"data":"  GIAI ĐOẠN 2: ĐÁNH GIÁ THỰC NGHIỆM TRÊN TẬP TEST NỘI MIỀN\n"}
+,{"stream_name":"stdout","time":33597.417746764,"data":"------------------------------------------------------------\n"}
+,{"stream_name":"stdout","time":33597.417917636,"data":"[*] Bắt đầu trích xuất dự đoán trên 2,873 mẫu (180 batches)...\n"}
+,{"stream_name":"stdout","time":33597.417927481,"data":"  Batch [  25/180] (  400/2873) | 2327.0s\n"}
+,{"stream_name":"stdout","time":33597.417930674,"data":"  Batch [  50/180] (  800/2873) | 4648.2s\n"}
+,{"stream_name":"stdout","time":33597.417949857,"data":"  Batch [  75/180] ( 1200/2873) | 6982.8s\n"}
+,{"stream_name":"stdout","time":33597.417953553,"data":"  Batch [ 100/180] ( 1600/2873) | 9343.8s\n"}
+,{"stream_name":"stdout","time":33597.417956503,"data":"  Batch [ 125/180] ( 2000/2873) | 11668.3s\n"}
+,{"stream_name":"stdout","time":33597.417959446,"data":"  Batch [ 150/180] ( 2400/2873) | 13978.7s\n"}
+,{"stream_name":"stdout","time":33597.417962379,"data":"  Batch [ 175/180] ( 2800/2873) | 16292.3s\n"}
+,{"stream_name":"stdout","time":33597.417965429,"data":"  Batch [ 180/180] ( 2873/2873) | 16687.7s\n"}
+,{"stream_name":"stdout","time":33597.417968354,"data":"\n"}
+,{"stream_name":"stdout","time":33597.417971174,"data":"===============================================================================================\n"}
+,{"stream_name":"stdout","time":33597.417974438,"data":"MÔ HÌNH / PHƯƠNG PHÁP                  | ACCURACY   | PRECISION  | RECALL     | F1-SCORE   | AUC-ROC   \n"}
+,{"stream_name":"stdout","time":33597.417977751,"data":"===============================================================================================\n"}
+,{"stream_name":"stdout","time":33597.417980888,"data":"BERT (bert-base-uncased)               |     95.86% |     97.77% |     92.45% |     95.04% |     98.05%\n"}
+,{"stream_name":"stdout","time":33597.417986551,"data":"RoBERTa (roberta-base)                 |     95.02% |     94.59% |     93.75% |     94.17% |     98.48%\n"}
+,{"stream_name":"stdout","time":33597.417989914,"data":"Longformer (longformer-base-4096)      |     96.45% |     98.21% |     93.43% |     95.76% |     98.65%\n"}
+,{"stream_name":"stdout","time":33597.417993009,"data":"Ensemble (Simple Soft Voting)          |     96.35% |     97.96% |     93.43% |     95.64% |     98.50%\n"}
+,{"stream_name":"stdout","time":33597.417996118,"data":"Ensemble (Weighted Soft Voting)        |     96.52% |     98.38% |     93.43% |     95.84% |     98.52%\n"}
+,{"stream_name":"stdout","time":33597.417999164,"data":"Ensemble (Stacking Meta-Classifier)    |     96.31% |     97.79% |     93.51% |     95.60% |     98.50%\n"}
+,{"stream_name":"stdout","time":33597.418002206,"data":"===============================================================================================\n"}
+,{"stream_name":"stdout","time":33597.418005237,"data":"\n"}
+,{"stream_name":"stdout","time":33597.418008263,"data":"[*] Đã lưu bảng so sánh chi tiết: /kaggle/working/ensemble_comparison_table.csv\n"}
+,{"stream_name":"stdout","time":33597.418011584,"data":"[*] Đã lưu file kết quả JSON: /kaggle/working/ensemble_test_results.json\n"}
+,{"stream_name":"stdout","time":33597.418014679,"data":"[*] Đã lưu cấu hình trọng số Ensemble: /kaggle/working/ensemble_weights.json\n"}
+,{"stream_name":"stdout","time":33597.418017864,"data":"[*] Đã lưu mô hình Stacking Meta-Learner: /kaggle/working/stacking_meta_learner.joblib\n"}
+,{"stream_name":"stdout","time":33597.418021117,"data":"[*] Đã lưu xác suất dự đoán chi tiết: /kaggle/working/test_predictions_ensemble.csv\n"}
+,{"stream_name":"stdout","time":33601.051745295,"data":"\n"}
+,{"stream_name":"stdout","time":33601.051821101,"data":"================================================================================\n"}
+,{"stream_name":"stdout","time":33601.05183014,"data":"  [v] ĐÁNH GIÁ ENSEMBLE THÀNH CÔNG VÀ HOÀN TẤT TRÊN KAGGLE GPU!\n"}
+,{"stream_name":"stdout","time":33601.051919903,"data":"  - Comparison Table   : /kaggle/working/ensemble_comparison_table.csv\n"}
+,{"stream_name":"stdout","time":33601.051926474,"data":"  - Detailed Metrics   : /kaggle/working/ensemble_test_results.json\n"}
+,{"stream_name":"stdout","time":33601.052472545,"data":"  - Optimal Weights    : /kaggle/working/ensemble_weights.json\n"}
+,{"stream_name":"stdout","time":33601.052484028,"data":"  - Stacking Model     : /kaggle/working/stacking_meta_learner.joblib\n"}
+,{"stream_name":"stdout","time":33601.052488914,"data":"  - Test Predictions   : /kaggle/working/test_predictions_ensemble.csv\n"}
+,{"stream_name":"stdout","time":33601.052493548,"data":"================================================================================\n"}
+,{"stream_name":"stderr","time":33605.796927482,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":33605.796972612,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":33606.349619675,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":33606.349669181,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":33608.493297667,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":33610.178157783,"data":"[NbConvertApp] Writing 288237 bytes to __results__.html\n"}
+]

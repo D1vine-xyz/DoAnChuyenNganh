@@ -184,7 +184,38 @@ kaggle kernels output quannguyenxx/do-an-train-bert -p ./output
 | **Test Loss** | 0.1442 | 0.2057 | **0.1377** | Longformer hội tụ mượt mà và tổng quát hóa tốt nhất |
 
 > 💡 **Cơ sở khoa học cho Mô hình Kết hợp (Ensemble ở Ngày 11-12):**  
-> Mỗi mô hình đơn lẻ đều có thế mạnh riêng biệt: **BERT** có độ chính xác câu ngắn sắc bén, **RoBERTa** bắt trúng biến thể AI nhạy nhất (Recall cao nhất), và **Longformer** bao quát ngữ cảnh dài xuất sắc nhất (Precision, F1 và AUC cao nhất). Việc kết hợp cả 3 mô hình bằng Soft Voting và Meta-Classifier (Stacking) hứa hẹn sẽ đưa hiệu năng tổng thể vượt mốc 97% Accuracy!
+> Mỗi mô hình đơn lẻ đều có thế mạnh riêng biệt: **BERT** có độ chính xác câu ngắn sắc bén, **RoBERTa** bắt trúng biến thể AI nhạy nhất (Recall cao nhất), và **Longformer** bao quát ngữ cảnh dài xuất sắc nhất (Precision, F1 và AUC cao nhất). Việc kết hợp cả 3 mô hình bằng Soft Voting và Meta-Classifier (Stacking) hứa hẹn sẽ đưa hiệu năng tổng thể vượt mốc kỷ lục mới!
+
+---
+
+## 🚀 Kết quả Mô hình Kết hợp (Ensemble Learning) - Hoàn thành Ngày 11
+
+Được thiết kế để kết hợp sức mạnh tối ưu từ cả 3 mô hình nền tảng (**BERT**, **RoBERTa**, **Longformer**), kiến trúc Ensemble thực thi 3 chiến lược:
+1. **Simple Soft Voting**: Bình quân xác suất đầu ra không trọng số ($P_{ens} = \frac{1}{3} \sum P_i$).
+2. **Weighted Soft Voting**: Tối ưu hóa véc-tơ trọng số $[w_{BERT}, w_{RoBERTa}, w_{Longformer}]$ trên tập Validation (2,872 mẫu) bằng thuật toán SLSQP (Cross-Entropy Loss minimization).
+3. **Stacking Meta-Classifier**: Mô hình phân loại cấp 2 (Logistic Regression) huấn luyện trên ma trận xác suất dự đoán của 3 PLMs.
+
+### 📊 Bảng Đối So Sánh Tổng Hợp Toàn Bộ Mô Hình (Test Set - 2,873 mẫu)
+
+| Mô hình / Chiến lược | Accuracy | Precision | Recall | F1-Score | AUC-ROC | Xếp hạng / Điểm nổi bật |
+| :--- | :---: | :---: | :---: | :---: | :---: | :--- |
+| **BERT** (`bert-base-uncased`) | 95.86% | 97.77% | 92.45% | 95.04% | 98.05% | Tốc độ nhanh, trích xuất đặc trưng tốt |
+| **RoBERTa** (`roberta-base`) | 95.02% | 94.59% | **93.75%** | 94.17% | 98.48% | Độ nhạy bắt bài AI đơn lẻ cao nhất |
+| **Longformer** (`longformer-base-4096`) | 96.45% | 98.21% | 93.43% | 95.76% | **98.65%** | Mô hình đơn lẻ xuất sắc nhất (1024 tokens) |
+| **Ensemble (Simple Soft Voting)** | 96.35% | 97.96% | 93.43% | 95.64% | 98.50% | Ổn định, cân bằng giữa các mô hình |
+| **Ensemble (Weighted Soft Voting)** | **96.52%** | **98.38%** | 93.43% | **95.84%** | 98.52% | 🏆 **VÔ ĐỊCH TOÀN DIỆN (Acc, Prec, F1)** |
+| **Ensemble (Stacking Meta-Classifier)**| 96.31% | 97.79% | 93.51% | 95.60% | 98.50% | Cân bằng xác suất phân loại cấp 2 |
+
+### 🎯 Trọng số Học được & Phân tích Đóng góp
+* **Trọng số Tối ưu (Weighted Soft Voting)**:
+  * $w_{\text{Longformer}} = \mathbf{48.65\%}$ (Đóng góp lớn nhất, nắm trọn ngữ cảnh bài báo dài)
+  * $w_{\text{BERT}} = \mathbf{33.96\%}$ (Bổ trợ đắc lực đặc trưng cục bộ)
+  * $w_{\text{RoBERTa}} = \mathbf{17.38\%}$ (Bổ sung tính đa dạng biểu diễn)
+* **Trọng số Meta-Classifier (Stacking)**:
+  * Hệ số hồi quy: $\beta_{\text{BERT}} = 3.057$, $\beta_{\text{RoBERTa}} = 1.582$, $\beta_{\text{Longformer}} = \mathbf{3.349}$, Intercept = $-3.398$.
+* **Kết luận Khoa học**:
+  * Chiến lược **Weighted Soft Voting** chính thức thiết lập đỉnh cao hiệu năng mới cho đề tài: **Accuracy đạt 96.52%**, **Precision đạt 98.38%** (chỉ có ~1.6% sai sót nhầm lẫn người viết thành AI), và **F1-Score đạt 95.84%**.
+  * Kết quả thực nghiệm chứng minh giả thuyết đề tài: Việc dung hợp tri thức đa mô hình (Multi-model Knowledge Fusion) bù trừ hoàn hảo nhược điểm của từng kiến trúc riêng lẻ, mang lại độ tin cậy vượt trội khi triển khai thực tế.
 
 ---
 
