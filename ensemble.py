@@ -102,6 +102,11 @@ class EnsembleDetector:
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.use_fp16 = use_fp16 and (self.device.type == "cuda")
 
+        if self.device.type == "cpu":
+            num_threads = os.cpu_count() or 4
+            torch.set_num_threads(num_threads)
+            print(f"[*] Tối ưu hóa CPU Multi-threading: {num_threads} threads (Intel MKL/OpenMP).")
+
         print(f"[*] Khởi tạo EnsembleDetector trên thiết bị: {self.device}")
         if self.device.type == "cuda":
             print(f"    - GPU: {torch.cuda.get_device_name(0)}")
@@ -362,6 +367,11 @@ def run_ensemble_evaluation(args):
     val_texts, val_labels = val_df["text"].tolist(), val_df["label"].values
     test_texts, test_labels = test_df["text"].tolist(), test_df["label"].values
 
+    if args.max_samples is not None and args.max_samples > 0:
+        print(f"[*] Chế độ giới hạn mẫu (max_samples): chỉ lấy {args.max_samples} mẫu đầu tiên để kiểm thử nhanh.")
+        val_texts, val_labels = val_texts[:args.max_samples], val_labels[:args.max_samples]
+        test_texts, test_labels = test_texts[:args.max_samples], test_labels[:args.max_samples]
+
     print(f"  [v] Tập Validation : {len(val_texts):,} mẫu")
     print(f"  [v] Tập Test       : {len(test_texts):,} mẫu")
 
@@ -492,6 +502,7 @@ def parse_args():
     parser.add_argument("--roberta_path", type=str, default="output/roberta_best.pt", help="Đường dẫn roberta_best.pt")
     parser.add_argument("--longformer_path", type=str, default="output/longformer_best.pt", help="Đường dẫn longformer_best.pt")
     parser.add_argument("--batch_size", type=int, default=16, help="Kích thước batch khi trích xuất dự đoán")
+    parser.add_argument("--max_samples", type=int, default=None, help="Giới hạn số mẫu kiểm thử nhanh")
     parser.add_argument("--fp16", action="store_true", default=True, help="Sử dụng FP16 tăng tốc độ")
     return parser.parse_args()
 
@@ -499,3 +510,4 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     run_ensemble_evaluation(args)
+
