@@ -1,0 +1,50 @@
+{
+  "BERT (bert-base-uncased)": {
+    "in_domain_accuracy": 0.9585798816568047,
+    "toefl_accuracy": 0.7380952380952381,
+    "delta_accuracy": -0.2204846435615666,
+    "in_domain_f1": 0.950354609929078,
+    "toefl_f1": 0.7924528301886793,
+    "delta_f1": -0.15790177974039876
+  },
+  "RoBERTa (roberta-base)": {
+    "in_domain_accuracy": 0.9502262443438914,
+    "toefl_accuracy": 0.5634920634920635,
+    "delta_accuracy": -0.38673418085182787,
+    "in_domain_f1": 0.9417040358744395,
+    "toefl_f1": 0.6961325966850829,
+    "delta_f1": -0.24557143918935664
+  },
+  "Longformer (longformer-base-4096)": {
+    "in_domain_accuracy": 0.9644970414201184,
+    "toefl_accuracy": 0.7380952380952381,
+    "delta_accuracy": -0.22640180332488025,
+    "in_domain_f1": 0.9575707154742097,
+    "toefl_f1": 0.7924528301886793,
+    "delta_f1": -0.1651178852855304
+  },
+  "Ensemble (Simple Soft Voting)": {
+    "in_domain_accuracy": 0.9634528367560041,
+    "toefl_accuracy": 0.6468253968253969,
+    "delta_accuracy": -0.31662743993060727,
+    "in_domain_f1": 0.9563772330702118,
+    "toefl_f1": 0.7390029325513197,
+    "delta_f1": -0.21737430051889217
+  },
+  "Ensemble (Weighted Soft Voting)": {
+    "in_domain_accuracy": 0.9651931778628611,
+    "toefl_accuracy": 0.6785714285714286,
+    "delta_accuracy": -0.28662174929143247,
+    "in_domain_f1": 0.958368026644463,
+    "toefl_f1": 0.7567567567567568,
+    "delta_f1": -0.20161126988770617
+  },
+  "Ensemble (Stacking Meta-Classifier)": {
+    "in_domain_accuracy": 0.9631047685346328,
+    "toefl_accuracy": 0.6468253968253969,
+    "delta_accuracy": -0.3162793717092359,
+    "in_domain_f1": 0.9560165975103735,
+    "toefl_f1": 0.7390029325513197,
+    "delta_f1": -0.21701366495905383
+  }
+}

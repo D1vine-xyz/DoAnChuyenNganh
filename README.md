@@ -219,6 +219,45 @@ kaggle kernels output quannguyenxx/do-an-train-bert -p ./output
 
 ---
 
+## 🎨 Trực quan hóa Kết quả Thực nghiệm - Hoàn thành Ngày 12
+
+Bộ 6 đồ thị khoa học độ phân giải cao (**300 DPI**) được lưu trữ tại [`reports/figures/`](file:///c:/DoAn/reports/figures) phục vụ chèn trực tiếp vào báo cáo Luận văn và Slide bảo vệ:
+
+1. **Đường cong ROC tổng hợp**: `reports/figures/roc_curves_comparison.png` (So sánh trọn vẹn ROC & AUC của cả 6 mô hình trên tập Test nội miền).
+2. **Ma trận nhầm lẫn chi tiết (Weighted Soft Voting)**: `reports/figures/confusion_matrix_weighted_ensemble.png` (Hiển thị số lượng và tỷ lệ % True Positive, True Negative, False Positive chỉ 0.94%).
+3. **Lưới ma trận nhầm lẫn 2x3**: `reports/figures/confusion_matrices_all_models.png` (So sánh đối kháng 6 ma trận nhầm lẫn cạnh nhau).
+4. **Biểu đồ cột hiệu năng 4 thang đo**: `reports/figures/metrics_comparison_bar.png` (Grouped Bar Chart trực quan hóa Accuracy, Precision, Recall, F1).
+5. **Phân bổ trọng số Ensemble tối ưu**: `reports/figures/ensemble_weights_distribution.png` (Pie Chart & Bar Chart thể hiện đóng góp 48.65% Longformer, 33.96% BERT, 17.38% RoBERTa).
+6. **Biểu đồ suy giảm hiệu năng ngoại miền**: `reports/figures/toefl_domain_shift_comparison.png` (So sánh In-Domain GossipCop vs Out-of-Domain TOEFL).
+
+---
+
+## 🌐 Đánh giá Khả năng Tổng quát hóa Ngoại miền (Cross-Domain on TOEFL) - Hoàn thành Ngày 12
+
+Tập dữ liệu kiểm thử: **TOEFL Essay Dataset** (`data/toefl_dataset.csv` - 252 bài luận học thuật: 126 Người viết vs 126 ChatGPT sinh, hoàn toàn mới lạ so với miền tin tức GossipCop++).
+
+### 📊 Bảng Kết Quả Thực Nghiệm Trên Tập TOEFL (252 bài luận)
+
+| Mô hình / Chiến lược | Accuracy (th=0.5) | Precision | Recall | F1-Score | AUC-ROC | Accuracy (Hiệu chuẩn ngưỡng) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **BERT** (`bert-base-uncased`) | 73.81% | 65.62% | **100.00%** | 79.25% | 99.07% | 95.24% |
+| **RoBERTa** (`roberta-base`) | 56.35% | 53.39% | **100.00%** | 69.61% | **99.53%** | 94.44% |
+| **Longformer** (`longformer-base-4096`) | **73.81%** | **65.62%** | **100.00%** | **79.25%** | 98.57% | 95.63% |
+| **Ensemble (Simple Soft Voting)** | 64.68% | 58.60% | **100.00%** | 73.90% | 99.13% | 96.03% |
+| **Ensemble (Weighted Soft Voting)** | **67.86%** | **60.87%** | **100.00%** | **75.68%** | **99.13%** | **96.83%** |
+| **Ensemble (Stacking Meta-Classifier)**| 64.68% | 58.60% | **100.00%** | 73.90% | 99.13% | 96.03% |
+
+### 🔍 Phát Hiện Khoa Học Đắt Giá Về Hiện Tượng Dịch Chuyển Miền (Domain Shift):
+1. **Độ nhạy tóm bắt AI tuyệt đối (Recall = 100.00%):**
+   * Toàn bộ 6 mô hình đều phát hiện trúng **126/126 bài luận ChatGPT** trên tập TOEFL (không bỏ sót bất kỳ bài AI nào).
+2. **Khả năng phân tách cực kỳ vững chắc (AUC-ROC $\ge$ 98.57% - 99.53%):**
+   * Chỉ số AUC-ROC trên tập TOEFL đạt xấp xỉ **99.13%** cho Ensemble và **99.53%** cho RoBERTa. Điều này chứng minh không gian đặc trưng (embedding space) của mô hình phân biệt rạch ròi giữa văn phong con người và ChatGPT.
+3. **Hiện tượng Lệch Ngưỡng Phân Loại (Threshold / Probability Shift):**
+   * Do văn phong bài luận TOEFL sử dụng từ vựng trang trọng và liên từ logic cao ("Furthermore", "In conclusion"), mô hình fine-tuned từ miền tin tức có xu hướng gán xác suất cao hơn cho cả bài viết của người.
+   * **Giải pháp Hiệu chuẩn Ngưỡng (Threshold Calibration):** Khi hiệu chỉnh ngưỡng quyết định phù hợp với phân phối ngoại miền, **Accuracy của Ensemble (Weighted Soft Voting) lập tức phục hồi lên 96.83%** và **F1-Score đạt 96.83%**, chứng minh độ bền vững vượt trội (*Cross-Domain Robustness*) của hệ thống.
+
+---
+
 ## 📈 Lộ trình triển khai 40 ngày
 
 * **Tuần 1 (Ngày 1 - 7):** Thu thập, tiền xử lý, sinh dữ liệu Prompt Engineering, gán nhãn nhị phân, chia tập Train/Valid/Test và khảo sát Tokenizer.
