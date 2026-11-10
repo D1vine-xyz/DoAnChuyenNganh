@@ -258,6 +258,52 @@ Tập dữ liệu kiểm thử: **TOEFL Essay Dataset** (`data/toefl_dataset.csv
 
 ---
 
+## ⚡ Module Suy Luận & Phân Tích Diễn Giải Cấp Câu - Hoàn thành Ngày 13
+
+Module [`inference.py`](file:///c:/DoAn/inference.py) đóng vai trò là "Bộ não suy luận độc lập" (Standalone Inference Engine) của toàn bộ hệ thống, sẵn sàng để tích hợp trực tiếp vào Backend API FastAPI và tiện ích trình duyệt:
+
+### 🌟 Tính Năng Cốt Lõi:
+1. **Lớp điều phối `AITextDetector`**: Nạp đồng bộ cả 3 checkpoints (.pt), trọng số tối ưu $w = [0.3396, 0.1738, 0.4865]$ và mô hình Stacking Logistic Regression.
+2. **Phân tích diễn giải cấp câu (Sentence-Level AI Hotspots)**: Bóc tách văn bản thành từng câu độc lập và gán nhãn mã màu trực quan:
+   * 🟢 **Xanh lá**: Văn phong tự nhiên do người viết ($P < 50\%$).
+   * 🟡 **Vàng**: Nghi vấn AI ($50\% \le P < 80\%$).
+   * 🔴 **Đỏ**: Chắc chắn AI sinh ($P \ge 80\%$).
+3. **Mức độ tin cậy tự động (Confidence Scoring)**: Phân cấp 4 mức từ *Rất cao* (Very High) tới *Không chắc chắn* (Borderline).
+
+### 🚀 Hướng Dẫn Sử Dụng Giao Diện Dòng Lệnh (CLI):
+```bash
+# 1. Dự đoán trực tiếp một đoạn văn bản (kèm phân tích từng câu)
+python inference.py --text "Artificial intelligence has seen unprecedented advancements..." --sentences
+
+# 2. Dự đoán văn bản từ tệp tin
+python inference.py --file input_essay.txt --sentences
+
+# 3. Bật chế độ tương tác nhập liên tục (Interactive CLI)
+python inference.py --interactive --sentences
+
+# 4. Đo đạc độ trễ và thông lượng suy luận chuẩn khoa học
+python inference.py --benchmark
+```
+
+### ⏱️ Bảng Đo Đạc Độ Trễ Suy Luận (Latency Benchmark trên CPU)
+
+| Độ dài văn bản | Số từ (Words) | Số Tokens (BPE) | Độ trễ trung bình ($\text{mean} \pm \text{std}$) | Thông lượng (Throughput) |
+| :--- | :---: | :---: | :---: | :---: |
+| **Đoạn ngắn (Short Text)** | 27 từ | 29 tokens | **1,301.5 ms** $\pm$ 77.7 ms | 22.3 tokens/s |
+| **Đoạn vừa (Medium Text)** | 78 từ | 93 tokens | **1,419.9 ms** $\pm$ 60.7 ms | 65.5 tokens/s |
+| **Đoạn dài (Long Text)** | 173 từ | 237 tokens | **1,966.1 ms** $\pm$ 282.8 ms | 120.5 tokens/s |
+
+> 💡 *Toàn bộ pipeline Ensemble gồm cả 3 mô hình BERT, RoBERTa và Longformer (1024 tokens) phản hồi chỉ trong **~1.3 - 1.9 giây** ngay trên CPU cá nhân, đảm bảo trải nghiệm mượt mà khi người dùng quét văn bản trên Extension.*
+
+### 🧪 Kiểm Thử Tự Động (Automated Testing)
+Đã xây dựng bộ kiểm thử đơn vị [`test_inference.py`](file:///c:/DoAn/test_inference.py) bao phủ khởi tạo mô hình, cấu trúc schema dữ liệu trả về, phân tách câu và xử lý ngoại lệ:
+```bash
+python -m unittest test_inference.py
+# Ran 4 tests in 21.5s -> OK (100% Passed)
+```
+
+---
+
 ## 📈 Lộ trình triển khai 40 ngày
 
 * **Tuần 1 (Ngày 1 - 7):** Thu thập, tiền xử lý, sinh dữ liệu Prompt Engineering, gán nhãn nhị phân, chia tập Train/Valid/Test và khảo sát Tokenizer.

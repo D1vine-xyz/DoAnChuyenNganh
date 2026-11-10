@@ -1,0 +1,23 @@
+{
+  "short_text": {
+    "word_count": 27,
+    "token_count": 29,
+    "mean_latency_ms": 1301.54,
+    "std_latency_ms": 77.7,
+    "throughput_tokens_per_sec": 22.3
+  },
+  "medium_text": {
+    "word_count": 78,
+    "token_count": 93,
+    "mean_latency_ms": 1419.94,
+    "std_latency_ms": 60.71,
+    "throughput_tokens_per_sec": 65.5
+  },
+  "long_text": {
+    "word_count": 173,
+    "token_count": 237,
+    "mean_latency_ms": 1966.12,
+    "std_latency_ms": 282.81,
+    "throughput_tokens_per_sec": 120.5
+  }
+}
