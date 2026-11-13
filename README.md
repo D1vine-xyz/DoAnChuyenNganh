@@ -304,6 +304,42 @@ python -m unittest test_inference.py
 
 ---
 
+## 🌐 Triển Khai Backend RESTful API bằng FastAPI - Hoàn thành Ngày 14
+
+Đóng gói toàn bộ mô hình Học kết hợp thành dịch vụ Web API hiệu năng cao với **FastAPI** và **Uvicorn**, sẵn sàng kết nối với tiện ích mở rộng Chrome Extension (Manifest v3) và các ứng dụng ngoài.
+
+### 🌟 Tính Năng Thiết Kế:
+1. **Quản lý Vòng đời (Lifespan Singleton)**: Nạp sẵn cả 3 mô hình PLMs lên bộ nhớ khi server khởi động (chỉ mất ~16s một lần duy nhất), các request sau phản hồi tức thì.
+2. **CORS Middleware toàn diện**: Cấu hình mở để các ứng dụng web và Chrome Extension (`chrome-extension://*`) gọi trực tiếp mà không bị chặn Cross-Origin.
+3. **Tài liệu API Tương tác tự động**: Tích hợp sẵn Swagger UI tại `http://localhost:8000/docs` và ReDoc tại `http://localhost:8000/redoc`.
+
+### 🚀 Khởi Chạy Server:
+```bash
+# Cách 1: Chạy nhanh bằng file batch (tự động bật trình duyệt Swagger UI)
+start_server.bat
+
+# Cách 2: Khởi chạy bằng lệnh Uvicorn
+uvicorn api:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### 📡 Danh Mục Endpoints Chính:
+
+| Phương thức | Đường dẫn Endpoint | Chức năng & Mục đích sử dụng |
+| :---: | :--- | :--- |
+| **`GET`** | `/health` | Kiểm tra trạng thái server, thiết bị (CPU/GPU) và tình trạng nạp của 3 mô hình |
+| **`POST`** | `/api/v1/detect` | Dự đoán văn bản đơn lẻ (trả về % AI, nhãn nhị phân, mức tin cậy và phân rã 3 mô hình) |
+| **`POST`** | `/api/v1/detect/sentences` | Bóc tách từng câu và gán mã màu (🟢 Xanh / 🟡 Vàng / 🔴 Đỏ) phục vụ Chrome Extension |
+| **`POST`** | `/api/v1/detect/batch` | Phân tích hàng loạt tối đa 50 văn bản trong cùng một request |
+
+### 🧪 Kiểm Thử Tích Hợp (Integration Tests):
+Đã xây dựng bộ kiểm thử tự động [`test_api.py`](file:///c:/DoAn/test_api.py) kiểm tra trọn vẹn cả 5 endpoints:
+```bash
+python -m unittest test_api.py
+# Ran 6 tests in 26.1s -> OK (100% Passed)
+```
+
+---
+
 ## 📈 Lộ trình triển khai 40 ngày
 
 * **Tuần 1 (Ngày 1 - 7):** Thu thập, tiền xử lý, sinh dữ liệu Prompt Engineering, gán nhãn nhị phân, chia tập Train/Valid/Test và khảo sát Tokenizer.
