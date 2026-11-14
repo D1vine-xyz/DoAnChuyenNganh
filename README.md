@@ -340,6 +340,33 @@ python -m unittest test_api.py
 
 ---
 
+## 🧩 Tiện Ích Trình Duyệt Chrome Extension (Manifest v3) - Hoàn thành Ngày 15
+
+Toàn bộ tiện ích mở rộng được đóng gói tại thư mục [`extension/`](file:///c:/DoAn/extension) theo chuẩn **Google Chrome Manifest v3** mới nhất, cho phép người dùng kiểm tra văn bản trực tiếp trong quá trình duyệt web theo thời gian thực.
+
+### 🌟 Tính Năng Tiện Ích:
+1. **Giao diện Popup Trực quan (`popup.html`)**:
+   * Kiểm tra nhanh trạng thái kết nối Backend FastAPI (đèn tín hiệu Xanh/Đỏ).
+   * Hộp nhập liệu tích hợp nút **Dán nhanh (Clipboard)**, **Xóa**, bộ đếm số từ và số ký tự.
+   * Thanh trượt điều chỉnh **Ngưỡng nhạy cảm phân loại (Threshold Slider)** từ 10% đến 90%.
+   * Thanh đo phần trăm (Gauge Bar) xác suất AI và huy hiệu phân loại nhị phân (*AI-Generated* vs *Human-Written*).
+   * Phân rã điểm số đóng góp của từng mô hình: **Longformer (48.7%)**, **BERT (34.0%)**, **RoBERTa (17.4%)**.
+   * Bóc tách cấp câu hiển thị danh sách câu kèm mã màu.
+2. **Quét Văn Bản Trực Tiếp Trên Trang Web (In-Page Selection & Floating Badge)**:
+   * **Nút bấm nổi thông minh (`content_script.js`)**: Khi bôi đen bất kỳ đoạn văn bản nào trên mọi website, nút `🤖 Quét AI` sẽ tự động hiển thị ngay cạnh con trỏ chuột.
+   * **Bảng kết quả nổi (Floating Tooltip Modal)**: Hiển thị điểm số xác suất AI tức thì mà không cần mở tab mới.
+   * **Menu chuột phải (Context Menu)**: Nhấp chuột phải vào đoạn bôi đen và chọn `🔍 Quét văn bản AI (AI Text Detector)`.
+
+### 🚀 Hướng Dẫn Cài Đặt Tiện Ích Vào Google Chrome:
+1. **Khởi chạy Backend Server:** Nhấp đúp vào file [`start_server.bat`](file:///c:/DoAn/start_server.bat) để khởi động máy chủ tại `http://localhost:8000`.
+2. **Mở trang quản lý Tiện ích của Chrome:** Truy cập đường dẫn `chrome://extensions/` trên thanh địa chỉ trình duyệt.
+3. **Bật Chế độ dành cho nhà phát triển (Developer Mode):** Gạt công tắc ở góc trên bên phải màn hình.
+4. **Tải tiện ích:** Nhấp vào nút **Tải tiện ích đã giải nén (Load unpacked)** ở góc trên bên trái.
+5. **Chọn thư mục:** Chọn thư mục `c:\DoAn\extension` (thư mục chứa file `manifest.json`).
+6. **Ghim tiện ích:** Nhấp vào biểu tượng mảnh ghép trên thanh công cụ của Chrome và bấm ghim biểu tượng **AI Text Detector** để sử dụng mọi lúc!
+
+---
+
 ## 📈 Lộ trình triển khai 40 ngày
 
 * **Tuần 1 (Ngày 1 - 7):** Thu thập, tiền xử lý, sinh dữ liệu Prompt Engineering, gán nhãn nhị phân, chia tập Train/Valid/Test và khảo sát Tokenizer.
