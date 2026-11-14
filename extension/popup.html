@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Text Detector - Ensemble PLMs</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <img src="icons/icon32.png" alt="Logo" class="logo">
+        <div class="brand-text">
+          <h1>AI Text Detector</h1>
+          <span class="subtitle">Ensemble PLMs (BERT + RoBERTa + Longformer)</span>
+        </div>
+      </div>
+      <div id="api-status" class="status-badge status-checking">
+        <span class="status-dot"></span>
+        <span id="status-text">Đang kết nối API...</span>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Input Section -->
+      <div class="input-card">
+        <div class="input-header">
+          <label for="text-input">Nhập hoặc dán văn bản cần kiểm tra:</label>
+          <div class="action-links">
+            <button id="btn-paste" class="text-btn">📋 Dán</button>
+            <button id="btn-clear" class="text-btn">🗑️ Xóa</button>
+          </div>
+        </div>
+        <textarea id="text-input" placeholder="Dán văn bản tiếng Anh vào đây (bài báo, bài luận, đoạn văn ngắn)..."></textarea>
+        <div class="input-footer">
+          <span id="word-count">0 từ | 0 ký tự</span>
+          <div class="threshold-control">
+            <label for="threshold-slider">Ngưỡng:</label>
+            <input type="range" id="threshold-slider" min="10" max="90" value="50" step="5">
+            <span id="threshold-val">50%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Analyze Button -->
+      <button id="btn-analyze" class="btn-primary">
+        <span class="btn-text">🔍 Phân tích Văn bản (Ensemble)</span>
+        <div id="spinner" class="spinner hidden"></div>
+      </button>
+
+      <!-- Alert Message Box -->
+      <div id="error-box" class="alert-box alert-error hidden"></div>
+
+      <!-- Results Section -->
+      <div id="results-card" class="results-card hidden">
+        <div class="result-header">
+          <div id="verdict-badge" class="verdict-badge">
+            <span id="verdict-icon">🤖</span>
+            <span id="verdict-title">AI-GENERATED</span>
+          </div>
+          <span id="inference-time" class="time-tag">150 ms</span>
+        </div>
+
+        <!-- Gauge Bar -->
+        <div class="gauge-section">
+          <div class="gauge-labels">
+            <span>Xác suất AI:</span>
+            <span id="ai-percentage-text" class="percentage-val">98.5%</span>
+          </div>
+          <div class="gauge-bar-bg">
+            <div id="gauge-bar-fill" class="gauge-bar-fill" style="width: 98.5%;"></div>
+          </div>
+          <div class="gauge-sub-labels">
+            <span id="human-percentage-text">Người viết: 1.5%</span>
+            <span id="confidence-text">Độ tin cậy: Rất cao</span>
+          </div>
+        </div>
+
+        <!-- Model Breakdown -->
+        <div class="breakdown-card">
+          <div class="breakdown-title">📊 Đóng góp từ các mô hình thành phần:</div>
+          <div class="model-row">
+            <span class="model-name">Longformer (1024 tokens) <small class="weight-tag">48.7%</small></span>
+            <span id="score-longformer" class="model-score">--%</span>
+          </div>
+          <div class="model-row">
+            <span class="model-name">BERT (512 tokens) <small class="weight-tag">34.0%</small></span>
+            <span id="score-bert" class="model-score">--%</span>
+          </div>
+          <div class="model-row">
+            <span class="model-name">RoBERTa (512 tokens) <small class="weight-tag">17.4%</small></span>
+            <span id="score-roberta" class="model-score">--%</span>
+          </div>
+        </div>
+
+        <!-- Sentence Breakdown Toggle -->
+        <div class="sentences-section">
+          <button id="btn-toggle-sentences" class="btn-secondary">
+            📑 Xem chi tiết từng câu (AI Hotspots)
+          </button>
+          <div id="sentences-list" class="sentences-list hidden"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>Đồ án Chuyên ngành (Chủ đề 6) • FastAPI Backend</span>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
