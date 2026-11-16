@@ -76,7 +76,7 @@ const btnRefreshHistory = document.getElementById("btn-refresh-history");
 // ==============================================================================
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Theme Toggle Sync
+  // Theme Toggle Sync with Silky Circular View Transition
   const btnThemeToggle = document.getElementById("btn-theme-toggle");
   const themeToggleIcon = document.getElementById("theme-toggle-icon");
 
@@ -90,14 +90,62 @@ document.addEventListener("DOMContentLoaded", () => {
   updateThemeIcon(initialTheme);
 
   if (btnThemeToggle) {
-    btnThemeToggle.addEventListener("click", () => {
+    btnThemeToggle.addEventListener("click", (e) => {
       const activeTheme = document.documentElement.getAttribute("data-theme") || "light";
       const nextTheme = activeTheme === "dark" ? "light" : "dark";
-      document.documentElement.setAttribute("data-theme", nextTheme);
-      try {
-        localStorage.setItem("veritext_theme", nextTheme);
-      } catch (e) {}
-      updateThemeIcon(nextTheme);
+
+      // 1. Icon flip spring animation
+      if (themeToggleIcon) {
+        themeToggleIcon.style.transform = "rotate(180deg) scale(0.2)";
+        setTimeout(() => {
+          updateThemeIcon(nextTheme);
+          themeToggleIcon.style.transform = "rotate(360deg) scale(1)";
+        }, 140);
+        setTimeout(() => {
+          themeToggleIcon.style.transform = "";
+        }, 320);
+      }
+
+      const applyTheme = () => {
+        document.documentElement.setAttribute("data-theme", nextTheme);
+        try {
+          localStorage.setItem("veritext_theme", nextTheme);
+        } catch (err) {}
+      };
+
+      // 2. Silky Circular Ripple Transition (View Transitions API)
+      if (document.startViewTransition) {
+        const rect = btnThemeToggle.getBoundingClientRect();
+        const x = e.clientX || rect.left + rect.width / 2;
+        const y = e.clientY || rect.top + rect.height / 2;
+        const endRadius = Math.hypot(
+          Math.max(x, window.innerWidth - x),
+          Math.max(y, window.innerHeight - y)
+        );
+
+        const transition = document.startViewTransition(() => {
+          applyTheme();
+        });
+
+        transition.ready.then(() => {
+          document.documentElement.animate(
+            {
+              clipPath: [
+                `circle(0px at ${x}px ${y}px)`,
+                `circle(${endRadius}px at ${x}px ${y}px)`,
+              ],
+            },
+            {
+              duration: 460,
+              easing: "cubic-bezier(0.4, 0, 0.2, 1)",
+              pseudoElement: "::view-transition-new(root)",
+            }
+          );
+        });
+      } else {
+        // Fallback for browsers without View Transition API
+        applyTheme();
+      }
     });
   }
 

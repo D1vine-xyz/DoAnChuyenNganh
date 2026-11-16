@@ -86,7 +86,51 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease;
+}
+
+/* Silky smooth transitions on all core theme surfaces */
+body,
+.navbar,
+.top-announcement,
+.input-main-card,
+.card-bottom-bar,
+.result-card-container,
+.clean-metric-item,
+.models-breakdown-box,
+.sentences-list-scroll,
+.sentence-item,
+.kpi-minimal-card,
+.history-card-box,
+.arch-card-box,
+.arch-layer-box,
+.data-table th,
+.data-table td,
+.footer,
+.btn-action-pill,
+.btn-submit-main,
+.status-pill,
+.theme-toggle-btn {
+  transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ==============================================================================
+   VIEW TRANSITIONS API (CIRCULAR RIPPLE THEME TOGGLE)
+   ============================================================================== */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 9999;
 }
 
 body {
@@ -234,6 +278,12 @@ body {
   background-color: var(--bg-hover);
   border-color: #9CA3AF;
   transform: rotate(15deg) scale(1.05);
+}
+
+#theme-toggle-icon {
+  display: inline-block;
+  line-height: 1;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .status-pill {
