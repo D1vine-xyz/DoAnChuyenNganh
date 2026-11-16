@@ -47,5 +47,26 @@ def extract_text_from_file(filename: str, content_bytes: bytes) -> Tuple[str, st
                 full_text.append(t.strip())
         return "\n\n".join(full_text).strip(), "pdf"
 
+    elif fn_lower.endswith(".doc"):
+        import olefile
+        import re
+        try:
+            ole_stream = io.BytesIO(content_bytes)
+            ole = olefile.OleFileIO(ole_stream)
+            if ole.exists("WordDocument"):
+                stream = ole.openstream("WordDocument").read()
+                decoded = stream.decode("utf-16-le", errors="ignore")
+                paragraphs = [p.strip() for p in re.split(r'[\r\n\x00-\x1f\x7f-\x9f]+', decoded) if len(p.strip()) > 10]
+                if paragraphs:
+                    return "\n\n".join(paragraphs).strip(), "doc"
+        except Exception:
+            pass
+
+        # Fallback đọc text thô nếu olefile không trích xuất được
+        import re
+        text = content_bytes.decode("latin-1", errors="ignore")
+        clean = re.findall(r'[\w\s\.,;:!?\(\)\-\'\"]{10,}', text)
+        return "\n\n".join(clean).strip(), "doc"
+
     else:
-        raise ValueError(f"Định dạng tệp '{filename}' không được hỗ trợ. Chỉ chấp nhận .txt, .docx, .pdf")
+        raise ValueError(f"Định dạng tệp '{filename}' không được hỗ trợ. Chỉ chấp nhận .txt, .docx, .doc, .pdf")

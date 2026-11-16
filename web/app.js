@@ -167,8 +167,8 @@ fileInput.addEventListener("change", () => {
 
 function handleFileSelected(file) {
   const ext = file.name.split(".").pop().toLowerCase();
-  if (!["txt", "docx", "pdf"].includes(ext)) {
-    alert("Chỉ hỗ trợ tệp tin định dạng: .PDF, .DOCX, hoặc .TXT");
+  if (!["txt", "docx", "doc", "pdf"].includes(ext)) {
+    alert("Chỉ hỗ trợ tệp tin định dạng: .PDF, .DOCX, .DOC, hoặc .TXT");
     return;
   }
   currentUploadedFile = file;

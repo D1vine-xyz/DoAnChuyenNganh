@@ -318,21 +318,33 @@ class AITextDetector:
 
         return result
 
-    def analyze_sentences(self, text: str, threshold: float = 0.5) -> List[Dict[str, Any]]:
+    def analyze_sentences(self, text: str, threshold: float = 0.5, max_sentences: int = 40) -> List[Dict[str, Any]]:
         """
-        Bóc tách văn bản thành từng câu độc lập và tính toán xác suất AI cho từng câu.
+        Bóc tách văn bản thành từng câu độc lập và tính toán xác suất AI theo Batch nhanh chóng.
         Phục vụ tính năng Highlight màu (AI Hotspots) cho Chrome Extension và Web UI.
         """
         raw_sentences = re.split(r'(?<=[.!?])\s+', text.strip())
-        sentences = [s.strip() for s in raw_sentences if len(s.strip().split()) >= 4]
+        sentences = [s.strip() for s in raw_sentences if len(s.strip().split()) >= 3]
 
         if not sentences:
             sentences = [text.strip()]
 
+        eval_sentences = sentences[:max_sentences]
+
+        # Tối ưu hóa: Dự đoán theo lô (Batch Inference) song song thay vì lặp tuần tự
+        p_bert = self._predict_bert(eval_sentences) if self.model_bert else np.full(len(eval_sentences), 0.5)
+        p_roberta = self._predict_roberta(eval_sentences) if self.model_roberta else np.full(len(eval_sentences), 0.5)
+        p_longformer = self._predict_longformer(eval_sentences) if self.model_longformer else np.full(len(eval_sentences), 0.5)
+
+        p_weighted = (
+            self.weights[0] * p_bert +
+            self.weights[1] * p_roberta +
+            self.weights[2] * p_longformer
+        )
+
         sentence_results = []
-        for idx, sentence in enumerate(sentences):
-            pred = self.predict(sentence, threshold=threshold, detailed=False)
-            prob = pred["ai_probability"]
+        for idx, sentence in enumerate(eval_sentences):
+            prob = float(p_weighted[idx])
 
             if prob >= 0.80:
                 color = "red"
@@ -348,7 +360,7 @@ class AITextDetector:
                 "sentence_index": idx + 1,
                 "sentence": sentence,
                 "word_count": len(sentence.split()),
-                "ai_probability": prob,
+                "ai_probability": round(prob, 4),
                 "ai_percentage": f"{prob * 100:.1f}%",
                 "highlight_color": color,
                 "assessment": level,
