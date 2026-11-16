@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Text Detector - Hệ thống Thẩm định Văn bản AI (Ensemble PLMs)</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Top Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="nav-brand">
+        <div class="brand-logo">🛡️</div>
+        <div>
+          <div class="brand-title">AI Text Detector <span class="badge-tag">v1.2 Enterprise</span></div>
+          <div class="brand-subtitle">Ensemble PLMs: Longformer (1024) + BERT + RoBERTa</div>
+        </div>
+      </div>
+
+      <nav class="nav-tabs">
+        <button class="nav-tab active" data-tab="tab-inspect">🔍 Thẩm Định Văn Bản</button>
+        <button class="nav-tab" data-tab="tab-history">📊 Lịch Sử Quét & Thống Kê</button>
+        <button class="nav-tab" data-tab="tab-architecture">🏗️ Kiến Trúc Hệ Thống</button>
+      </nav>
+
+      <div class="nav-status">
+        <div id="server-status" class="status-indicator status-online">
+          <span class="status-dot"></span>
+          <span id="server-status-text">FastAPI Server: Sẵn sàng</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main App Content -->
+  <main class="main-body">
+
+    <!-- ==================================================================== -->
+    <!-- TAB 1: THẨM ĐỊNH VĂN BẢN (INSPECTION & UPLOAD) -->
+    <!-- ==================================================================== -->
+    <section id="tab-inspect" class="tab-pane active">
+      <div class="inspector-layout">
+        
+        <!-- Left Column: Input Form -->
+        <div class="card input-card">
+          <div class="card-header">
+            <h3>📝 Nhập Liệu Thẩm Định</h3>
+            <div class="header-actions">
+              <button id="btn-paste" class="btn-sm btn-ghost">📋 Dán clipboard</button>
+              <button id="btn-sample-ai" class="btn-sm btn-ghost">🤖 Mẫu AI</button>
+              <button id="btn-sample-human" class="btn-sm btn-ghost">👤 Mẫu Người</button>
+              <button id="btn-clear" class="btn-sm btn-ghost text-danger">🗑️ Xóa</button>
+            </div>
+          </div>
+
+          <!-- Drag and Drop File Upload Area -->
+          <div id="drop-zone" class="drop-zone">
+            <input type="file" id="file-input" accept=".txt,.docx,.pdf" class="hidden-input">
+            <div class="drop-zone-content">
+              <span class="upload-icon">📁</span>
+              <p><b>Kéo thả tệp tin vào đây</b> hoặc <span class="browse-link">Chọn tệp</span></p>
+              <small>Hỗ trợ tài liệu: <b>.PDF, .DOCX, .TXT</b> (Tự động bóc tách nội dung)</small>
+            </div>
+            <div id="file-info" class="file-info-bar hidden">
+              <span id="file-name" class="file-name">document.pdf</span>
+              <span id="file-size" class="file-size">(120 KB)</span>
+              <button id="btn-remove-file" class="btn-remove">&times;</button>
+            </div>
+          </div>
+
+          <!-- Text Area -->
+          <div class="textarea-wrapper">
+            <textarea id="text-input" placeholder="Dán hoặc gõ văn bản tiếng Anh vào đây (bài báo, bài luận, đoạn văn ngắn)..."></textarea>
+          </div>
+
+          <!-- Bottom Controls -->
+          <div class="controls-row">
+            <div class="text-stats">
+              <span id="stat-words"><b>0</b> từ</span>
+              <span class="separator">•</span>
+              <span id="stat-chars"><b>0</b> ký tự</span>
+              <span class="separator">•</span>
+              <span id="stat-sentences"><b>0</b> câu</span>
+            </div>
+
+            <div class="threshold-wrapper">
+              <label for="threshold-range">Ngưỡng nhạy cảm:</label>
+              <input type="range" id="threshold-range" min="10" max="90" value="50" step="5">
+              <span id="threshold-val" class="threshold-badge">50%</span>
+            </div>
+          </div>
+
+          <!-- Submit Button -->
+          <button id="btn-submit" class="btn-primary btn-large">
+            <span class="btn-text">🔍 Bắt Đầu Thẩm Định Văn Bản</span>
+            <div id="spinner" class="spinner hidden"></div>
+          </button>
+        </div>
+
+        <!-- Right Column: Results Dashboard -->
+        <div class="card result-card">
+          <div class="card-header">
+            <h3>📑 Kết Quả Giám Định</h3>
+            <div id="result-actions" class="header-actions hidden">
+              <button id="btn-export-pdf" class="btn-sm btn-success">
+                📥 Xuất Báo Cáo PDF
+              </button>
+            </div>
+          </div>
+
+          <!-- Placeholder when no result yet -->
+          <div id="result-placeholder" class="result-placeholder">
+            <div class="placeholder-icon">🛡️</div>
+            <h4>Hệ Thống Đang Chờ Dữ Liệu</h4>
+            <p>Vui lòng nhập văn bản hoặc tải file (.pdf, .docx, .txt) ở khung bên trái và bấm <b>Thẩm Định</b> để xem báo cáo chi tiết.</p>
+          </div>
+
+          <!-- Results Content (Revealed after analysis) -->
+          <div id="result-content" class="result-content hidden">
+            <!-- Verdict Banner -->
+            <div id="verdict-banner" class="verdict-banner verdict-ai">
+              <div class="verdict-main">
+                <span id="verdict-icon" class="verdict-icon">🤖</span>
+                <div>
+                  <h2 id="verdict-title">VĂN BẢN DO AI SINH (AI-GENERATED)</h2>
+                  <p id="verdict-subtitle">Phát hiện dấu hiệu tổng hợp từ Mô hình Ngôn ngữ Lớn (LLM)</p>
+                </div>
+              </div>
+              <div class="verdict-score">
+                <span id="verdict-percent" class="percent-val">98.5%</span>
+                <span class="percent-label">Xác suất AI</span>
+              </div>
+            </div>
+
+            <!-- Key Metrics Grid -->
+            <div class="metrics-grid">
+              <div class="metric-box">
+                <span class="metric-label">Xác suất Người</span>
+                <span id="metric-human-prob" class="metric-value">1.5%</span>
+              </div>
+              <div class="metric-box">
+                <span class="metric-label">Mức độ Tin cậy</span>
+                <span id="metric-confidence" class="metric-value text-accent">Rất cao</span>
+              </div>
+              <div class="metric-box">
+                <span class="metric-label">Thời gian Xử lý</span>
+                <span id="metric-latency" class="metric-value">145 ms</span>
+              </div>
+              <div class="metric-box">
+                <span class="metric-label">Ngữ cảnh Bao phủ</span>
+                <span id="metric-coverage" class="metric-value text-success">1024 Tokens</span>
+              </div>
+            </div>
+
+            <!-- Ensemble Breakdown Cards -->
+            <div class="breakdown-section">
+              <h4 class="section-title">📊 Đóng Góp Từ 3 Mô Hình Nền Tảng (Ensemble PLMs):</h4>
+              <div class="model-cards-grid">
+                <div class="model-card champion">
+                  <div class="model-card-header">
+                    <span class="badge-pill pill-gold">Trụ cột (48.7%)</span>
+                    <strong>Longformer</strong>
+                  </div>
+                  <div class="model-spec">1024 tokens • Sliding Window</div>
+                  <div class="model-prob-bar">
+                    <div id="bar-longformer" class="bar-fill" style="width: 98%;"></div>
+                  </div>
+                  <div class="model-card-footer">
+                    <span>Xác suất AI:</span>
+                    <strong id="prob-longformer">98.2%</strong>
+                  </div>
+                </div>
+
+                <div class="model-card">
+                  <div class="model-card-header">
+                    <span class="badge-pill">Trọng số 34.0%</span>
+                    <strong>BERT</strong>
+                  </div>
+                  <div class="model-spec">512 tokens • bert-base-uncased</div>
+                  <div class="model-prob-bar">
+                    <div id="bar-bert" class="bar-fill" style="width: 95%;"></div>
+                  </div>
+                  <div class="model-card-footer">
+                    <span>Xác suất AI:</span>
+                    <strong id="prob-bert">95.4%</strong>
+                  </div>
+                </div>
+
+                <div class="model-card">
+                  <div class="model-card-header">
+                    <span class="badge-pill">Trọng số 17.4%</span>
+                    <strong>RoBERTa</strong>
+                  </div>
+                  <div class="model-spec">512 tokens • roberta-base</div>
+                  <div class="model-prob-bar">
+                    <div id="bar-roberta" class="bar-fill" style="width: 93%;"></div>
+                  </div>
+                  <div class="model-card-footer">
+                    <span>Xác suất AI:</span>
+                    <strong id="prob-roberta">93.1%</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Sentence-level AI Hotspots -->
+            <div class="sentences-section">
+              <div class="sentences-header">
+                <h4 class="section-title">📑 Bóc Tách Chi Tiết Từng Câu (AI Hotspots):</h4>
+                <div class="hotspots-legend">
+                  <span class="legend-item"><span class="dot dot-red"></span> Chắc chắn AI (≥80%)</span>
+                  <span class="legend-item"><span class="dot dot-yellow"></span> Nghi vấn (50-80%)</span>
+                  <span class="legend-item"><span class="dot dot-green"></span> Người viết (&lt;50%)</span>
+                </div>
+              </div>
+              <div id="sentences-container" class="sentences-container">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==================================================================== -->
+    <!-- TAB 2: LỊCH SỬ QUÉT & THỐNG KÊ (SCAN HISTORY) -->
+    <!-- ==================================================================== -->
+    <section id="tab-history" class="tab-pane">
+      <div class="history-layout">
+        <!-- KPI Summary Cards -->
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <span class="kpi-icon">📋</span>
+            <div class="kpi-info">
+              <span class="kpi-label">Tổng Lượt Thẩm Định</span>
+              <h2 id="kpi-total-scans">0</h2>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-icon">🤖</span>
+            <div class="kpi-info">
+              <span class="kpi-label">Tỷ Lệ Phát Hiện AI</span>
+              <h2 id="kpi-ai-rate">0.0%</h2>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-icon">✍️</span>
+            <div class="kpi-info">
+              <span class="kpi-label">Tổng Số Từ Đã Quét</span>
+              <h2 id="kpi-total-words">0</h2>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-icon">⚡</span>
+            <div class="kpi-info">
+              <span class="kpi-label">Độ Trễ Trung Bình</span>
+              <h2 id="kpi-avg-latency">0 ms</h2>
+            </div>
+          </div>
+        </div>
+
+        <!-- History Table Card -->
+        <div class="card history-card">
+          <div class="card-header">
+            <h3>📑 Nhật Ký Các Lần Thẩm Định (SQLite Database)</h3>
+            <div class="header-actions">
+              <button id="btn-refresh-history" class="btn-sm btn-ghost">🔄 Làm mới</button>
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Mã ID</th>
+                  <th>Thời Gian</th>
+                  <th>Tên Tài Liệu / Tệp</th>
+                  <th>Độ Dài</th>
+                  <th>Kết Luận</th>
+                  <th>Xác Suất AI</th>
+                  <th>Độ Trễ</th>
+                  <th style="text-align: right;">Thao Tác</th>
+                </tr>
+              </thead>
+              <tbody id="history-table-body">
+                <tr>
+                  <td colspan="8" class="text-center">Đang tải nhật ký...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================================================================== -->
+    <!-- TAB 3: KIẾN TRÚC HỆ THỐNG (SOFTWARE ARCHITECTURE) -->
+    <!-- ==================================================================== -->
+    <section id="tab-architecture" class="tab-pane">
+      <div class="architecture-layout">
+        <div class="card">
+          <div class="card-header">
+            <h3>🏛️ Sơ Đồ Kiến Trúc Hệ Thống (Software System Architecture)</h3>
+          </div>
+          <div class="arch-content">
+            <div class="arch-box client-layer">
+              <h4>1. TẦNG KHÁCH HÀNG (CLIENT APPLICATION LAYER)</h4>
+              <div class="arch-chips">
+                <span class="chip">🌐 Web Dashboard (SPA - HTML5/CSS3/Vanilla JS)</span>
+                <span class="chip">🧩 Chrome Extension (Manifest v3 - In-page selection)</span>
+                <span class="chip">💻 CLI Interface (inference.py interactive)</span>
+              </div>
+            </div>
+
+            <div class="arch-arrow">⬇️ HTTP / JSON RESTful Endpoints (CORS Enabled)</div>
+
+            <div class="arch-box api-layer">
+              <h4>2. TẦNG DỊCH VỤ BACKEND (FASTAPI & UVICORN API GATEWAY)</h4>
+              <div class="arch-chips">
+                <span class="chip">⚙️ Lifespan Singleton Manager</span>
+                <span class="chip">📁 File Parser (.pdf, .docx, .txt)</span>
+                <span class="chip">🗄️ SQLite Database Engine</span>
+                <span class="chip">📄 ReportLab PDF Generator</span>
+              </div>
+            </div>
+
+            <div class="arch-arrow">⬇️ Tensors / Batch Tokenization (PyTorch Dynamic Padding)</div>
+
+            <div class="arch-box model-layer">
+              <h4>3. TẦNG SUY LUẬN TRÍ TUỆ NHÂN TẠO (ENSEMBLE PLMs INFERENCE CORE)</h4>
+              <div class="arch-chips">
+                <span class="chip chip-gold">🦅 Longformer-base-4096 (1024 context - 48.65% Weight)</span>
+                <span class="chip">📘 BERT-base-uncased (512 context - 33.96% Weight)</span>
+                <span class="chip">📕 RoBERTa-base (512 context - 17.38% Weight)</span>
+                <span class="chip chip-purple">🏆 Weighted Soft Voting (96.52% Acc / 98.38% Prec)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 20px;">
+          <div class="card-header">
+            <h3>📈 Bảng Đối So Sánh Hiệu Năng Thực Nghiệm (Scientific Benchmarks)</h3>
+          </div>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Mô Hình / Chiến Lược</th>
+                  <th>Số Tham Số</th>
+                  <th>Ngữ Cảnh</th>
+                  <th>Test Accuracy</th>
+                  <th>Precision</th>
+                  <th>Recall</th>
+                  <th>F1-Score</th>
+                  <th>AUC-ROC</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><b>BERT</b> (bert-base-uncased)</td>
+                  <td>110M</td>
+                  <td>512</td>
+                  <td>95.86%</td>
+                  <td>97.77%</td>
+                  <td>92.45%</td>
+                  <td>95.04%</td>
+                  <td>98.05%</td>
+                </tr>
+                <tr>
+                  <td><b>RoBERTa</b> (roberta-base)</td>
+                  <td>125M</td>
+                  <td>512</td>
+                  <td>95.02%</td>
+                  <td>94.59%</td>
+                  <td><b>93.75%</b></td>
+                  <td>94.17%</td>
+                  <td>98.48%</td>
+                </tr>
+                <tr>
+                  <td><b>Longformer</b> (allenai/longformer-4096)</td>
+                  <td>149M</td>
+                  <td><b>1024</b></td>
+                  <td>96.45%</td>
+                  <td>98.21%</td>
+                  <td>93.43%</td>
+                  <td>95.76%</td>
+                  <td><b>98.65%</b></td>
+                </tr>
+                <tr class="highlight-row">
+                  <td><b>Ensemble (Weighted Soft Voting)</b></td>
+                  <td><b>384M</b></td>
+                  <td><b>1024</b></td>
+                  <td><b>96.52%</b></td>
+                  <td><b>98.38%</b></td>
+                  <td>93.43%</td>
+                  <td><b>95.84%</b></td>
+                  <td>98.52%</td>
+                </tr>
+                <tr>
+                  <td><b>Cross-Domain TOEFL (Ngoại miền)</b></td>
+                  <td>384M</td>
+                  <td>1024</td>
+                  <td><b>96.83%*</b></td>
+                  <td>--</td>
+                  <td><b>100.0%</b></td>
+                  <td><b>96.83%</b></td>
+                  <td><b>99.13%</b></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <div class="footer-container">
+      <span>Đồ án Chuyên ngành Kỹ thuật Phần mềm (Chủ đề 6) • Lõi AI Ensemble PLMs</span>
+      <span>Hỗ trợ định dạng: Chrome Extension, Web Dashboard & RESTful API</span>
+    </div>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

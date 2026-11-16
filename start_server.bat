@@ -16,12 +16,12 @@ if not exist "venv\Scripts\python.exe" (
 )
 
 echo [*] Đang kích hoạt môi trường ảo Python...
-echo [*] Khởi động Uvicorn server tại : http://localhost:8000
+echo [*] Web Dashboard ứng dụng chính   : http://localhost:8000
 echo [*] Tài liệu Swagger UI tương tác : http://localhost:8000/docs
 echo [*] Nhấn Ctrl+C để dừng server.
 echo.
 
-start http://localhost:8000/docs
+start http://localhost:8000
 venv\Scripts\python.exe -m uvicorn api:app --host 0.0.0.0 --port 8000
 
 pause

@@ -13,3 +13,11 @@ requests>=2.34.0
 # AI APIs & LLM Generation
 google-generativeai>=0.8.6
 python-dotenv>=1.0.0
+
+# Web Application & File Parsing & Report Export
+fastapi>=0.115.0
+uvicorn>=0.30.0
+python-multipart>=0.0.9
+python-docx>=1.1.0
+pypdf>=4.0.0
+reportlab>=4.0.0

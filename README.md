@@ -326,17 +326,44 @@ uvicorn api:app --host 0.0.0.0 --port 8000 --reload
 
 | Phương thức | Đường dẫn Endpoint | Chức năng & Mục đích sử dụng |
 | :---: | :--- | :--- |
+| **`GET`** | `/` | **Web Dashboard SPA**: Giao diện ứng dụng web tương tác người dùng |
 | **`GET`** | `/health` | Kiểm tra trạng thái server, thiết bị (CPU/GPU) và tình trạng nạp của 3 mô hình |
 | **`POST`** | `/api/v1/detect` | Dự đoán văn bản đơn lẻ (trả về % AI, nhãn nhị phân, mức tin cậy và phân rã 3 mô hình) |
-| **`POST`** | `/api/v1/detect/sentences` | Bóc tách từng câu và gán mã màu (🟢 Xanh / 🟡 Vàng / 🔴 Đỏ) phục vụ Chrome Extension |
+| **`POST`** | `/api/v1/detect/sentences` | Bóc tách từng câu và gán mã màu (🟢 Xanh / 🟡 Vàng / 🔴 Đỏ) phục vụ Chrome Extension & Web |
+| **`POST`** | `/api/v1/detect/web` | Endpoint phân tích từ Web Dashboard, tự động lưu lịch sử vào SQLite |
+| **`POST`** | `/api/v1/detect/upload` | Tiếp nhận và bóc tách tệp tải lên (.PDF, .DOCX, .TXT) để thẩm định |
 | **`POST`** | `/api/v1/detect/batch` | Phân tích hàng loạt tối đa 50 văn bản trong cùng một request |
+| **`GET`** | `/api/v1/history` | Truy xuất danh sách nhật ký thẩm định từ CSDL SQLite |
+| **`GET`** | `/api/v1/history/{id}` | Lấy chi tiết một lượt thẩm định theo ID |
+| **`DELETE`**| `/api/v1/history/{id}` | Xóa một bản ghi lịch sử khỏi CSDL |
+| **`GET`** | `/api/v1/stats` | Thống kê KPI tổng quan (Tổng số lượt, Tỷ lệ AI %, Độ trễ trung bình) |
+| **`GET`** | `/api/v1/report/pdf/{id}` | **Xuất Báo Cáo Kiểm Định PDF (Audit Certificate)** đóng dấu phân tích chi tiết |
 
 ### 🧪 Kiểm Thử Tích Hợp (Integration Tests):
-Đã xây dựng bộ kiểm thử tự động [`test_api.py`](file:///c:/DoAn/test_api.py) kiểm tra trọn vẹn cả 5 endpoints:
+Đã xây dựng bộ kiểm thử tự động [`test_api.py`](file:///c:/DoAn/test_api.py) kiểm tra trọn vẹn cả 8 luồng nghiệp vụ:
 ```bash
 python -m unittest test_api.py
-# Ran 6 tests in 26.1s -> OK (100% Passed)
+# Ran 8 tests in 23.1s -> OK (100% Passed)
 ```
+
+---
+
+## 🖥️ Web Application Dashboard & Xuất Báo Cáo PDF - Hoàn thành Ngày 16
+
+Hệ thống được nâng cấp thành một **Ứng dụng Phần mềm Thẩm định Độc lập (Standalone AI Audit Web App)** chuẩn chuyên ngành Kỹ thuật Phần mềm tại thư mục [`web/`](file:///c:/DoAn/web):
+
+### 🌟 Tính Năng Phần Mềm Nổi Bật:
+1. **Giao diện Web Dashboard Hiện Đại (`http://localhost:8000`)**:
+   * Thiết kế theo phong cách Dark Mode chuyên nghiệp, tối ưu cho môi trường làm việc học thuật và cơ quan thẩm định.
+   * Cung cấp 3 Tab nghiệp vụ: **🔍 Thẩm Định Văn Bản**, **📊 Lịch Sử Quét & Thống Kê KPI**, và **🏗️ Kiến Trúc Hệ Thống**.
+2. **Kéo Thả Tải Tệp Đa Định Dạng (.PDF, .DOCX, .TXT)**:
+   * Module [`file_parser.py`](file:///c:/DoAn/file_parser.py) tự động phân tích nhị phân, bóc tách chuỗi văn bản sạch từ bài báo cáo docx hoặc tệp sách điện tử PDF mà không cần phần mềm bên thứ ba.
+3. **Cơ Sở Dữ Liệu SQLite & Nhật Ký Thẩm Định (`database.py`)**:
+   * Tự động lưu trữ chi tiết từng lượt quét vào file CSDL SQLite [`output/scan_history.db`](file:///c:/DoAn/output/scan_history.db).
+   * Bảng Dashboard cho phép xem lại chi tiết, tính toán tỷ lệ văn bản AI, tổng số từ đã kiểm định và thời gian phản hồi trung bình.
+4. **Xuất Báo Cáo Chứng Thực Kiểm Định PDF (`pdf_report.py`)**:
+   * Tự động sinh file PDF kích thước A4 chuẩn thẩm mỹ bằng thư viện **ReportLab** có hỗ trợ tiếng Việt Unicode (`ArialVN`).
+   * Báo cáo bao gồm: Mã chứng thực (`AUDIT-XXXXXX`), Thời gian thẩm định, Khung kết luận nhãn màu, Bảng phân rã 3 mô hình PLMs và Bảng phân tích từng câu AI Hotspots.
 
 ---
 

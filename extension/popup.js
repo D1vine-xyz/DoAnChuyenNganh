@@ -284,3 +284,4 @@ function showError(msg) {
 function hideError() {
   errorBox.classList.add("hidden");
 }
+

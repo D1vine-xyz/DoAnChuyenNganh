@@ -209,3 +209,4 @@ function renderModalResults(data) {
     modal.classList.add("hidden");
   });
 }
+
