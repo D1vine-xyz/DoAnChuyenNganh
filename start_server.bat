@@ -1,28 +1,24 @@
 @echo off
-chcp 65001 > nul
 title AI-Generated Text Detection API Server (FastAPI)
 echo ======================================================================
-echo   KHỞI ĐỘNG FASTAPI BACKEND SERVER - ĐỒ ÁN CHUYÊN NGÀNH
-echo   Mô hình Ensemble PLMs: BERT + RoBERTa + Longformer
+echo   KHOI DONG FASTAPI BACKEND SERVER - DO AN CHUYEN NGANH
+echo   Mo hinh Ensemble PLMs: BERT + RoBERTa + Longformer
 echo ======================================================================
 echo.
 
 cd /d "%~dp0"
 
 if not exist "venv\Scripts\python.exe" (
-    echo [!] LỖI: Không tìm thấy môi trường ảo venv! Vui lòng cài đặt trước.
+    echo [!] LOI: Khong tim thay moi truong ao venv!
     pause
     exit /b 1
 )
 
-echo [*] Đang kích hoạt môi trường ảo Python...
-echo [*] Web Dashboard ứng dụng chính   : http://localhost:8000
-echo [*] Tài liệu Swagger UI tương tác : http://localhost:8000/docs
-echo [*] Nhấn Ctrl+C để dừng server.
-echo.
+echo [*] Dang khoi dong server va nap mo hinh, vui long cho...
+venv\Scripts\python.exe run_server.py
 
-start http://localhost:8000
-venv\Scripts\python.exe -m uvicorn api:app --host 0.0.0.0 --port 8000
-
-pause
-
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo [!] Co loi xay ra khi chay server.
+    pause
+)
