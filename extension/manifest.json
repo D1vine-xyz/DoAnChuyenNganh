@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "AI Text Detector - Ensemble PLMs",
+  "name": "VeriText AI - Ensemble PLMs",
   "version": "1.0.0",
   "description": "Phát hiện văn bản do AI/ChatGPT sinh sử dụng mô hình kết hợp Ensemble PLMs (BERT, RoBERTa, Longformer 1024 tokens).",
   "permissions": [

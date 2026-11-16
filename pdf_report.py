@@ -66,7 +66,7 @@ class NumberedCanvas(canvas.Canvas):
         self.setStrokeColor(colors.HexColor("#E2E8F0"))
         self.setLineWidth(0.5)
         self.line(40, 800, 555, 800)
-        self.drawString(40, 805, "AI Text Detector • Hệ thống Giám định Văn bản Ensemble PLMs")
+        self.drawString(40, 805, "VeriText AI • Hệ thống Giám định Văn bản Ensemble PLMs")
 
         # Footer
         self.line(40, 45, 555, 45)
