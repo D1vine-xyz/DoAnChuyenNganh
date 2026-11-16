@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
     """
     global detector_instance
     print("\n" + "=" * 70)
-    print("  KHỞI ĐỘNG FASTAPI BACKEND SERVER - AI TEXT DETECTOR")
+    print("  KHỞI ĐỘNG FASTAPI BACKEND SERVER - VERITEXT AI")
     print("=" * 70)
 
     # Đảm bảo CSDL SQLite đã sẵn sàng

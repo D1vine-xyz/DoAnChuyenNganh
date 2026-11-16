@@ -95,7 +95,7 @@ async function triggerDetection(text) {
     <div class="ai-detect-modal-header">
       <div class="ai-detect-brand">
         <span class="ai-detect-icon">🛡️</span>
-        <strong>AI Text Detector (Ensemble PLMs)</strong>
+        <strong>VeriText AI (Ensemble PLMs)</strong>
       </div>
       <button class="ai-detect-close-btn" id="ai-detect-close">&times;</button>
     </div>

@@ -40,7 +40,7 @@ class TestDetectionAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         # Kỳ vọng trả về file HTML
         self.assertIn("text/html", response.headers.get("content-type", ""))
-        self.assertIn("AI Text Detector", response.text)
+        self.assertIn("VeriText AI", response.text)
 
     def test_02_health_endpoint(self):
         """Kiểm tra endpoint sức khỏe GET /health"""

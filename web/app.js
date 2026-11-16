@@ -1,5 +1,5 @@
 /**
- * AI Text Detector - Web Dashboard Single Page Application Logic
+ * VeriText AI - Web Dashboard Single Page Application Logic
  * Đồ án Chuyên ngành Kỹ thuật Phần mềm (Chủ đề 6)
  */
 
@@ -32,6 +32,7 @@ const thresholdVal = document.getElementById("threshold-val");
 
 const btnSubmit = document.getElementById("btn-submit");
 const spinner = document.getElementById("spinner");
+const btnUpload = document.getElementById("btn-upload");
 const btnPaste = document.getElementById("btn-paste");
 const btnClear = document.getElementById("btn-clear");
 const btnSampleAi = document.getElementById("btn-sample-ai");
@@ -135,13 +136,14 @@ thresholdRange.addEventListener("input", () => {
   thresholdVal.textContent = `${thresholdRange.value}%`;
 });
 
-// Drag and drop events
-dropZone.addEventListener("click", (e) => {
-  if (e.target !== btnRemoveFile) {
+// File upload button
+if (btnUpload) {
+  btnUpload.addEventListener("click", () => {
     fileInput.click();
-  }
-});
+  });
+}
 
+// Drag and drop events on input card
 dropZone.addEventListener("dragover", (e) => {
   e.preventDefault();
   dropZone.classList.add("dragover");
@@ -175,7 +177,6 @@ function handleFileSelected(file) {
   fileNameEl.textContent = file.name;
   fileSizeEl.textContent = `(${(file.size / 1024).toFixed(1)} KB)`;
   fileInfoBar.classList.remove("hidden");
-  dropZone.querySelector(".drop-zone-content").classList.add("hidden");
 }
 
 btnRemoveFile.addEventListener("click", (e) => {
@@ -183,7 +184,6 @@ btnRemoveFile.addEventListener("click", (e) => {
   currentUploadedFile = null;
   fileInput.value = "";
   fileInfoBar.classList.add("hidden");
-  dropZone.querySelector(".drop-zone-content").classList.remove("hidden");
 });
 
 // Action buttons
@@ -203,8 +203,6 @@ btnClear.addEventListener("click", () => {
   currentUploadedFile = null;
   fileInput.value = "";
   fileInfoBar.classList.add("hidden");
-  dropZone.querySelector(".drop-zone-content").classList.remove("hidden");
-  resultPlaceholder.classList.remove("hidden");
   resultContent.classList.add("hidden");
   resultActions.classList.add("hidden");
 });
@@ -304,10 +302,10 @@ function setLoading(isLoading) {
   btnSubmit.disabled = isLoading;
   const btnText = btnSubmit.querySelector(".btn-text");
   if (isLoading) {
-    btnText.textContent = "Đang phân tích qua 3 PLMs...";
+    btnText.textContent = "Đang kiểm tra qua 3 PLMs...";
     spinner.classList.remove("hidden");
   } else {
-    btnText.textContent = "🔍 Bắt Đầu Thẩm Định Văn Bản";
+    btnText.textContent = "Kiểm tra nội dung AI";
     spinner.classList.add("hidden");
   }
 }
@@ -318,7 +316,7 @@ function setLoading(isLoading) {
 // ==============================================================================
 
 function renderResults(data) {
-  resultPlaceholder.classList.add("hidden");
+  if (resultPlaceholder) resultPlaceholder.classList.add("hidden");
   resultContent.classList.remove("hidden");
   resultActions.classList.remove("hidden");
 
@@ -328,7 +326,7 @@ function renderResults(data) {
   const humanPct = (overall.human_probability * 100).toFixed(1);
 
   // 1. Verdict Banner
-  verdictBanner.className = "verdict-banner " + (isAI ? "verdict-ai" : "verdict-human");
+  verdictBanner.className = "verdict-header " + (isAI ? "verdict-ai" : "verdict-human");
   verdictIcon.textContent = isAI ? "🤖" : "👤";
   verdictTitle.textContent = isAI ? "VĂN BẢN DO AI SINH (AI-GENERATED)" : "VĂN BẢN DO CON NGƯỜI VIẾT (HUMAN-WRITTEN)";
   verdictSubtitle.textContent = isAI
@@ -363,6 +361,9 @@ function renderResults(data) {
 
   // 4. Sentences Hotspots
   renderSentences(data.sentences || []);
+
+  // Smooth scroll into view
+  resultContent.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 function renderSentences(sentences) {
