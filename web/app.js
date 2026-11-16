@@ -76,6 +76,31 @@ const btnRefreshHistory = document.getElementById("btn-refresh-history");
 // ==============================================================================
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Theme Toggle Sync
+  const btnThemeToggle = document.getElementById("btn-theme-toggle");
+  const themeToggleIcon = document.getElementById("theme-toggle-icon");
+
+  function updateThemeIcon(theme) {
+    if (themeToggleIcon) {
+      themeToggleIcon.textContent = theme === "dark" ? "☀️" : "🌙";
+    }
+  }
+
+  const initialTheme = document.documentElement.getAttribute("data-theme") || "light";
+  updateThemeIcon(initialTheme);
+
+  if (btnThemeToggle) {
+    btnThemeToggle.addEventListener("click", () => {
+      const activeTheme = document.documentElement.getAttribute("data-theme") || "light";
+      const nextTheme = activeTheme === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", nextTheme);
+      try {
+        localStorage.setItem("veritext_theme", nextTheme);
+      } catch (e) {}
+      updateThemeIcon(nextTheme);
+    });
+  }
+
   checkServerHealth();
   updateTextCounts();
 
