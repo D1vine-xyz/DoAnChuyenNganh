@@ -30,6 +30,10 @@ runs/
 output/*.pt
 output/tokenizer_*/
 
+# Database runtime files
+*.db
+output/*.db
+
 # Office temp files
 ~$*.docx
 ~$*.xlsx
