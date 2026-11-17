@@ -57,8 +57,14 @@ def extract_text_from_file(filename: str, content_bytes: bytes) -> Tuple[str, st
                 stream = ole.openstream("WordDocument").read()
                 decoded = stream.decode("utf-16-le", errors="ignore")
                 paragraphs = [p.strip() for p in re.split(r'[\r\n\x00-\x1f\x7f-\x9f]+', decoded) if len(p.strip()) > 10]
-                if paragraphs:
-                    return "\n\n".join(paragraphs).strip(), "doc"
+                # Lọc bỏ các đoạn chứa ký tự rác nhị phân (binary junk)
+                cleaned = []
+                for p in paragraphs:
+                    valid_chars = sum(1 for c in p if c.isalnum() or c.isspace() or c in ".,;:!?()-_'\"/\\@#%&*+=<>[]{}")
+                    if len(p) > 0 and (valid_chars / len(p)) >= 0.70:
+                        cleaned.append(p)
+                if cleaned:
+                    return "\n\n".join(cleaned).strip(), "doc"
         except Exception:
             pass
 

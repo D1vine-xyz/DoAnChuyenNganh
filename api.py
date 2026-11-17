@@ -370,6 +370,7 @@ async def detect_uploaded_file(
     return {
         "scan_id": scan_id,
         "filename": file.filename,
+        "extracted_text": extracted_text,
         "overall": overall_pred,
         "sentence_summary": {
             "total_sentences": len(sentences),

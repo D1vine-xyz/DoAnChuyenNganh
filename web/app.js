@@ -3,7 +3,7 @@
  * Đồ án Chuyên ngành Kỹ thuật Phần mềm (Chủ đề 6)
  */
 
-const API_BASE = "";
+const API_BASE = window.location.protocol === "file:" ? "http://localhost:8000" : "";
 
 // Global State
 let currentScanId = null;
@@ -152,6 +152,15 @@ document.addEventListener("DOMContentLoaded", () => {
   checkServerHealth();
   updateTextCounts();
 
+  // Tự động kiểm tra định kỳ trạng thái máy chủ
+  let healthInterval = setInterval(async () => {
+    const isOnline = await checkServerHealth();
+    if (isOnline) {
+      clearInterval(healthInterval);
+      setInterval(checkServerHealth, 20000);
+    }
+  }, 3500);
+
   // Tab switching
   navTabs.forEach((tab) => {
     tab.addEventListener("click", () => {
@@ -175,15 +184,18 @@ async function checkServerHealth() {
     const res = await fetch(`${API_BASE}/health`);
     if (res.ok) {
       const data = await res.json();
-      serverStatusEl.className = "status-indicator " + (data.ready ? "status-online" : "status-offline");
+      serverStatusEl.className = "status-pill " + (data.ready ? "status-online" : "status-offline");
       serverStatusTextEl.textContent = data.ready ? `FastAPI: Sẵn sàng (${data.device})` : "Đang nạp mô hình...";
+      return data.ready;
     } else {
-      serverStatusEl.className = "status-indicator status-offline";
+      serverStatusEl.className = "status-pill status-offline";
       serverStatusTextEl.textContent = "FastAPI: Lỗi phản hồi";
+      return false;
     }
   } catch (err) {
-    serverStatusEl.className = "status-indicator status-offline";
+    serverStatusEl.className = "status-pill status-offline";
     serverStatusTextEl.textContent = "FastAPI: Chưa kết nối";
+    return false;
   }
 }
 
@@ -234,6 +246,10 @@ dropZone.addEventListener("drop", (e) => {
   }
 });
 
+fileInput.addEventListener("click", () => {
+  fileInput.value = null;
+});
+
 fileInput.addEventListener("change", () => {
   if (fileInput.files && fileInput.files.length > 0) {
     handleFileSelected(fileInput.files[0]);
@@ -250,6 +266,19 @@ function handleFileSelected(file) {
   fileNameEl.textContent = file.name;
   fileSizeEl.textContent = `(${(file.size / 1024).toFixed(1)} KB)`;
   fileInfoBar.classList.remove("hidden");
+
+  // Nếu là file .txt thì nạp xem trước ngay vào textarea
+  if (ext === "txt") {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      textInput.value = e.target.result;
+      updateTextCounts();
+    };
+    reader.readAsText(file);
+  } else {
+    // Với tài liệu .docx, .doc, .pdf
+    textInput.placeholder = `[Đã chọn tệp: ${file.name} (${(file.size / 1024).toFixed(1)} KB)]\nNhấn "Kiểm tra nội dung AI" để máy chủ tự động bóc tách và phân tích toàn bộ văn bản.`;
+  }
 }
 
 btnRemoveFile.addEventListener("click", (e) => {
@@ -257,6 +286,9 @@ btnRemoveFile.addEventListener("click", (e) => {
   currentUploadedFile = null;
   fileInput.value = "";
   fileInfoBar.classList.add("hidden");
+  textInput.placeholder = "Nhập văn bản vào đây hoặc tải lên tệp để kiểm tra Nội dung AI.";
+  textInput.value = "";
+  updateTextCounts();
 });
 
 // Action buttons
@@ -276,6 +308,7 @@ btnClear.addEventListener("click", () => {
   currentUploadedFile = null;
   fileInput.value = "";
   fileInfoBar.classList.add("hidden");
+  textInput.placeholder = "Nhập văn bản vào đây hoặc tải lên tệp để kiểm tra Nội dung AI.";
   resultContent.classList.add("hidden");
   resultActions.classList.add("hidden");
 });
@@ -322,15 +355,33 @@ btnSubmit.addEventListener("click", async () => {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || "Lỗi xử lý file từ server.");
+        let errDetail = "Lỗi xử lý file từ server.";
+        try {
+          const err = await res.json();
+          errDetail = err.detail || errDetail;
+        } catch (e) {
+          errDetail = `HTTP ${res.status}: ${res.statusText}`;
+        }
+        throw new Error(errDetail);
       }
 
       const data = await res.json();
       currentScanId = data.scan_id;
+
+      // Đưa toàn bộ nội dung đã bóc tách vào ô văn bản để người dùng theo dõi
+      if (data.extracted_text) {
+        textInput.value = data.extracted_text;
+        updateTextCounts();
+      }
+
       renderResults(data);
     } catch (err) {
-      alert("Lỗi thẩm định tệp: " + err.message);
+      console.error("Lỗi upload:", err);
+      if (err.message.includes("Failed to fetch") || err.message.includes("NetworkError")) {
+        alert("Không thể kết nối đến máy chủ FastAPI (http://localhost:8000).\nVui lòng chạy 'start_server.bat' để khởi động server trước khi quét!");
+      } else {
+        alert("Lỗi thẩm định tệp: " + err.message);
+      }
     } finally {
       setLoading(false);
     }

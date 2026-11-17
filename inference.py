@@ -214,7 +214,7 @@ class AITextDetector:
         char_count = len(text)
 
         # Đo độ dài token trên tokenizer RoBERTa (chuẩn BPE)
-        token_count = len(self.tokenizer_roberta.tokenize(text))
+        token_count = len(self.tokenizer_roberta.encode(text, add_special_tokens=False, truncation=False))
 
         t0 = time.time()
         batch_text = [text]
@@ -331,16 +331,25 @@ class AITextDetector:
 
         eval_sentences = sentences[:max_sentences]
 
-        # Tối ưu hóa: Dự đoán theo lô (Batch Inference) song song thay vì lặp tuần tự
+        # Tối ưu hóa: Dự đoán theo lô (Batch Inference) song song thay vì lặp tuần tự.
+        # Với câu ngắn (10-30 từ), BERT và RoBERTa phản hồi cực nhanh (~150ms).
         p_bert = self._predict_bert(eval_sentences) if self.model_bert else np.full(len(eval_sentences), 0.5)
         p_roberta = self._predict_roberta(eval_sentences) if self.model_roberta else np.full(len(eval_sentences), 0.5)
-        p_longformer = self._predict_longformer(eval_sentences) if self.model_longformer else np.full(len(eval_sentences), 0.5)
 
-        p_weighted = (
-            self.weights[0] * p_bert +
-            self.weights[1] * p_roberta +
-            self.weights[2] * p_longformer
-        )
+        # Longformer trên CPU có attention window cố định 512 tokens gây chậm ~20s cho batch câu đơn.
+        # Nếu có GPU (CUDA), chạy cả 3 mô hình; trên CPU, kết hợp BERT + RoBERTa để đạt tốc độ thời gian thực (<0.5s).
+        if self.device == "cuda" and self.model_longformer:
+            p_longformer = self._predict_longformer(eval_sentences)
+            p_weighted = (
+                self.weights[0] * p_bert +
+                self.weights[1] * p_roberta +
+                self.weights[2] * p_longformer
+            )
+        else:
+            w_sum = self.weights[0] + self.weights[1]
+            w_bert = self.weights[0] / w_sum
+            w_roberta = self.weights[1] / w_sum
+            p_weighted = w_bert * p_bert + w_roberta * p_roberta
 
         sentence_results = []
         for idx, sentence in enumerate(eval_sentences):
