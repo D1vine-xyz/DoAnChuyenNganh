@@ -20,6 +20,10 @@ data/gossipcop/HR.json
 data/gossipcop/HF.json
 data/gossipcop/MR.json
 data/gossipcop/MF.json
+backend/data/gossipcop/HR.json
+backend/data/gossipcop/HF.json
+backend/data/gossipcop/MR.json
+backend/data/gossipcop/MF.json
 
 # Checkpoints & weights
 *.pt
@@ -29,10 +33,13 @@ checkpoint-*/
 runs/
 output/*.pt
 output/tokenizer_*/
+backend/output/*.pt
+backend/output/tokenizer_*/
 
 # Database runtime files
 *.db
 output/*.db
+backend/output/*.db
 
 # Office temp files
 ~$*.docx

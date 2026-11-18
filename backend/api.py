@@ -49,7 +49,16 @@ async def lifespan(app: FastAPI):
     # Đảm bảo CSDL SQLite đã sẵn sàng
     db.init_db()
 
-    models_dir = os.environ.get("MODELS_DIR", "output")
+    # Tự động tìm thư mục chứa models_dir ('output')
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    if os.environ.get("MODELS_DIR"):
+        models_dir = os.environ.get("MODELS_DIR")
+    elif os.path.exists(os.path.join(base_dir, "output")):
+        models_dir = os.path.join(base_dir, "output")
+    elif os.path.exists(os.path.join(base_dir, "..", "output")):
+        models_dir = os.path.join(base_dir, "..", "output")
+    else:
+        models_dir = os.path.join(base_dir, "output")
     try:
         t0 = time.time()
         detector_instance = AITextDetector(models_dir=models_dir)
@@ -88,7 +97,21 @@ app.add_middleware(
 )
 
 # Phục vụ thư mục tĩnh cho Web Dashboard
-WEB_DIR = os.path.join(os.path.dirname(__file__), "web")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+POSSIBLE_WEB_DIRS = [
+    os.path.abspath(os.path.join(BASE_DIR, "..", "frontend", "web")),
+    os.path.abspath(os.path.join(BASE_DIR, "..", "frontend")),
+    os.path.abspath(os.path.join(BASE_DIR, "web")),
+    os.path.abspath(os.path.join(BASE_DIR, "..", "web")),
+]
+WEB_DIR = None
+for d in POSSIBLE_WEB_DIRS:
+    if os.path.exists(os.path.join(d, "index.html")):
+        WEB_DIR = d
+        break
+if WEB_DIR is None:
+    WEB_DIR = POSSIBLE_WEB_DIRS[0]
+
 if os.path.exists(WEB_DIR):
     app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
 

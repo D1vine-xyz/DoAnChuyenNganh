@@ -4,54 +4,47 @@
 
 ---
 
-## 📌 Cấu trúc dự án
+## 📌 Cấu trúc dự án (Fullstack Architecture: Frontend - Backend - Docs)
 
 ```text
-DoAnChuyenNganh/
-├── data/
-│   ├── train.csv                     # Tập huấn luyện chính thức 70% (13,403 mẫu)
-│   ├── val.csv                       # Tập kiểm tra lựa chọn mô hình 15% (2,872 mẫu)
-│   ├── test.csv                      # Tập kiểm thử nội miền 15% (2,873 mẫu)
-│   ├── toefl_dataset.csv             # Tập kiểm thử miền mới Unseen Domain (252 bài luận)
-│   ├── token_length_stats.json       # Báo cáo thống kê độ dài token (BERT, RoBERTa, Longformer)
-│   ├── final_train_dataset.csv       # Tập dữ liệu tổng hợp hoàn chỉnh (19,148 mẫu)
-│   ├── gossipcop_cleaned.csv         # Dữ liệu tin tức dài GossipCop đã làm sạch
-│   ├── gossipcop_paired_sample.csv   # Mẫu 20 bài báo đối sánh Người vs AI (Gemini)
-│   ├── liar_train_cleaned.csv        # Dữ liệu phát biểu ngắn LIAR (Train sạch)
-│   ├── liar_test_cleaned.csv         # Dữ liệu phát biểu ngắn LIAR (Test sạch)
-│   ├── liar_valid_cleaned.csv        # Dữ liệu phát biểu ngắn LIAR (Validation sạch)
-│   └── liar_train_paired_sample.csv  # Mẫu 20 câu đối sánh Người vs AI (Gemini)
+DoAn/
+├── frontend/                          # Toàn bộ giao diện người dùng (Client-Side)
+│   ├── web/                           # Web Application Dashboard SPA (HTML5, Modern CSS, Vanilla JS)
+│   │   ├── index.html                 # Giao diện chính thẩm định văn bản & dashboard KPI
+│   │   ├── style.css                  # Thiết kế Glassmorphism, Dark/Light Mode, CSS Variables
+│   │   └── app.js                     # Xử lý logic API, Hotspots highlight, Dark mode transition
+│   ├── extension/                     # Tiện ích mở rộng trình duyệt (Chrome Extension Manifest v3)
+│   │   ├── manifest.json              # Khai báo quyền, Service Worker, Context Menus
+│   │   ├── popup.html / popup.js      # Giao diện Popup quét nhanh & phân rã 3 mô hình
+│   │   ├── content_script.js          # Nút bấm nổi thông minh khi bôi đen văn bản trên mọi web
+│   │   └── icons/                     # Bộ biểu tượng ứng dụng đa kích thước
+│   └── README.md                      # Hướng dẫn chi tiết sử dụng và cài đặt frontend
 │
-├── download_liar.py                  # Tải dữ liệu phát biểu ngắn LIAR từ GitHub
-├── download_gossipcop.py              # Tải bài báo người viết từ GossipCop++
-├── download_clean_gossipcop.py        # Tải & tiền xử lý GossipCop++ từ Hugging Face
-├── download_toefl.py                 # Tải dữ liệu 252 bài luận kiểm thử TOEFL
-├── clean_data.py                      # Tiền xử lý, lọc trùng và làm sạch dữ liệu LIAR
-├── process_toefl.py                  # Chuẩn hóa tập dữ liệu kiểm thử TOEFL
-├── generate_fake_text.py              # Sinh văn bản ngắn AI paraphrase qua Gemini API
-├── generate_fake_gossipcop.py         # Sinh văn bản tin dài AI paraphrase qua Gemini API
-├── merge_datasets.py                  # Hợp nhất toàn bộ dữ liệu & gán nhãn nhị phân (0/1)
-├── split_data.py                      # Phân chia dữ liệu phân tầng (Train 70% - Val 15% - Test 15%)
-├── explore_tokenizers.py              # Khảo sát phân phối token BERT, RoBERTa, Longformer
-├── dataset.py                         # PyTorch Dataset, Dynamic Padding Collator & DataLoader
+├── backend/                           # Toàn bộ xử lý máy chủ & mô hình AI (Server & AI Pipeline)
+│   ├── api.py                         # Máy chủ RESTful API FastAPI (CORS, Lifespan, Swagger Docs)
+│   ├── run_server.py                  # Script khởi động server & tự động mở Web Dashboard
+│   ├── inference.py                   # Bộ suy luận Ensemble PLMs (Soft-voting & Stacking Meta-Learner)
+│   ├── models.py                      # Định nghĩa kiến trúc PyTorch cho BERT, RoBERTa, Longformer
+│   ├── ensemble.py                    # Pipeline tối ưu hóa trọng số học kết hợp (Nelder-Mead & Stacking)
+│   ├── database.py                    # Quản lý CSDL SQLite lưu trữ lịch sử quét & thống kê KPI
+│   ├── file_parser.py                 # Bộ bóc tách tệp tải lên (.txt, .docx, .doc, .pdf)
+│   ├── pdf_report.py                  # Trình sinh chứng nhận thẩm định PDF chuẩn A4 (ReportLab)
+│   ├── dataset.py                     # PyTorch Dataset, Dynamic Padding Collator & DataLoaders
+│   ├── test_api.py                    # Suite 8 unit & integration tests kiểm thử toàn bộ luồng
+│   ├── requirements.txt               # Danh mục thư viện Python backend
+│   ├── data/                          # Thư mục dữ liệu huấn luyện & kiểm thử (GossipCop, LIAR, TOEFL)
+│   ├── output/                        # Checkpoints (.pt), tokenizers, CSDL SQLite, kết quả đánh giá
+│   ├── kaggle_jobs/                   # Cấu hình huấn luyện mô hình từ xa trên Kaggle GPU T4
+│   └── scripts/                       # Các kịch bản phụ trợ & kết nối NotebookLM MCP
 │
-├── auth_setup.mjs                     # Cấu hình đăng nhập cho MCP NotebookLM
-├── save_state.mjs                     # Lưu trữ phiên làm việc và cookies NotebookLM
-├── query_notebooklm.mjs               # Truy vấn tài liệu trực tiếp từ NotebookLM
-├── dang_nhap_notebooklm.bat           # Script khởi động đăng nhập nhanh NotebookLM
+├── docs/                              # Tài liệu đồ án, đề bài & báo cáo nghiên cứu
+│   ├── CHỦ ĐỀ 6.docx                  # Phiếu giao đề tài chính thức của giảng viên
+│   ├── BAO_CAO_TIEN_DO_TUAN_1.md      # Nhật ký tiến độ chi tiết từ Ngày 1 đến Ngày 7
+│   ├── reports/                       # Biểu đồ khoa học phân tích ROC-AUC, Confusion Matrix
+│   └── ...                            # Các tài liệu nghiên cứu và danh mục tài liệu tham khảo
 │
-├── BAO_CAO_TIEN_DO_TUAN_1.md          # Báo cáo tiến độ chi tiết từ Ngày 1 đến Ngày 7 (Hoàn thành Tuần 1)
-├── kaggle_jobs/                       # Cấu hình huấn luyện mô hình từ xa trên Kaggle GPU
-│   ├── train_bert/                    # Job Kaggle cho BERT (Tesla T4)
-│   ├── train_roberta/                 # Job Kaggle cho RoBERTa (Tesla T4)
-│   └── train_longformer/              # Job Kaggle cho Longformer (Tesla T4)
-├── train_bert.py                      # Pipeline huấn luyện mô hình BERT
-├── train_roberta.py                   # Pipeline huấn luyện mô hình RoBERTa
-├── train_longformer.py                # Pipeline huấn luyện mô hình Longformer (Context 1024)
-├── models.py                          # Định nghĩa kiến trúc PyTorch cho cả 3 PLMs
-├── requirements.txt                   # Danh mục thư viện Python yêu cầu
-├── .env.example                       # Mẫu cấu hình biến môi trường
-└── README.md                          # Giới thiệu & Hướng dẫn sử dụng
+├── start_server.bat                   # 🚀 Script 1-click khởi chạy toàn bộ hệ thống từ thư mục gốc
+└── README.md                          # Hướng dẫn tổng quan đồ án
 ```
 
 ---
@@ -340,26 +333,27 @@ uvicorn api:app --host 0.0.0.0 --port 8000 --reload
 | **`GET`** | `/api/v1/report/pdf/{id}` | **Xuất Báo Cáo Kiểm Định PDF (Audit Certificate)** đóng dấu phân tích chi tiết |
 
 ### 🧪 Kiểm Thử Tích Hợp (Integration Tests):
-Đã xây dựng bộ kiểm thử tự động [`test_api.py`](file:///c:/DoAn/test_api.py) kiểm tra trọn vẹn cả 8 luồng nghiệp vụ:
+Đã xây dựng bộ kiểm thử tự động [`test_api.py`](file:///c:/DoAn/backend/test_api.py) kiểm tra trọn vẹn cả 8 luồng nghiệp vụ:
 ```bash
+cd backend
 python -m unittest test_api.py
-# Ran 8 tests in 23.1s -> OK (100% Passed)
+# Ran 8 tests in 22.8s -> OK (100% Passed)
 ```
 
 ---
 
 ## 🖥️ Web Application Dashboard & Xuất Báo Cáo PDF - Hoàn thành Ngày 16
 
-Hệ thống được nâng cấp thành một **Ứng dụng Phần mềm Thẩm định Độc lập (Standalone AI Audit Web App)** chuẩn chuyên ngành Kỹ thuật Phần mềm tại thư mục [`web/`](file:///c:/DoAn/web):
+Hệ thống được nâng cấp thành một **Ứng dụng Phần mềm Thẩm định Độc lập (Standalone AI Audit Web App)** chuẩn chuyên ngành Kỹ thuật Phần mềm tại thư mục [`frontend/web/`](file:///c:/DoAn/frontend/web):
 
 ### 🌟 Tính Năng Phần Mềm Nổi Bật:
 1. **Giao diện Web Dashboard Hiện Đại (`http://localhost:8000`)**:
    * Thiết kế theo phong cách Dark Mode chuyên nghiệp, tối ưu cho môi trường làm việc học thuật và cơ quan thẩm định.
    * Cung cấp 3 Tab nghiệp vụ: **🔍 Thẩm Định Văn Bản**, **📊 Lịch Sử Quét & Thống Kê KPI**, và **🏗️ Kiến Trúc Hệ Thống**.
 2. **Kéo Thả Tải Tệp Đa Định Dạng (.PDF, .DOCX, .TXT)**:
-   * Module [`file_parser.py`](file:///c:/DoAn/file_parser.py) tự động phân tích nhị phân, bóc tách chuỗi văn bản sạch từ bài báo cáo docx hoặc tệp sách điện tử PDF mà không cần phần mềm bên thứ ba.
+   * Module [`file_parser.py`](file:///c:/DoAn/backend/file_parser.py) tự động phân tích nhị phân, bóc tách chuỗi văn bản sạch từ bài báo cáo docx hoặc tệp sách điện tử PDF mà không cần phần mềm bên thứ ba.
 3. **Cơ Sở Dữ Liệu SQLite & Nhật Ký Thẩm Định (`database.py`)**:
-   * Tự động lưu trữ chi tiết từng lượt quét vào file CSDL SQLite [`output/scan_history.db`](file:///c:/DoAn/output/scan_history.db).
+   * Tự động lưu trữ chi tiết từng lượt quét vào file CSDL SQLite [`backend/output/scan_history.db`](file:///c:/DoAn/backend/output/scan_history.db).
    * Bảng Dashboard cho phép xem lại chi tiết, tính toán tỷ lệ văn bản AI, tổng số từ đã kiểm định và thời gian phản hồi trung bình.
 4. **Xuất Báo Cáo Chứng Thực Kiểm Định PDF (`pdf_report.py`)**:
    * Tự động sinh file PDF kích thước A4 chuẩn thẩm mỹ bằng thư viện **ReportLab** có hỗ trợ tiếng Việt Unicode (`ArialVN`).
@@ -369,7 +363,7 @@ Hệ thống được nâng cấp thành một **Ứng dụng Phần mềm Thẩ
 
 ## 🧩 Tiện Ích Trình Duyệt Chrome Extension (Manifest v3) - Hoàn thành Ngày 15
 
-Toàn bộ tiện ích mở rộng được đóng gói tại thư mục [`extension/`](file:///c:/DoAn/extension) theo chuẩn **Google Chrome Manifest v3** mới nhất, cho phép người dùng kiểm tra văn bản trực tiếp trong quá trình duyệt web theo thời gian thực.
+Toàn bộ tiện ích mở rộng được đóng gói tại thư mục [`frontend/extension/`](file:///c:/DoAn/frontend/extension) theo chuẩn **Google Chrome Manifest v3** mới nhất, cho phép người dùng kiểm tra văn bản trực tiếp trong quá trình duyệt web theo thời gian thực.
 
 ### 🌟 Tính Năng Tiện Ích:
 1. **Giao diện Popup Trực quan (`popup.html`)**:
@@ -388,6 +382,7 @@ Toàn bộ tiện ích mở rộng được đóng gói tại thư mục [`exten
 1. **Khởi chạy Backend Server:** Nhấp đúp vào file [`start_server.bat`](file:///c:/DoAn/start_server.bat) để khởi động máy chủ tại `http://localhost:8000`.
 2. **Mở trang quản lý Tiện ích của Chrome:** Truy cập đường dẫn `chrome://extensions/` trên thanh địa chỉ trình duyệt.
 3. **Bật Chế độ dành cho nhà phát triển (Developer Mode):** Gạt công tắc ở góc trên bên phải màn hình.
+4. **Tải Tiện ích đã giải nén (Load Unpacked):** Bấm nút `Load unpacked` và trỏ vào thư mục `c:\DoAn\frontend\extension`.
 4. **Tải tiện ích:** Nhấp vào nút **Tải tiện ích đã giải nén (Load unpacked)** ở góc trên bên trái.
 5. **Chọn thư mục:** Chọn thư mục `c:\DoAn\extension` (thư mục chứa file `manifest.json`).
 6. **Ghim tiện ích:** Nhấp vào biểu tượng mảnh ghép trên thanh công cụ của Chrome và bấm ghim biểu tượng **AI Text Detector** để sử dụng mọi lúc!

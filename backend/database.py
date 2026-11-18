@@ -10,7 +10,14 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional
 from contextlib import contextmanager
 
-DB_DIR = "output"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if os.path.exists(os.path.join(BASE_DIR, "output")):
+    DB_DIR = os.path.join(BASE_DIR, "output")
+elif os.path.exists(os.path.join(BASE_DIR, "..", "output")):
+    DB_DIR = os.path.join(BASE_DIR, "..", "output")
+else:
+    DB_DIR = os.path.join(BASE_DIR, "output")
+
 DB_PATH = os.path.join(DB_DIR, "scan_history.db")
 
 

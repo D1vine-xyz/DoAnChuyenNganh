@@ -15,7 +15,8 @@ if not exist "venv\Scripts\python.exe" (
 )
 
 echo [*] Dang khoi dong server va nap mo hinh, vui long cho...
-venv\Scripts\python.exe run_server.py
+cd backend
+..\venv\Scripts\python.exe run_server.py
 
 if %ERRORLEVEL% NEQ 0 (
     echo.

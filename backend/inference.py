@@ -44,7 +44,19 @@ class AITextDetector:
         load_roberta: bool = True,
         load_longformer: bool = True,
     ):
-        self.models_dir = models_dir
+        # Tự động phân giải đường dẫn models_dir linh hoạt
+        if not os.path.isabs(models_dir):
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            if os.path.exists(models_dir):
+                self.models_dir = os.path.abspath(models_dir)
+            elif os.path.exists(os.path.join(base_dir, models_dir)):
+                self.models_dir = os.path.join(base_dir, models_dir)
+            elif os.path.exists(os.path.join(base_dir, "..", models_dir)):
+                self.models_dir = os.path.abspath(os.path.join(base_dir, "..", models_dir))
+            else:
+                self.models_dir = models_dir
+        else:
+            self.models_dir = models_dir
 
         if device is None:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
