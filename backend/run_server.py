@@ -15,10 +15,11 @@ import uvicorn
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-# Đảm bảo thư mục chứa script luôn có trong sys.path để import các module backend
+# Đảm bảo thư mục chứa script luôn có trong sys.path và làm working directory
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 if CURRENT_DIR not in sys.path:
     sys.path.insert(0, CURRENT_DIR)
+os.chdir(CURRENT_DIR)
 
 
 def wait_and_open_browser(url: str = "http://localhost:8000", max_wait_sec: int = 60):
