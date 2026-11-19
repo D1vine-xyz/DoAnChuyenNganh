@@ -124,7 +124,7 @@ class DetectRequest(BaseModel):
     text: str = Field(
         ...,
         min_length=3,
-        description="Đoạn văn bản cần kiểm tra (tiếng Anh).",
+        description="Đoạn văn bản cần kiểm tra (tiếng Anh hoặc tiếng Việt).",
         examples=["Artificial intelligence has transformed modern software development and academic research."]
     )
     threshold: float = Field(
@@ -137,12 +137,17 @@ class DetectRequest(BaseModel):
         default=True,
         description="Có trả về phân rã điểm số chi tiết của từng mô hình thành phần hay không.",
     )
+    language: Optional[str] = Field(
+        default=None,
+        description="Tùy chọn chỉ định ngôn ngữ ('en' hoặc 'vi'). Mặc định None sẽ tự động nhận diện."
+    )
 
 
 class WebDetectRequest(BaseModel):
     text: str = Field(..., min_length=5, description="Văn bản gửi từ Web Dashboard")
     threshold: float = Field(default=0.5, ge=0.0, le=1.0)
     title: Optional[str] = Field(default=None, description="Tiêu đề hoặc tên tài liệu")
+    language: Optional[str] = Field(default=None, description="Tùy chọn chỉ định ngôn ngữ ('en' hoặc 'vi')")
 
 
 class SentenceAnalysisRequest(BaseModel):
@@ -152,6 +157,7 @@ class SentenceAnalysisRequest(BaseModel):
         description="Đoạn văn bản cần phân tích và bóc tách từng câu để tô màu.",
     )
     threshold: float = Field(default=0.5, ge=0.0, le=1.0)
+    language: Optional[str] = Field(default=None, description="Tùy chọn chỉ định ngôn ngữ ('en' hoặc 'vi')")
 
 
 class BatchDetectRequest(BaseModel):
@@ -195,10 +201,12 @@ async def health_check():
         "status": "healthy" if is_ready else "initializing_or_error",
         "ready": is_ready,
         "device": device_info,
+        "languages_supported": ["en", "vi"],
         "models_loaded": {
             "bert": is_ready and detector_instance.model_bert is not None,
             "roberta": is_ready and detector_instance.model_roberta is not None,
             "longformer": is_ready and detector_instance.model_longformer is not None,
+            "phobert": is_ready and detector_instance.model_phobert is not None,
             "stacking_meta_learner": is_ready and detector_instance.meta_classifier is not None,
         },
         "ensemble_weights": {
@@ -218,7 +226,7 @@ async def detect_text(req: DetectRequest):
     """
     Phân tích một đoạn văn bản thô:
     Trả về xác suất văn bản do AI sinh (%), nhãn nhị phân, mức độ tin cậy
-    và điểm số đóng góp của từng mô hình (BERT, RoBERTa, Longformer).
+    và điểm số đóng góp của từng mô hình (BERT, RoBERTa, Longformer hoặc PhoBERT).
     """
     if detector_instance is None:
         raise HTTPException(
@@ -238,6 +246,7 @@ async def detect_text(req: DetectRequest):
             text=clean_text,
             threshold=req.threshold,
             detailed=req.detailed,
+            force_language=req.language,
         )
         return JSONResponse(status_code=status.HTTP_200_OK, content=result)
     except Exception as e:
@@ -253,6 +262,7 @@ async def detect_sentences(req: SentenceAnalysisRequest):
     Phân tích diễn giải cấp câu (AI Hotspots) phục vụ Chrome Extension & Web Dashboard:
     Bóc tách đoạn văn bản thành từng câu độc lập, tính toán xác suất AI
     và gán nhãn màu cảnh báo (🟢 Xanh: Người viết, 🟡 Vàng: Nghi vấn, 🔴 Đỏ: Chắc chắn AI).
+    Hỗ trợ tự động nhận diện Song ngữ Anh - Việt.
     """
     if detector_instance is None:
         raise HTTPException(
@@ -269,15 +279,29 @@ async def detect_sentences(req: SentenceAnalysisRequest):
 
     try:
         t0 = time.time()
-        overall_pred = detector_instance.predict(clean_text, threshold=req.threshold, detailed=True)
-        sentences = detector_instance.analyze_sentences(clean_text, threshold=req.threshold)
+        overall_pred = detector_instance.predict(
+            clean_text,
+            threshold=req.threshold,
+            detailed=True,
+            force_language=req.language,
+        )
+        sentences = detector_instance.analyze_sentences(
+            clean_text,
+            threshold=req.threshold,
+            force_language=req.language,
+        )
         total_time_ms = round((time.time() - t0) * 1000, 2)
 
         red_count = sum(1 for s in sentences if s["highlight_color"] == "red")
         yellow_count = sum(1 for s in sentences if s["highlight_color"] == "yellow")
         green_count = sum(1 for s in sentences if s["highlight_color"] == "green")
 
-        # Lưu tự động vào CSDL SQLite
+        # Lưu tự động vào CSDL SQLite (bảo toàn cấu trúc an toàn)
+        ind_models = overall_pred.get("model_breakdown", {}).get("individual_models", {})
+        score_bert = float(ind_models.get("bert", {}).get("probability", overall_pred["ai_probability"]))
+        score_roberta = float(ind_models.get("roberta", {}).get("probability", overall_pred["ai_probability"]))
+        score_longformer = float(ind_models.get("longformer", {}).get("probability", overall_pred["ai_probability"]))
+
         scan_id = db.save_scan(
             title=clean_text[:40] + "...",
             full_text=clean_text,
@@ -287,10 +311,13 @@ async def detect_sentences(req: SentenceAnalysisRequest):
             verdict=overall_pred["label"],
             confidence=overall_pred["confidence"],
             inference_time_ms=total_time_ms,
-            score_bert=overall_pred["model_breakdown"]["individual_models"]["bert"]["probability"],
-            score_roberta=overall_pred["model_breakdown"]["individual_models"]["roberta"]["probability"],
-            score_longformer=overall_pred["model_breakdown"]["individual_models"]["longformer"]["probability"],
+            score_bert=score_bert,
+            score_roberta=score_roberta,
+            score_longformer=score_longformer,
             details_json={
+                "language": overall_pred.get("language", "en"),
+                "language_label": overall_pred.get("language_label", "Tiếng Anh"),
+                "detected_model": overall_pred.get("detected_model", ""),
                 "sentences": sentences,
                 "model_breakdown": overall_pred.get("model_breakdown"),
             },
@@ -321,7 +348,11 @@ async def detect_web(req: WebDetectRequest):
     Endpoint tối ưu cho Web Dashboard: Phân tích toàn diện cả đoạn văn và từng câu,
     tự động lưu vào CSDL và trả về ID để hỗ trợ xuất báo cáo PDF.
     """
-    return await detect_sentences(SentenceAnalysisRequest(text=req.text, threshold=req.threshold))
+    return await detect_sentences(SentenceAnalysisRequest(
+        text=req.text,
+        threshold=req.threshold,
+        language=req.language,
+    ))
 
 
 @app.post("/api/v1/detect/upload", tags=["Web Dashboard"])
@@ -371,6 +402,11 @@ async def detect_uploaded_file(
     green_count = sum(1 for s in sentences if s["highlight_color"] == "green")
 
     # Lưu vào SQLite
+    ind_models = overall_pred.get("model_breakdown", {}).get("individual_models", {})
+    score_bert = float(ind_models.get("bert", {}).get("probability", overall_pred["ai_probability"]))
+    score_roberta = float(ind_models.get("roberta", {}).get("probability", overall_pred["ai_probability"]))
+    score_longformer = float(ind_models.get("longformer", {}).get("probability", overall_pred["ai_probability"]))
+
     scan_id = db.save_scan(
         title=f"Tài liệu: {file.filename}",
         filename=file.filename,
@@ -381,10 +417,13 @@ async def detect_uploaded_file(
         verdict=overall_pred["label"],
         confidence=overall_pred["confidence"],
         inference_time_ms=total_time_ms,
-        score_bert=overall_pred["model_breakdown"]["individual_models"]["bert"]["probability"],
-        score_roberta=overall_pred["model_breakdown"]["individual_models"]["roberta"]["probability"],
-        score_longformer=overall_pred["model_breakdown"]["individual_models"]["longformer"]["probability"],
+        score_bert=score_bert,
+        score_roberta=score_roberta,
+        score_longformer=score_longformer,
         details_json={
+            "language": overall_pred.get("language", "en"),
+            "language_label": overall_pred.get("language_label", "Tiếng Anh"),
+            "detected_model": overall_pred.get("detected_model", ""),
             "sentences": sentences,
             "model_breakdown": overall_pred.get("model_breakdown"),
         },
