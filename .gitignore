@@ -45,6 +45,15 @@ backend/output/*.db
 ~$*.docx
 ~$*.xlsx
 
+# Private study notes & Q&A guides (không push lên git)
+*Cam_Nang*.docx
+*VAN_DAP*.docx
+*bi_kip*.docx
+*Giai_Thich*.docx
+*Chuc_Nang*.docx
+generate_docx_guide.py
+generate_files_guide.py
+
 # Kaggle credentials
 kaggle.json
 .kaggle/

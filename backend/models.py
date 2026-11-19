@@ -170,6 +170,47 @@ class LongformerTextClassifier(nn.Module):
         return logits
 
 
+class PhoBERTTextClassifier(nn.Module):
+    """
+    Mô hình phát hiện văn bản do AI sinh cho Tiếng Việt dựa trên PhoBERT (vinai/phobert-base-v2).
+    Kiến trúc: PhoBERT Backbone -> Dropout -> Linear Classification Head (Logit nhị phân).
+    """
+
+    def __init__(
+        self,
+        pretrained_name: str = "vinai/phobert-base-v2",
+        dropout_rate: float = 0.3,
+        freeze_backbone: bool = False,
+    ):
+        super().__init__()
+        self.pretrained_name = pretrained_name
+        self.config = AutoConfig.from_pretrained(pretrained_name)
+        self.phobert = AutoModel.from_pretrained(pretrained_name, config=self.config)
+
+        if freeze_backbone:
+            for param in self.phobert.parameters():
+                param.requires_grad = False
+
+        self.dropout = nn.Dropout(dropout_rate)
+        self.classifier = nn.Linear(self.config.hidden_size, 1)
+
+        nn.init.xavier_normal_(self.classifier.weight)
+        nn.init.zeros_(self.classifier.bias)
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        **kwargs,
+    ) -> torch.Tensor:
+        outputs = self.phobert(input_ids=input_ids, attention_mask=attention_mask)
+        sequence_output = outputs[0]
+        cls_token = sequence_output[:, 0, :]
+        cls_token = self.dropout(cls_token)
+        logits = self.classifier(cls_token)
+        return logits.squeeze(-1)
+
+
 def build_model(
     model_type: str = "bert",
     pretrained_name: Optional[str] = None,
@@ -178,7 +219,7 @@ def build_model(
 ) -> nn.Module:
     """
     Factory function khởi tạo mô hình chuẩn hóa cho Ensemble Pipeline.
-    :param model_type: 'bert', 'roberta', hoặc 'longformer'
+    :param model_type: 'bert', 'roberta', 'longformer', hoặc 'phobert'
     :param pretrained_name: Tên checkpoint Hugging Face (nếu None sẽ lấy mặc định)
     :param dropout_rate: Tỷ lệ Dropout cho head phân loại
     :param freeze_backbone: Có đóng băng tầng backbone hay không
@@ -194,8 +235,11 @@ def build_model(
     elif model_type == "longformer":
         name = pretrained_name or "allenai/longformer-base-4096"
         return LongformerTextClassifier(pretrained_name=name, dropout_rate=dropout_rate, freeze_backbone=freeze_backbone)
+    elif model_type in ["phobert", "phobert-base", "phobert-base-v2"]:
+        name = pretrained_name or "vinai/phobert-base-v2"
+        return PhoBERTTextClassifier(pretrained_name=name, dropout_rate=dropout_rate, freeze_backbone=freeze_backbone)
     else:
-        raise ValueError(f"Loại mô hình '{model_type}' không được hỗ trợ. Chọn trong: ['bert', 'roberta', 'longformer']")
+        raise ValueError(f"Loại mô hình '{model_type}' không được hỗ trợ. Chọn trong: ['bert', 'roberta', 'longformer', 'phobert']")
 
 
 if __name__ == "__main__":
