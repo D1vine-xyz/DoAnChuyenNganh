@@ -1,6 +1,8 @@
-# Nghiên cứu Phát hiện Văn bản do LLM sinh sử dụng Mô hình kết hợp (Ensemble PLMs)
+# Nghiên cứu Phát hiện Văn bản do LLM sinh sử dụng Mô hình kết hợp Song ngữ (Ensemble PLMs & PhoBERT)
 
-Đồ án chuyên ngành (Chủ đề 6) nghiên cứu và xây dựng hệ thống phát hiện văn bản do các Mô hình Ngôn ngữ Lớn (LLMs như ChatGPT, Gemini) tạo ra, sử dụng kỹ thuật học kết hợp (Ensemble Learning) từ các mô hình ngôn ngữ tiền huấn luyện (PLMs): **BERT**, **RoBERTa** và **Longformer**.
+Đồ án chuyên ngành (Chủ đề 6) nghiên cứu và xây dựng hệ thống phát hiện văn bản do các Mô hình Ngôn ngữ Lớn (LLMs như ChatGPT, Gemini) tạo ra, hỗ trợ **Song ngữ Anh - Việt** với kiến trúc Định tuyến Thông minh (Dynamic Language Router):
+- **Tuyến Tiếng Anh**: Kỹ thuật học kết hợp (Ensemble Learning) từ 3 mô hình tiền huấn luyện lớn: **Longformer (1024 tokens)**, **BERT** và **RoBERTa** (Đạt độ chính xác **96.52%**).
+- **Tuyến Tiếng Việt**: Mô hình bản địa hóa chuyên sâu **PhoBERT base v2** (VinAI) kết hợp thuật toán bóc tách từ ghép **PyVi** (Đạt độ chính xác nhãn AI **81.58%**).
 
 ---
 
@@ -10,30 +12,33 @@
 DoAn/
 ├── frontend/                          # Toàn bộ giao diện người dùng (Client-Side)
 │   ├── web/                           # Web Application Dashboard SPA (HTML5, Modern CSS, Vanilla JS)
-│   │   ├── index.html                 # Giao diện chính thẩm định văn bản & dashboard KPI
+│   │   ├── index.html                 # Giao diện chính thẩm định văn bản & dashboard KPI (Hỗ trợ Song ngữ)
 │   │   ├── style.css                  # Thiết kế Glassmorphism, Dark/Light Mode, CSS Variables
 │   │   └── app.js                     # Xử lý logic API, Hotspots highlight, Dark mode transition
 │   ├── extension/                     # Tiện ích mở rộng trình duyệt (Chrome Extension Manifest v3)
 │   │   ├── manifest.json              # Khai báo quyền, Service Worker, Context Menus
-│   │   ├── popup.html / popup.js      # Giao diện Popup quét nhanh & phân rã 3 mô hình
+│   │   ├── popup.html / popup.js      # Giao diện Popup quét nhanh & phân rã mô hình song ngữ
 │   │   ├── content_script.js          # Nút bấm nổi thông minh khi bôi đen văn bản trên mọi web
 │   │   └── icons/                     # Bộ biểu tượng ứng dụng đa kích thước
 │   └── README.md                      # Hướng dẫn chi tiết sử dụng và cài đặt frontend
 │
 ├── backend/                           # Toàn bộ xử lý máy chủ & mô hình AI (Server & AI Pipeline)
-│   ├── api.py                         # Máy chủ RESTful API FastAPI (CORS, Lifespan, Swagger Docs)
+│   ├── api.py                         # Máy chủ RESTful API FastAPI (Song ngữ, Lifespan, Swagger Docs)
 │   ├── run_server.py                  # Script khởi động server & tự động mở Web Dashboard
-│   ├── inference.py                   # Bộ suy luận Ensemble PLMs (Soft-voting & Stacking Meta-Learner)
-│   ├── models.py                      # Định nghĩa kiến trúc PyTorch cho BERT, RoBERTa, Longformer
+│   ├── inference.py                   # Bộ suy luận Song ngữ (Language Router, PhoBERT, Ensemble PLMs)
+│   ├── models.py                      # Định nghĩa kiến trúc PyTorch cho BERT, RoBERTa, Longformer, PhoBERT
+│   ├── train_phobert.py               # Pipeline huấn luyện PhoBERT base v2 với PyVi segmentation
+│   ├── create_vietnamese_dataset.py   # Script thu thập VnExpress & sinh dữ liệu AI bằng Gemini API
+│   ├── verify_phase4.py               # Kịch bản kiểm thử End-to-End toàn diện 6/6 kịch bản
 │   ├── ensemble.py                    # Pipeline tối ưu hóa trọng số học kết hợp (Nelder-Mead & Stacking)
 │   ├── database.py                    # Quản lý CSDL SQLite lưu trữ lịch sử quét & thống kê KPI
 │   ├── file_parser.py                 # Bộ bóc tách tệp tải lên (.txt, .docx, .doc, .pdf)
-│   ├── pdf_report.py                  # Trình sinh chứng nhận thẩm định PDF chuẩn A4 (ReportLab)
+│   ├── pdf_report.py                  # Trình sinh chứng nhận thẩm định PDF chuẩn A4 (ReportLab, font ArialVN)
 │   ├── dataset.py                     # PyTorch Dataset, Dynamic Padding Collator & DataLoaders
-│   ├── test_api.py                    # Suite 8 unit & integration tests kiểm thử toàn bộ luồng
-│   ├── requirements.txt               # Danh mục thư viện Python backend
-│   ├── data/                          # Thư mục dữ liệu huấn luyện & kiểm thử (GossipCop, LIAR, TOEFL)
-│   ├── output/                        # Checkpoints (.pt), tokenizers, CSDL SQLite, kết quả đánh giá
+│   ├── test_api.py                    # Suite 10 unit & integration tests kiểm thử toàn bộ luồng song ngữ
+│   ├── requirements.txt               # Danh mục thư viện Python backend (PyTorch, Transformers, PyVi, LangDetect)
+│   ├── data/                          # Thư mục dữ liệu: GossipCop, LIAR, TOEFL, và vietnamese_*.csv
+│   ├── output/                        # Checkpoints (*_best.pt), tokenizers, CSDL SQLite, kết quả đánh giá
 │   ├── kaggle_jobs/                   # Cấu hình huấn luyện mô hình từ xa trên Kaggle GPU T4
 │   └── scripts/                       # Các kịch bản phụ trợ & kết nối NotebookLM MCP
 │
@@ -386,6 +391,31 @@ Toàn bộ tiện ích mở rộng được đóng gói tại thư mục [`front
 4. **Tải tiện ích:** Nhấp vào nút **Tải tiện ích đã giải nén (Load unpacked)** ở góc trên bên trái.
 5. **Chọn thư mục:** Chọn thư mục `c:\DoAn\extension` (thư mục chứa file `manifest.json`).
 6. **Ghim tiện ích:** Nhấp vào biểu tượng mảnh ghép trên thanh công cụ của Chrome và bấm ghim biểu tượng **AI Text Detector** để sử dụng mọi lúc!
+
+---
+
+## 🇻🇳 Module Mở Rộng Song Ngữ: PhoBERT & Dynamic Language Router
+
+Hệ thống được nâng cấp toàn diện lên kiến trúc **Song ngữ Anh - Việt (Bilingual Architecture)** với khả năng tự động nhận diện ngôn ngữ và định tuyến luồng suy luận thời gian thực:
+
+### 🌟 Kiến Trúc Định Tuyến Ngôn Ngữ (Dynamic Language Router):
+- **Tầng 1 - Quét ký tự dấu Tiếng Việt (< 0.05ms):** Kiểm tra tức thì tập ký tự dấu thanh đặc trưng tiếng Việt (`ă, â, đ, ê, ô, ơ, ư, à, á...`).
+- **Tầng 2 - Fallback LangDetect:** Tự động phát hiện văn bản không dấu hoặc câu ngắn.
+- **Tuyến Tiếng Việt (PhoBERT v2 & PyVi):**
+  - Mô hình nền tảng: `vinai/phobert-base-v2` (Bộ từ vựng BPE 64.000 tokens bản địa hóa).
+  - Phân đoạn từ: Tích hợp thư viện `pyvi` liên kết từ ghép tự động (`trí_tuệ nhân_tạo`).
+  - Tập dữ liệu: 1.000 mẫu cặp đôi (500 bài báo VnExpress + 500 bài Gemini sinh đối ứng), chia `GroupShuffleSplit` (Train 700, Val 150, Test 150).
+  - Hiệu năng trên tập Test độc lập: **Precision AI 81.58%**, **Accuracy 66.0%**, **AUC-ROC 0.67**.
+- **Tuyến Tiếng Anh (Ensemble 3 PLMs):**
+  - Weighted Soft Voting: Longformer (48.65%) + BERT (33.96%) + RoBERTa (17.38%).
+  - Đạt **Accuracy 96.52%**, **F1-Score 95.84%** và **AUC-ROC 0.9852**.
+
+### 📊 Bảng So Sánh Hiệu Năng Song Ngữ:
+
+| Ngôn ngữ | Mô hình đảm nhiệm | Tập dữ liệu huấn luyện | Cửa sổ ngữ cảnh | Chỉ số chính (Test Set) |
+| :--- | :--- | :--- | :---: | :---: |
+| 🇬🇧 **Tiếng Anh** | Ensemble (Longformer + BERT + RoBERTa) | GossipCop++ & LIAR (19.148 mẫu) | 1.024 tokens | **Accuracy: 96.52%** \| **F1: 95.84%** |
+| 🇻🇳 **Tiếng Việt** | PhoBERT base v2 + PyVi | VnExpress & Gemini (1.000 mẫu cặp) | 256 tokens | **Precision AI: 81.58%** \| **AUC: 0.67** |
 
 ---
 
