@@ -218,9 +218,15 @@ function renderResults(data, sentences) {
   // 4. Breakdown các mô hình
   if (data.model_breakdown && data.model_breakdown.individual_models) {
     const m = data.model_breakdown.individual_models;
-    scoreLongformer.textContent = `${(m.longformer.probability * 100).toFixed(1)}% AI`;
-    scoreBert.textContent = `${(m.bert.probability * 100).toFixed(1)}% AI`;
-    scoreRoberta.textContent = `${(m.roberta.probability * 100).toFixed(1)}% AI`;
+    if (data.language === "vi") {
+      scoreLongformer.textContent = `${aiPct}% (PhoBERT)`;
+      scoreBert.textContent = "100% (PyVi)";
+      scoreRoberta.textContent = "Tiếng Việt 🇻🇳";
+    } else {
+      scoreLongformer.textContent = `${(m.longformer.probability * 100).toFixed(1)}% AI`;
+      scoreBert.textContent = `${(m.bert.probability * 100).toFixed(1)}% AI`;
+      scoreRoberta.textContent = `${(m.roberta.probability * 100).toFixed(1)}% AI`;
+    }
   }
 
   // 5. Cấp câu

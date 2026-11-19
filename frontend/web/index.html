@@ -122,8 +122,10 @@
               <span>📋</span>
               <span>Dán văn bản</span>
             </button>
-            <button id="btn-sample-ai" class="btn-text-only" type="button">🤖 Mẫu AI</button>
-            <button id="btn-sample-human" class="btn-text-only" type="button">👤 Mẫu Người</button>
+            <button id="btn-sample-ai" class="btn-text-only" type="button" title="Mẫu tiếng Anh do AI sinh">🤖 Mẫu AI (EN)</button>
+            <button id="btn-sample-human" class="btn-text-only" type="button" title="Mẫu tiếng Anh do Người viết">👤 Mẫu Người (EN)</button>
+            <button id="btn-sample-ai-vi" class="btn-text-only" type="button" title="Mẫu tiếng Việt do ChatGPT sinh">🇻🇳 Mẫu AI (VI)</button>
+            <button id="btn-sample-human-vi" class="btn-text-only" type="button" title="Mẫu tiếng Việt báo chí chính thống">🇻🇳 Mẫu Người (VI)</button>
             <button id="btn-clear" class="btn-text-only text-danger" type="button">🗑️ Xóa</button>
           </div>
 
@@ -159,7 +161,10 @@
           <div id="verdict-banner" class="verdict-header verdict-ai">
             <div id="verdict-icon" class="verdict-icon-box">🤖</div>
             <div class="verdict-title-text">
-              <h3 id="verdict-title">VĂN BẢN DO AI SINH (AI-GENERATED)</h3>
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <h3 id="verdict-title" style="margin: 0;">VĂN BẢN DO AI SINH (AI-GENERATED)</h3>
+                <span id="verdict-lang-badge" class="lang-badge" style="background: rgba(37, 99, 235, 0.12); color: #2563eb; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; border: 1px solid rgba(37, 99, 235, 0.25);">🇬🇧 Tiếng Anh (Ensemble 3 PLMs)</span>
+              </div>
               <p id="verdict-subtitle">Phát hiện dấu hiệu cú pháp và thống kê đặc trưng của Mô hình Ngôn ngữ Lớn (LLM)</p>
             </div>
           </div>
@@ -190,14 +195,14 @@
           </div>
         </div>
 
-        <!-- Ensemble 3 Models Breakdown -->
+        <!-- Ensemble / Model Breakdown -->
         <div class="models-breakdown-box">
-          <div class="models-box-title">Đóng góp từ 3 Mô hình Nền tảng (Ensemble PLMs):</div>
+          <div id="models-box-title" class="models-box-title">Đóng góp từ 3 Mô hình Nền tảng (Ensemble PLMs):</div>
           <div class="models-row-grid">
-            <div class="model-stat-col primary-col">
+            <div class="model-stat-col primary-col" id="col-model-1">
               <div class="model-col-header">
-                <span class="model-name">Longformer</span>
-                <span class="model-weight">Trụ cột (48.7%)</span>
+                <span class="model-name" id="name-model-1">Longformer</span>
+                <span class="model-weight" id="weight-model-1">Trụ cột (48.7%)</span>
               </div>
               <div class="model-mini-bar">
                 <div id="bar-longformer" class="model-mini-fill" style="width: 98%;"></div>
@@ -205,10 +210,10 @@
               <div class="model-score-text">Xác suất: <span id="prob-longformer">98.2%</span></div>
             </div>
 
-            <div class="model-stat-col">
+            <div class="model-stat-col" id="col-model-2">
               <div class="model-col-header">
-                <span class="model-name">BERT</span>
-                <span class="model-weight">Trọng số 34.0%</span>
+                <span class="model-name" id="name-model-2">BERT</span>
+                <span class="model-weight" id="weight-model-2">Trọng số 34.0%</span>
               </div>
               <div class="model-mini-bar">
                 <div id="bar-bert" class="model-mini-fill" style="width: 95%;"></div>
@@ -216,10 +221,10 @@
               <div class="model-score-text">Xác suất: <span id="prob-bert">95.4%</span></div>
             </div>
 
-            <div class="model-stat-col">
+            <div class="model-stat-col" id="col-model-3">
               <div class="model-col-header">
-                <span class="model-name">RoBERTa</span>
-                <span class="model-weight">Trọng số 17.4%</span>
+                <span class="model-name" id="name-model-3">RoBERTa</span>
+                <span class="model-weight" id="weight-model-3">Trọng số 17.4%</span>
               </div>
               <div class="model-mini-bar">
                 <div id="bar-roberta" class="model-mini-fill" style="width: 93%;"></div>

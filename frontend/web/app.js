@@ -37,6 +37,8 @@ const btnPaste = document.getElementById("btn-paste");
 const btnClear = document.getElementById("btn-clear");
 const btnSampleAi = document.getElementById("btn-sample-ai");
 const btnSampleHuman = document.getElementById("btn-sample-human");
+const btnSampleAiVi = document.getElementById("btn-sample-ai-vi");
+const btnSampleHumanVi = document.getElementById("btn-sample-human-vi");
 const btnExportPdf = document.getElementById("btn-export-pdf");
 const resultActions = document.getElementById("result-actions");
 
@@ -48,16 +50,26 @@ const verdictIcon = document.getElementById("verdict-icon");
 const verdictTitle = document.getElementById("verdict-title");
 const verdictSubtitle = document.getElementById("verdict-subtitle");
 const verdictPercent = document.getElementById("verdict-percent");
+const verdictLangBadge = document.getElementById("verdict-lang-badge");
 
 const metricHumanProb = document.getElementById("metric-human-prob");
 const metricConfidence = document.getElementById("metric-confidence");
 const metricLatency = document.getElementById("metric-latency");
 const metricCoverage = document.getElementById("metric-coverage");
 
+const modelsBoxTitle = document.getElementById("models-box-title");
+const nameModel1 = document.getElementById("name-model-1");
+const weightModel1 = document.getElementById("weight-model-1");
 const barLongformer = document.getElementById("bar-longformer");
 const probLongformer = document.getElementById("prob-longformer");
+
+const nameModel2 = document.getElementById("name-model-2");
+const weightModel2 = document.getElementById("weight-model-2");
 const barBert = document.getElementById("bar-bert");
 const probBert = document.getElementById("prob-bert");
+
+const nameModel3 = document.getElementById("name-model-3");
+const weightModel3 = document.getElementById("weight-model-3");
 const barRoberta = document.getElementById("bar-roberta");
 const probRoberta = document.getElementById("prob-roberta");
 const sentencesContainer = document.getElementById("sentences-container");
@@ -333,6 +345,30 @@ btnSampleHuman.addEventListener("click", () => {
   updateTextCounts();
 });
 
+if (btnSampleAiVi) {
+  btnSampleAiVi.addEventListener("click", () => {
+    textInput.value = (
+      "Trí tuệ nhân tạo (AI) ngày nay đang đóng vai trò then chốt trong sự phát triển của nền công nghệ toàn cầu. "
+      + "Các mô hình xử lý ngôn ngữ tự nhiên hiện đại có khả năng tiếp nhận và xử lý lượng thông tin khổng lồ một cách ấn tượng. "
+      + "Tuy nhiên, sự xuất hiện ngày càng phổ biến của các nội dung do máy sinh đòi hỏi các giải pháp kiểm định nghiêm ngặt và đáng tin cậy. "
+      + "Chính vì vậy, việc ứng dụng các mô hình học sâu như PhoBERT vào bài toán phát hiện văn bản AI là một hướng đi vô cùng cấp thiết."
+    );
+    updateTextCounts();
+  });
+}
+
+if (btnSampleHumanVi) {
+  btnSampleHumanVi.addEventListener("click", () => {
+    textInput.value = (
+      "Chè cam tào phớ giải nhiệt mùa hè là một món giải khát rất dễ làm, vừa giúp thanh lọc cơ thể lại không bị béo ngậy. "
+      + "Cam tươi gọt sạch vỏ, bóc lấy phần tép và giữ lại một chút vỏ thái chỉ để tạo mùi thơm dịu nhẹ. "
+      + "Nước cam hòa cùng đường phèn đun sôi liu riu trên bếp, thêm chút bột năng khuấy đều đến khi sánh mịn thì tắt bếp. "
+      + "Múc từng lát tào phớ mềm mượt ra bát, chan nước cam lên trên và thưởng thức cùng vài viên đá mát lạnh."
+    );
+    updateTextCounts();
+  });
+}
+
 
 // ==============================================================================
 // 3. THỰC HIỆN THẨM ĐỊNH (SUBMIT ANALYSIS)
@@ -449,13 +485,28 @@ function renderResults(data) {
   const aiPct = (overall.ai_probability * 100).toFixed(1);
   const humanPct = (overall.human_probability * 100).toFixed(1);
 
-  // 1. Verdict Banner
+  // 1. Language Badge & Verdict Banner
+  const isVi = overall.language === "vi";
+  if (verdictLangBadge) {
+    if (isVi) {
+      verdictLangBadge.textContent = "🇻🇳 Tiếng Việt (PhoBERT v2)";
+      verdictLangBadge.style.background = "rgba(16, 185, 129, 0.15)";
+      verdictLangBadge.style.color = "#059669";
+      verdictLangBadge.style.borderColor = "rgba(16, 185, 129, 0.35)";
+    } else {
+      verdictLangBadge.textContent = "🇬🇧 Tiếng Anh (Ensemble 3 PLMs)";
+      verdictLangBadge.style.background = "rgba(37, 99, 235, 0.12)";
+      verdictLangBadge.style.color = "#2563eb";
+      verdictLangBadge.style.borderColor = "rgba(37, 99, 235, 0.25)";
+    }
+  }
+
   verdictBanner.className = "verdict-header " + (isAI ? "verdict-ai" : "verdict-human");
   verdictIcon.textContent = isAI ? "🤖" : "👤";
   verdictTitle.textContent = isAI ? "VĂN BẢN DO AI SINH (AI-GENERATED)" : "VĂN BẢN DO CON NGƯỜI VIẾT (HUMAN-WRITTEN)";
   verdictSubtitle.textContent = isAI
-    ? "Phát hiện dấu hiệu cú pháp và thống kê đặc trưng của Mô hình Ngôn ngữ Lớn (LLM)"
-    : "Văn phong tự nhiên, mức độ biến thiên từ vựng cao, không phát hiện dấu vết máy sinh";
+    ? (isVi ? "Phát hiện dấu hiệu văn phong và phân bố token đặc trưng của ChatGPT / LLMs tiếng Việt" : "Phát hiện dấu hiệu cú pháp và thống kê đặc trưng của Mô hình Ngôn ngữ Lớn (LLM)")
+    : (isVi ? "Văn phong tự nhiên, mức độ biến thiên từ vựng phong phú, không phát hiện dấu hiệu máy sinh" : "Văn phong tự nhiên, mức độ biến thiên từ vựng cao, không phát hiện dấu vết máy sinh");
   verdictPercent.textContent = `${aiPct}%`;
 
   // 2. Metrics Box
@@ -463,11 +514,39 @@ function renderResults(data) {
   metricConfidence.textContent = overall.confidence || "Rất cao";
   metricLatency.textContent = `${data.total_processing_time_ms || overall.inference_time_ms || 120} ms`;
   if (overall.text_stats) {
-    metricCoverage.textContent = overall.text_stats.context_coverage || "1024 Tokens";
+    metricCoverage.textContent = overall.text_stats.context_coverage || (isVi ? "256 Tokens (Full)" : "1024 Tokens");
   }
 
   // 3. Model Breakdown
-  if (overall.model_breakdown && overall.model_breakdown.individual_models) {
+  if (modelsBoxTitle) {
+    modelsBoxTitle.textContent = isVi
+      ? "Đánh giá từ Mô hình Chuyên biệt Tiếng Việt (PhoBERT base v2 & PyVi):"
+      : "Đóng góp từ 3 Mô hình Nền tảng (Ensemble PLMs):";
+  }
+
+  if (isVi) {
+    if (nameModel1) nameModel1.textContent = "PhoBERT v2";
+    if (weightModel1) weightModel1.textContent = "Chuyên biệt (100%)";
+    probLongformer.textContent = `${aiPct}%`;
+    barLongformer.style.width = `${aiPct}%`;
+
+    if (nameModel2) nameModel2.textContent = "PyVi Segmenter";
+    if (weightModel2) weightModel2.textContent = "Tách từ ghép";
+    probBert.textContent = "Hoàn tất";
+    barBert.style.width = "100%";
+
+    if (nameModel3) nameModel3.textContent = "Language Router";
+    if (weightModel3) weightModel3.textContent = "Định tuyến tự động";
+    probRoberta.textContent = "Tiếng Việt 🇻🇳";
+    barRoberta.style.width = "100%";
+  } else if (overall.model_breakdown && overall.model_breakdown.individual_models) {
+    if (nameModel1) nameModel1.textContent = "Longformer";
+    if (weightModel1) weightModel1.textContent = "Trụ cột (48.7%)";
+    if (nameModel2) nameModel2.textContent = "BERT";
+    if (weightModel2) weightModel2.textContent = "Trọng số 34.0%";
+    if (nameModel3) nameModel3.textContent = "RoBERTa";
+    if (weightModel3) weightModel3.textContent = "Trọng số 17.4%";
+
     const m = overall.model_breakdown.individual_models;
     const pLong = (m.longformer.probability * 100).toFixed(1);
     const pBert = (m.bert.probability * 100).toFixed(1);
