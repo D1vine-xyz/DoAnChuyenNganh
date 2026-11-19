@@ -16,8 +16,16 @@ Kiểm thử toàn bộ endpoints:
 - DELETE /api/v1/history/{id}     : Xóa bản ghi lịch sử
 """
 
+import os
+import sys
 import io
 import unittest
+
+# Đảm bảo đường dẫn backend luôn có trong sys.path
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
 from fastapi.testclient import TestClient
 from api import app
 
@@ -147,6 +155,38 @@ class TestDetectionAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["total_items"], 2)
+
+    def test_09_vietnamese_detection(self):
+        """Kiểm tra nhận diện và định tuyến văn bản Tiếng Việt qua PhoBERT"""
+        vi_sample = (
+            "Trí tuệ nhân tạo ngày nay đang đóng vai trò then chốt trong sự phát triển của công nghệ toàn cầu. "
+            "Các mô hình xử lý ngôn ngữ tự nhiên hiện đại có khả năng tiếp nhận và xử lý lượng thông tin khổng lồ."
+        )
+        response = self.client.post("/api/v1/detect", json={
+            "text": vi_sample,
+            "threshold": 0.5,
+            "detailed": True,
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["language"], "vi")
+        self.assertIn("PhoBERT", data["detected_model"])
+        self.assertIn("ai_probability", data)
+
+    def test_10_vietnamese_sentence_analysis(self):
+        """Kiểm tra bóc tách cấp câu Tiếng Việt và lưu CSDL"""
+        vi_paragraph = (
+            "Bộ Giáo dục và Đào tạo vừa công bố phương án thi tốt nghiệp trung học phổ thông mới. "
+            "Học sinh sẽ thi hai môn bắt buộc và hai môn tự chọn theo định hướng nghề nghiệp cá nhân."
+        )
+        response = self.client.post("/api/v1/detect/sentences", json={
+            "text": vi_paragraph,
+            "threshold": 0.5,
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["overall"]["language"], "vi")
+        self.assertGreaterEqual(len(data["sentences"]), 2)
 
 
 if __name__ == "__main__":
