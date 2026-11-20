@@ -51,8 +51,10 @@ backend/output/*.db
 *bi_kip*.docx
 *Giai_Thich*.docx
 *Chuc_Nang*.docx
+*Tom_Tat*.docx
 generate_docx_guide.py
 generate_files_guide.py
+generate_summary_docx.py
 
 # Kaggle credentials
 kaggle.json
