@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VeriText AI - Ensemble PLMs</title>
+  <title>VeriText AI - Phân Tích Văn Bản AI</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
@@ -13,8 +13,8 @@
       <div class="brand">
         <img src="icons/icon32.png" alt="Logo" class="logo">
         <div class="brand-text">
-          <h1>VeriText AI</h1>
-          <span class="subtitle">Ensemble PLMs (BERT + RoBERTa + Longformer)</span>
+          <h1>VeriText AI <span class="version-tag">v2.0</span></h1>
+          <span class="subtitle">Phát hiện AI Đa ngôn ngữ (Anh - Việt)</span>
         </div>
       </div>
       <div id="api-status" class="status-badge status-checking">
@@ -34,7 +34,7 @@
             <button id="btn-clear" class="text-btn">🗑️ Xóa</button>
           </div>
         </div>
-        <textarea id="text-input" placeholder="Dán văn bản tiếng Anh vào đây (bài báo, bài luận, đoạn văn ngắn)..."></textarea>
+        <textarea id="text-input" placeholder="Dán văn bản cần kiểm tra vào đây (tiếng Anh hoặc tiếng Việt)..."></textarea>
         <div class="input-footer">
           <span id="word-count">0 từ | 0 ký tự</span>
           <div class="threshold-control">
@@ -83,15 +83,15 @@
         <div class="breakdown-card">
           <div class="breakdown-title">📊 Đóng góp từ các mô hình thành phần:</div>
           <div class="model-row">
-            <span class="model-name">Longformer (1024 tokens) <small class="weight-tag">48.7%</small></span>
+            <span class="model-name">Longformer / PhoBERT <small class="weight-tag">Primary</small></span>
             <span id="score-longformer" class="model-score">--%</span>
           </div>
           <div class="model-row">
-            <span class="model-name">BERT (512 tokens) <small class="weight-tag">34.0%</small></span>
+            <span class="model-name">BERT / Tokenizer <small class="weight-tag">Support</small></span>
             <span id="score-bert" class="model-score">--%</span>
           </div>
           <div class="model-row">
-            <span class="model-name">RoBERTa (512 tokens) <small class="weight-tag">17.4%</small></span>
+            <span class="model-name">RoBERTa / Router <small class="weight-tag">Ensemble</small></span>
             <span id="score-roberta" class="model-score">--%</span>
           </div>
         </div>
@@ -115,4 +115,3 @@
   <script src="popup.js"></script>
 </body>
 </html>
-
