@@ -1,65 +1,265 @@
 """
-Module Quản lý Cơ sở Dữ liệu Lịch sử Thẩm định Văn bản (SQLite Database)
+Module Quản lý Cơ sở Dữ liệu Microsoft SQL Server (Database: VeriTextAI)
 Đồ án Chuyên ngành Kỹ thuật Phần mềm: Hệ thống Phát hiện Văn bản do LLM sinh (Ensemble PLMs)
+Hỗ trợ:
+- Xác thực người dùng, phân quyền Giảng viên & Sinh viên (Role-based access).
+- Lưu trữ lịch sử thẩm định chi tiết theo từng người dùng (User-specific audit logs).
+- Quản lý các lô chấm bài tập hàng loạt của lớp học (Classroom batches).
 """
 
 import os
-import sqlite3
+import sys
 import json
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 from contextlib import contextmanager
+import pyodbc
+import bcrypt
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-if os.path.exists(os.path.join(BASE_DIR, "output")):
-    DB_DIR = os.path.join(BASE_DIR, "output")
-elif os.path.exists(os.path.join(BASE_DIR, "..", "output")):
-    DB_DIR = os.path.join(BASE_DIR, "..", "output")
-else:
-    DB_DIR = os.path.join(BASE_DIR, "output")
+# Đảm bảo in tiếng Việt UTF-8 chuẩn trên Windows Console
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-DB_PATH = os.path.join(DB_DIR, "scan_history.db")
+ODBC_DRIVERS = [
+    "ODBC Driver 17 for SQL Server",
+    "ODBC Driver 18 for SQL Server",
+    "SQL Server",
+]
+
+def get_connection_string() -> str:
+    """Tự động phát hiện driver ODBC khả dụng và tạo connection string."""
+    available_drivers = pyodbc.drivers()
+    selected_driver = "ODBC Driver 17 for SQL Server"
+    for d in ODBC_DRIVERS:
+        if d in available_drivers:
+            selected_driver = d
+            break
+
+    server = os.environ.get("DB_SERVER", "localhost")
+    database = os.environ.get("DB_NAME", "VeriTextAI")
+    trust_cert = ";TrustServerCertificate=yes" if "18" in selected_driver else ""
+    return f"DRIVER={{{selected_driver}}};SERVER={server};DATABASE={database};Trusted_Connection=yes{trust_cert};"
+
+DB_CONNECTION_STRING = get_connection_string()
 
 
 @contextmanager
 def get_connection():
-    """Khởi tạo kết nối SQLite với row_factory dạng Row và tự động đóng kết nối khi hoàn tất."""
-    os.makedirs(DB_DIR, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    """Khởi tạo kết nối tới Microsoft SQL Server và tự động đóng khi hoàn tất."""
+    conn = pyodbc.connect(DB_CONNECTION_STRING, autocommit=False)
     try:
         yield conn
+    except Exception as e:
+        conn.rollback()
+        raise e
     finally:
         conn.close()
 
 
 def init_db():
-    """Khởi tạo cấu trúc bảng CSDL nếu chưa tồn tại."""
+    """Khởi tạo cấu trúc bảng CSDL nếu chưa tồn tại trong VeriTextAI."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+
+        # 1. Bảng Người dùng (users)
+        cursor.execute("""
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
+            BEGIN
+                CREATE TABLE users (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    email NVARCHAR(255) NOT NULL UNIQUE,
+                    password_hash NVARCHAR(255) NOT NULL,
+                    full_name NVARCHAR(255) NOT NULL,
+                    role NVARCHAR(50) NOT NULL DEFAULT 'student',
+                    is_active BIT NOT NULL DEFAULT 1,
+                    created_at DATETIME2 DEFAULT GETDATE()
+                );
+            END;
+        """)
+
+        # 2. Bảng Lịch sử thẩm định (detection_history)
+        cursor.execute("""
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='detection_history' AND xtype='U')
+            BEGIN
+                CREATE TABLE detection_history (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    user_id INT NULL FOREIGN KEY REFERENCES users(id) ON DELETE SET NULL,
+                    title NVARCHAR(255) NULL,
+                    text_snippet NVARCHAR(MAX) NOT NULL,
+                    language NVARCHAR(10) NOT NULL DEFAULT 'en',
+                    label NVARCHAR(50) NOT NULL,
+                    ai_probability FLOAT NOT NULL,
+                    human_probability FLOAT NOT NULL,
+                    confidence NVARCHAR(50) NOT NULL,
+                    word_count INT NOT NULL,
+                    char_count INT NOT NULL,
+                    sentence_count INT NOT NULL,
+                    model_breakdown NVARCHAR(MAX) NULL,
+                    sentences_data NVARCHAR(MAX) NULL,
+                    perplexity_score FLOAT NULL,
+                    burstiness_score FLOAT NULL,
+                    has_bypass_warning BIT NOT NULL DEFAULT 0,
+                    bypass_details NVARCHAR(MAX) NULL,
+                    inference_time_ms FLOAT NOT NULL,
+                    created_at DATETIME2 DEFAULT GETDATE()
+                );
+            END;
+        """)
+
+        # 3. Bảng Lô bài tập lớp học (classroom_batches)
+        cursor.execute("""
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='classroom_batches' AND xtype='U')
+            BEGIN
+                CREATE TABLE classroom_batches (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    teacher_id INT NOT NULL FOREIGN KEY REFERENCES users(id) ON DELETE CASCADE,
+                    batch_name NVARCHAR(255) NOT NULL,
+                    total_files INT NOT NULL DEFAULT 0,
+                    high_risk_count INT NOT NULL DEFAULT 0,
+                    moderate_risk_count INT NOT NULL DEFAULT 0,
+                    safe_count INT NOT NULL DEFAULT 0,
+                    created_at DATETIME2 DEFAULT GETDATE()
+                );
+            END;
+        """)
+        conn.commit()
+
+    # Nạp 2 tài khoản mẫu nếu chưa có
+    seed_sample_users()
+
+
+def seed_sample_users():
+    """Tạo sẵn 2 tài khoản mẫu để demo vấn đáp thuận tiện: 1 Giảng viên + 1 Sinh viên."""
+    try:
+        if not authenticate_user("giangvien@veritext.ai", "123456"):
+            try:
+                create_user(
+                    email="giangvien@veritext.ai",
+                    password="123456",
+                    full_name="TS. Hoàng Văn Thầy (Giảng viên)",
+                    role="teacher"
+                )
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    try:
+        if not authenticate_user("sinhvien@veritext.ai", "123456"):
+            try:
+                create_user(
+                    email="sinhvien@veritext.ai",
+                    password="123456",
+                    full_name="Nguyễn Văn Sinh Viên (K16)",
+                    role="student"
+                )
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
+# ==============================================================================
+# 1. QUẢN LÝ NGƯỜI DÙNG & XÁC THỰC (USERS & AUTH)
+# ==============================================================================
+
+def hash_password(password: str) -> str:
+    """Mã hóa mật khẩu bằng thuật toán bcrypt an toàn tuyệt đối."""
+    salt = bcrypt.gensalt(rounds=12)
+    return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Kiểm tra tính trùng khớp của mật khẩu."""
+    try:
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    except Exception:
+        return False
+
+
+def create_user(email: str, password: str, full_name: str, role: str = "student") -> Dict[str, Any]:
+    """Đăng ký tài khoản người dùng mới (Sinh viên hoặc Giảng viên)."""
+    email_clean = email.strip().lower()
+    full_name_clean = full_name.strip()
+    role_clean = "teacher" if role.lower() in ["teacher", "giangvien", "giảng viên"] else "student"
+    pwd_hash = hash_password(password)
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE email = ?;", (email_clean,))
+        if cursor.fetchone():
+            raise ValueError(f"Email '{email_clean}' đã được đăng ký trong hệ thống!")
+
+        cursor.execute("""
+            INSERT INTO users (email, password_hash, full_name, role)
+            OUTPUT INSERTED.id, INSERTED.created_at
+            VALUES (?, ?, ?, ?);
+        """, (email_clean, pwd_hash, full_name_clean, role_clean))
+        row = cursor.fetchone()
+        conn.commit()
+
+        return {
+            "id": row[0],
+            "email": email_clean,
+            "full_name": full_name_clean,
+            "role": role_clean,
+            "created_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "",
+        }
+
+
+def authenticate_user(email: str, password: str) -> Optional[Dict[str, Any]]:
+    """Xác thực đăng nhập người dùng."""
+    email_clean = email.strip().lower()
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS scans (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                title TEXT,
-                filename TEXT,
-                text_snippet TEXT,
-                full_text TEXT,
-                word_count INTEGER,
-                char_count INTEGER,
-                ai_probability REAL,
-                verdict TEXT,
-                confidence TEXT,
-                inference_time_ms REAL,
-                score_bert REAL,
-                score_roberta REAL,
-                score_longformer REAL,
-                details_json TEXT
-            )
-        """)
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON scans (timestamp DESC)")
-        conn.commit()
+            SELECT id, email, password_hash, full_name, role, is_active, created_at
+            FROM users
+            WHERE email = ?;
+        """, (email_clean,))
+        row = cursor.fetchone()
+        if not row:
+            return None
 
+        user_id, user_email, pwd_hash, full_name, role, is_active, created_at = row
+        if not is_active:
+            return None
+
+        if verify_password(password, pwd_hash):
+            return {
+                "id": user_id,
+                "email": user_email,
+                "full_name": full_name,
+                "role": role,
+                "created_at": created_at.strftime("%Y-%m-%d %H:%M:%S") if created_at else "",
+            }
+        return None
+
+
+def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
+    """Lấy thông tin người dùng theo ID."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, email, full_name, role, is_active, created_at
+            FROM users WHERE id = ?;
+        """, (user_id,))
+        row = cursor.fetchone()
+        if not row:
+            return None
+        return {
+            "id": row[0],
+            "email": row[1],
+            "full_name": row[2],
+            "role": row[3],
+            "is_active": bool(row[4]),
+            "created_at": row[5].strftime("%Y-%m-%d %H:%M:%S") if row[5] else "",
+        }
+
+
+# ==============================================================================
+# 2. QUẢN LÝ LỊCH SỬ THẨM ĐỊNH (DETECTION HISTORY)
+# ==============================================================================
 
 def save_scan(
     title: str,
@@ -75,85 +275,202 @@ def save_scan(
     score_longformer: float,
     details_json: Dict[str, Any],
     filename: Optional[str] = None,
+    user_id: Optional[int] = None,
+    language: str = "en",
+    perplexity_score: Optional[float] = None,
+    burstiness_score: Optional[float] = None,
+    has_bypass_warning: bool = False,
+    bypass_details: Optional[str] = None,
 ) -> int:
-    """Lưu trữ một lượt quét mới vào CSDL."""
+    """Lưu trữ một lượt quét mới vào CSDL SQL Server gắn liền với tài khoản (nếu có)."""
     snippet = full_text[:180] + ("..." if len(full_text) > 180 else "")
+    sentences_data_json = json.dumps(details_json.get("sentences", []), ensure_ascii=False)
+    model_breakdown_json = json.dumps(details_json.get("model_breakdown", {}), ensure_ascii=False)
+    sentence_count = len(details_json.get("sentences", []))
+
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO scans (
-                title, filename, text_snippet, full_text, word_count, char_count,
-                ai_probability, verdict, confidence, inference_time_ms,
-                score_bert, score_roberta, score_longformer, details_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO detection_history (
+                user_id, title, text_snippet, language, label,
+                ai_probability, human_probability, confidence,
+                word_count, char_count, sentence_count,
+                model_breakdown, sentences_data,
+                perplexity_score, burstiness_score,
+                has_bypass_warning, bypass_details,
+                inference_time_ms
+            )
+            OUTPUT INSERTED.id
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, (
-            title or "Văn bản không tên",
-            filename or "",
+            user_id,
+            title or filename or "Văn bản không tên",
             snippet,
-            full_text,
-            word_count,
-            char_count,
-            round(ai_probability, 4),
+            language or "en",
             verdict,
+            round(float(ai_probability), 4),
+            round(1.0 - float(ai_probability), 4),
             confidence,
-            round(inference_time_ms, 2),
-            round(score_bert, 4),
-            round(score_roberta, 4),
-            round(score_longformer, 4),
-            json.dumps(details_json, ensure_ascii=False),
+            int(word_count),
+            int(char_count),
+            int(sentence_count),
+            model_breakdown_json,
+            sentences_data_json,
+            perplexity_score,
+            burstiness_score,
+            1 if has_bypass_warning else 0,
+            bypass_details,
+            round(float(inference_time_ms), 2),
         ))
+        inserted_id = cursor.fetchone()[0]
         conn.commit()
-        return cursor.lastrowid
+        return inserted_id
 
 
-def get_history(limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
-    """Truy xuất danh sách lịch sử thẩm định."""
+def get_history(limit: int = 50, offset: int = 0, user_id: Optional[int] = None, role: Optional[str] = None) -> List[Dict[str, Any]]:
+    """
+    Truy xuất danh sách lịch sử thẩm định theo phân quyền:
+    - Sinh viên: Chỉ xem lịch sử cá nhân (user_id = ?).
+    - Giảng viên / Quản trị viên: Xem toàn bộ lịch sử của sinh viên và lớp học.
+    - Khách chưa đăng nhập: Xem các bài quét công khai gần nhất.
+    """
+    with get_connection() as conn:
+        cursor = conn.cursor()
+
+        if role == "student" and user_id is not None:
+            query = """
+                SELECT h.id, h.created_at, h.title, h.text_snippet, h.word_count, h.char_count,
+                       h.ai_probability, h.label, h.confidence, h.inference_time_ms,
+                       h.language, h.perplexity_score, h.burstiness_score, h.has_bypass_warning,
+                       u.full_name as author_name, u.role as author_role
+                FROM detection_history h
+                LEFT JOIN users u ON h.user_id = u.id
+                WHERE h.user_id = ?
+                ORDER BY h.id DESC
+                OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
+            """
+            cursor.execute(query, (user_id, offset, limit))
+        else:
+            query = """
+                SELECT h.id, h.created_at, h.title, h.text_snippet, h.word_count, h.char_count,
+                       h.ai_probability, h.label, h.confidence, h.inference_time_ms,
+                       h.language, h.perplexity_score, h.burstiness_score, h.has_bypass_warning,
+                       u.full_name as author_name, u.role as author_role
+                FROM detection_history h
+                LEFT JOIN users u ON h.user_id = u.id
+                ORDER BY h.id DESC
+                OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
+            """
+            cursor.execute(query, (offset, limit))
+
+        rows = cursor.fetchall()
+        result = []
+        for r in rows:
+            result.append({
+                "id": r[0],
+                "timestamp": r[1].strftime("%Y-%m-%d %H:%M:%S") if r[1] else "",
+                "title": r[2],
+                "text_snippet": r[3],
+                "word_count": r[4],
+                "char_count": r[5],
+                "ai_probability": r[6],
+                "verdict": r[7],
+                "confidence": r[8],
+                "inference_time_ms": r[9],
+                "language": r[10],
+                "perplexity_score": r[11],
+                "burstiness_score": r[12],
+                "has_bypass_warning": bool(r[13]),
+                "author_name": r[14] or "Khách",
+                "author_role": r[15] or "guest",
+            })
+        return result
+
+
+def get_scan_by_id(scan_id: int, user_id: Optional[int] = None, role: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Truy xuất chi tiết một lượt quét theo ID kèm kiểm tra quyền truy cập."""
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, timestamp, title, filename, text_snippet, word_count, char_count,
-                   ai_probability, verdict, confidence, inference_time_ms,
-                   score_bert, score_roberta, score_longformer
-            FROM scans
-            ORDER BY id DESC
-            LIMIT ? OFFSET ?
-        """, (limit, offset))
-        rows = cursor.fetchall()
-        return [dict(row) for row in rows]
-
-
-def get_scan_by_id(scan_id: int) -> Optional[Dict[str, Any]]:
-    """Truy xuất chi tiết một lượt quét theo ID."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM scans WHERE id = ?", (scan_id,))
+            SELECT h.*, u.full_name as author_name, u.email as author_email
+            FROM detection_history h
+            LEFT JOIN users u ON h.user_id = u.id
+            WHERE h.id = ?;
+        """, (scan_id,))
         row = cursor.fetchone()
         if not row:
             return None
-        res = dict(row)
-        if res.get("details_json"):
+
+        # Sinh viên không được xem bài của sinh viên khác (nếu bài đó gắn user_id khác)
+        if role == "student" and user_id is not None:
+            if row.user_id is not None and row.user_id != user_id:
+                return None
+
+        sentences = []
+        model_breakdown = {}
+        if row.sentences_data:
             try:
-                res["details"] = json.loads(res["details_json"])
+                sentences = json.loads(row.sentences_data)
             except Exception:
-                res["details"] = {}
-        return res
+                sentences = []
+        if row.model_breakdown:
+            try:
+                model_breakdown = json.loads(row.model_breakdown)
+            except Exception:
+                model_breakdown = {}
+
+        return {
+            "id": row.id,
+            "user_id": row.user_id,
+            "author_name": row.author_name or "Khách",
+            "author_email": row.author_email or "",
+            "title": row.title,
+            "text_snippet": row.text_snippet,
+            "language": row.language,
+            "label": row.label,
+            "ai_probability": row.ai_probability,
+            "human_probability": row.human_probability,
+            "confidence": row.confidence,
+            "word_count": row.word_count,
+            "char_count": row.char_count,
+            "sentence_count": row.sentence_count,
+            "perplexity_score": row.perplexity_score,
+            "burstiness_score": row.burstiness_score,
+            "has_bypass_warning": bool(row.has_bypass_warning),
+            "bypass_details": row.bypass_details,
+            "inference_time_ms": row.inference_time_ms,
+            "created_at": row.created_at.strftime("%Y-%m-%d %H:%M:%S") if row.created_at else "",
+            "details": {
+                "sentences": sentences,
+                "model_breakdown": model_breakdown,
+            }
+        }
 
 
-def delete_scan(scan_id: int) -> bool:
-    """Xóa một lượt quét khỏi CSDL."""
+def delete_scan(scan_id: int, user_id: Optional[int] = None, role: Optional[str] = None) -> bool:
+    """Xóa một lượt quét (Sinh viên chỉ được xóa bài của mình, Giảng viên có thể xóa bất kỳ)."""
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM scans WHERE id = ?", (scan_id,))
+        if role == "student" and user_id is not None:
+            cursor.execute("DELETE FROM detection_history WHERE id = ? AND user_id = ?;", (scan_id, user_id))
+        else:
+            cursor.execute("DELETE FROM detection_history WHERE id = ?;", (scan_id,))
         conn.commit()
         return cursor.rowcount > 0
 
 
-def get_statistics() -> Dict[str, Any]:
-    """Tính toán thống kê tổng quan các lượt quét trên Dashboard."""
+def get_statistics(user_id: Optional[int] = None, role: Optional[str] = None) -> Dict[str, Any]:
+    """Tính toán thống kê Dashboard theo quyền người dùng."""
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) AS total FROM scans")
-        total = cursor.fetchone()["total"]
+        where_clause = ""
+        params = []
+        if role == "student" and user_id is not None:
+            where_clause = "WHERE user_id = ?"
+            params.append(user_id)
+
+        cursor.execute(f"SELECT COUNT(*) FROM detection_history {where_clause};", tuple(params))
+        total = cursor.fetchone()[0]
 
         if total == 0:
             return {
@@ -165,21 +482,22 @@ def get_statistics() -> Dict[str, Any]:
                 "total_words_scanned": 0,
             }
 
-        cursor.execute("SELECT COUNT(*) AS ai_cnt FROM scans WHERE verdict = 'AI-generated'")
-        ai_cnt = cursor.fetchone()["ai_cnt"]
+        ai_where = f"{where_clause} AND" if where_clause else "WHERE"
+        cursor.execute(f"SELECT COUNT(*) FROM detection_history {ai_where} label = 'AI-generated';", tuple(params))
+        ai_cnt = cursor.fetchone()[0]
 
-        cursor.execute("SELECT AVG(inference_time_ms) AS avg_time, SUM(word_count) AS total_words FROM scans")
-        stats = cursor.fetchone()
+        cursor.execute(f"SELECT AVG(inference_time_ms), SUM(word_count) FROM detection_history {where_clause};", tuple(params))
+        avg_time, total_words = cursor.fetchone()
 
         return {
             "total_scans": total,
             "ai_count": ai_cnt,
             "human_count": total - ai_cnt,
             "ai_percentage": round((ai_cnt / total) * 100, 1),
-            "avg_inference_time_ms": round(stats["avg_time"] or 0, 1),
-            "total_words_scanned": stats["total_words"] or 0,
+            "avg_inference_time_ms": round(avg_time or 0.0, 1),
+            "total_words_scanned": int(total_words or 0),
         }
 
 
-# Tự động khởi tạo CSDL khi import
+# Tự động khởi tạo database khi import
 init_db()

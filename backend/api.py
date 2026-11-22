@@ -19,7 +19,7 @@ from typing import Dict, Any, List, Optional
 from contextlib import asynccontextmanager
 
 import torch
-from fastapi import FastAPI, HTTPException, status, UploadFile, File, Form, Query
+from fastapi import FastAPI, HTTPException, status, UploadFile, File, Form, Query, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -27,6 +27,8 @@ from pydantic import BaseModel, Field
 
 from inference import AITextDetector
 import database as db
+import auth
+from auth import get_current_user, get_current_user_optional, require_role
 from file_parser import extract_text_from_file
 from pdf_report import generate_pdf_report
 
@@ -170,6 +172,85 @@ class BatchDetectRequest(BaseModel):
     threshold: float = Field(default=0.5, ge=0.0, le=1.0)
 
 
+class RegisterRequest(BaseModel):
+    email: str = Field(..., description="Email đăng ký", examples=["sinhvien@veritext.ai"])
+    password: str = Field(..., min_length=6, description="Mật khẩu tối thiểu 6 ký tự", examples=["123456"])
+    full_name: str = Field(..., min_length=2, description="Họ và tên đầy đủ", examples=["Nguyễn Văn A"])
+    role: str = Field(default="student", description="Vai trò: 'student' (Sinh viên) hoặc 'teacher' (Giảng viên)", examples=["student"])
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(..., description="Email đăng nhập", examples=["sinhvien@veritext.ai"])
+    password: str = Field(..., description="Mật khẩu", examples=["123456"])
+
+
+# ==============================================================================
+# 0. AUTHENTICATION & USER MANAGEMENT (SQL SERVER + JWT)
+# ==============================================================================
+
+@app.post("/api/v1/auth/register", tags=["Authentication"])
+async def register_account(req: RegisterRequest):
+    """Đăng ký tài khoản người dùng mới (Sinh viên hoặc Giảng viên) vào Microsoft SQL Server."""
+    try:
+        user = db.create_user(
+            email=req.email,
+            password=req.password,
+            full_name=req.full_name,
+            role=req.role,
+        )
+        token = auth.create_access_token({
+            "id": user["id"],
+            "email": user["email"],
+            "full_name": user["full_name"],
+            "role": user["role"],
+        })
+        return {
+            "success": True,
+            "message": "Đăng ký tài khoản thành công!",
+            "access_token": token,
+            "token_type": "bearer",
+            "user": user,
+        }
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Lỗi đăng ký: {str(e)}")
+
+
+@app.post("/api/v1/auth/login", tags=["Authentication"])
+async def login_account(req: LoginRequest):
+    """Đăng nhập tài khoản, xác thực mật khẩu qua bcrypt và trả về JWT Access Token."""
+    user = db.authenticate_user(req.email, req.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email hoặc mật khẩu không chính xác!",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    token = auth.create_access_token({
+        "id": user["id"],
+        "email": user["email"],
+        "full_name": user["full_name"],
+        "role": user["role"],
+    })
+    return {
+        "success": True,
+        "message": "Đăng nhập thành công!",
+        "access_token": token,
+        "token_type": "bearer",
+        "user": user,
+    }
+
+
+@app.get("/api/v1/auth/me", tags=["Authentication"])
+async def get_my_profile(current_user: Dict[str, Any] = Depends(auth.get_current_user)):
+    """Lấy thông tin tài khoản đang đăng nhập từ JWT Token."""
+    user = db.get_user_by_id(current_user["id"])
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Người dùng không tồn tại.")
+    return {"user": user}
+
+
 # ==============================================================================
 # 1. WEB DASHBOARD & HEALTH ENDPOINTS
 # ==============================================================================
@@ -188,6 +269,7 @@ async def serve_dashboard():
 
 
 @app.get("/health", tags=["General"])
+@app.get("/api/v1/health", tags=["General"])
 async def health_check():
     """Kiểm tra tình trạng hoạt động của Server và các mô hình đã nạp."""
     is_ready = detector_instance is not None
@@ -257,7 +339,10 @@ async def detect_text(req: DetectRequest):
 
 
 @app.post("/api/v1/detect/sentences", tags=["Detection"])
-async def detect_sentences(req: SentenceAnalysisRequest):
+async def detect_sentences(
+    req: SentenceAnalysisRequest,
+    current_user: Optional[Dict[str, Any]] = Depends(auth.get_current_user_optional),
+):
     """
     Phân tích diễn giải cấp câu (AI Hotspots) phục vụ Chrome Extension & Web Dashboard:
     Bóc tách đoạn văn bản thành từng câu độc lập, tính toán xác suất AI
@@ -296,7 +381,7 @@ async def detect_sentences(req: SentenceAnalysisRequest):
         yellow_count = sum(1 for s in sentences if s["highlight_color"] == "yellow")
         green_count = sum(1 for s in sentences if s["highlight_color"] == "green")
 
-        # Lưu tự động vào CSDL SQLite (bảo toàn cấu trúc an toàn)
+        # Lưu tự động vào CSDL Microsoft SQL Server (VeriTextAI)
         ind_models = overall_pred.get("model_breakdown", {}).get("individual_models", {})
         score_bert = float(ind_models.get("bert", {}).get("probability", overall_pred["ai_probability"]))
         score_roberta = float(ind_models.get("roberta", {}).get("probability", overall_pred["ai_probability"]))
@@ -321,6 +406,8 @@ async def detect_sentences(req: SentenceAnalysisRequest):
                 "sentences": sentences,
                 "model_breakdown": overall_pred.get("model_breakdown"),
             },
+            user_id=current_user["id"] if current_user else None,
+            language=overall_pred.get("language", "en"),
         )
 
         return {
@@ -343,22 +430,29 @@ async def detect_sentences(req: SentenceAnalysisRequest):
 
 
 @app.post("/api/v1/detect/web", tags=["Web Dashboard"])
-async def detect_web(req: WebDetectRequest):
+async def detect_web(
+    req: WebDetectRequest,
+    current_user: Optional[Dict[str, Any]] = Depends(auth.get_current_user_optional),
+):
     """
     Endpoint tối ưu cho Web Dashboard: Phân tích toàn diện cả đoạn văn và từng câu,
     tự động lưu vào CSDL và trả về ID để hỗ trợ xuất báo cáo PDF.
     """
-    return await detect_sentences(SentenceAnalysisRequest(
-        text=req.text,
-        threshold=req.threshold,
-        language=req.language,
-    ))
+    return await detect_sentences(
+        SentenceAnalysisRequest(
+            text=req.text,
+            threshold=req.threshold,
+            language=req.language,
+        ),
+        current_user=current_user,
+    )
 
 
 @app.post("/api/v1/detect/upload", tags=["Web Dashboard"])
 async def detect_uploaded_file(
     file: UploadFile = File(...),
     threshold: float = Form(0.5),
+    current_user: Optional[Dict[str, Any]] = Depends(auth.get_current_user_optional),
 ):
     """
     Tiếp nhận tệp tin tải lên (.PDF, .DOCX, .TXT):
@@ -401,7 +495,6 @@ async def detect_uploaded_file(
     yellow_count = sum(1 for s in sentences if s["highlight_color"] == "yellow")
     green_count = sum(1 for s in sentences if s["highlight_color"] == "green")
 
-    # Lưu vào SQLite
     ind_models = overall_pred.get("model_breakdown", {}).get("individual_models", {})
     score_bert = float(ind_models.get("bert", {}).get("probability", overall_pred["ai_probability"]))
     score_roberta = float(ind_models.get("roberta", {}).get("probability", overall_pred["ai_probability"]))
@@ -427,6 +520,8 @@ async def detect_uploaded_file(
             "sentences": sentences,
             "model_breakdown": overall_pred.get("model_breakdown"),
         },
+        user_id=current_user["id"] if current_user else None,
+        language=overall_pred.get("language", "en"),
     )
 
     return {
@@ -478,34 +573,54 @@ async def detect_batch(req: BatchDetectRequest):
 # ==============================================================================
 
 @app.get("/api/v1/history", tags=["History"])
-async def get_scan_history(limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0)):
-    """Lấy danh sách các lần thẩm định trước đó từ CSDL SQLite."""
-    items = db.get_history(limit=limit, offset=offset)
-    return {"total": len(items), "history": items}
+async def get_scan_history(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    current_user: Optional[Dict[str, Any]] = Depends(auth.get_current_user_optional),
+):
+    """Lấy danh sách các lần thẩm định trước đó từ CSDL Microsoft SQL Server theo phân quyền."""
+    user_id = current_user["id"] if current_user else None
+    role = current_user["role"] if current_user else None
+    items = db.get_history(limit=limit, offset=offset, user_id=user_id, role=role)
+    return {"total": len(items), "history": items, "current_user": current_user}
 
 
 @app.get("/api/v1/history/{scan_id}", tags=["History"])
-async def get_scan_detail(scan_id: int):
+async def get_scan_detail(
+    scan_id: int,
+    current_user: Optional[Dict[str, Any]] = Depends(auth.get_current_user_optional),
+):
     """Lấy thông tin chi tiết một lượt quét theo ID."""
-    item = db.get_scan_by_id(scan_id)
+    user_id = current_user["id"] if current_user else None
+    role = current_user["role"] if current_user else None
+    item = db.get_scan_by_id(scan_id, user_id=user_id, role=role)
     if not item:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy lượt quét này.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy lượt quét này hoặc bạn không có quyền xem.")
     return item
 
 
 @app.delete("/api/v1/history/{scan_id}", tags=["History"])
-async def delete_scan_record(scan_id: int):
+async def delete_scan_record(
+    scan_id: int,
+    current_user: Optional[Dict[str, Any]] = Depends(auth.get_current_user_optional),
+):
     """Xóa một bản ghi lịch sử thẩm định khỏi CSDL."""
-    success = db.delete_scan(scan_id)
+    user_id = current_user["id"] if current_user else None
+    role = current_user["role"] if current_user else None
+    success = db.delete_scan(scan_id, user_id=user_id, role=role)
     if not success:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy mục để xóa.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy mục để xóa hoặc bạn không có quyền.")
     return {"success": True, "deleted_id": scan_id}
 
 
 @app.get("/api/v1/stats", tags=["History"])
-async def get_dashboard_stats():
+async def get_dashboard_stats(
+    current_user: Optional[Dict[str, Any]] = Depends(auth.get_current_user_optional),
+):
     """Lấy các chỉ số KPI thống kê tổng hợp phục vụ hiển thị trên Dashboard."""
-    return db.get_statistics()
+    user_id = current_user["id"] if current_user else None
+    role = current_user["role"] if current_user else None
+    return db.get_statistics(user_id=user_id, role=role)
 
 
 @app.get("/api/v1/report/pdf/{scan_id}", tags=["Audit Report"])

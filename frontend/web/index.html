@@ -52,6 +52,17 @@
           <span class="status-dot"></span>
           <span id="server-status-text">FastAPI: Sẵn sàng</span>
         </div>
+
+        <!-- Auth Controls (Login button & User Profile) -->
+        <button id="btn-open-auth" class="btn-auth-pill" type="button">
+          <span>👤 Đăng Nhập</span>
+        </button>
+
+        <div id="user-profile-box" class="user-profile-pill hidden">
+          <span id="user-role-badge" class="user-role-badge">🎓</span>
+          <span id="user-display-name" class="user-display-name">Sinh Viên</span>
+          <button id="btn-logout" class="btn-logout-small" type="button" title="Đăng xuất khỏi hệ thống">Thoát</button>
+        </div>
       </div>
     </div>
   </header>
@@ -432,6 +443,90 @@
     </section>
 
   </main>
+
+  <!-- ==================================================================== -->
+  <!-- AUTH MODAL: ĐĂNG NHẬP / ĐĂNG KÝ PHÂN QUYỀN (GIẢNG VIÊN & SINH VIÊN) -->
+  <!-- ==================================================================== -->
+  <div id="auth-modal" class="auth-modal-overlay hidden">
+    <div class="auth-modal-card">
+      <div class="auth-modal-header">
+        <div class="auth-brand">
+          <span class="brand-dot"></span>
+          <span class="auth-modal-title">Tài khoản VeriText AI</span>
+        </div>
+        <button id="btn-close-auth-modal" class="auth-close-btn" type="button" aria-label="Đóng">&times;</button>
+      </div>
+
+      <!-- Auth Tabs: Đăng nhập vs Đăng ký -->
+      <div class="auth-tabs">
+        <button id="tab-btn-login" class="auth-tab-btn active" type="button">Đăng Nhập</button>
+        <button id="tab-btn-register" class="auth-tab-btn" type="button">Đăng Ký Mới</button>
+      </div>
+
+      <!-- Alert thông báo -->
+      <div id="auth-alert" class="auth-alert hidden"></div>
+
+      <!-- FORM 1: ĐĂNG NHẬP -->
+      <form id="form-login" class="auth-form">
+        <div class="auth-form-group">
+          <label for="login-email">Email tài khoản:</label>
+          <input type="email" id="login-email" class="auth-input" placeholder="nhapemail@veritext.ai" required autocomplete="username">
+        </div>
+        <div class="auth-form-group">
+          <label for="login-password">Mật khẩu:</label>
+          <input type="password" id="login-password" class="auth-input" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <button type="submit" id="btn-submit-login" class="btn-auth-primary">
+          <span>🚀 Đăng Nhập Hệ Thống</span>
+        </button>
+
+        <!-- Nút Đăng nhập mẫu cho Demo Vấn đáp -->
+        <div class="quick-demo-login-box">
+          <span class="quick-demo-title">⚡ Đăng nhập mẫu nhanh để thử nghiệm:</span>
+          <div class="quick-demo-btns">
+            <button type="button" class="btn-quick-demo" id="btn-quick-teacher">
+              👨‍🏫 TS. Hoàng Văn Thầy (Giảng viên)
+            </button>
+            <button type="button" class="btn-quick-demo" id="btn-quick-student">
+              🎓 Nguyễn Văn Sinh Viên (Sinh viên)
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <!-- FORM 2: ĐĂNG KÝ -->
+      <form id="form-register" class="auth-form hidden">
+        <div class="auth-form-group">
+          <label for="reg-fullname">Họ và tên đầy đủ:</label>
+          <input type="text" id="reg-fullname" class="auth-input" placeholder="Ví dụ: Nguyễn Văn A" required>
+        </div>
+        <div class="auth-form-group">
+          <label for="reg-email">Email:</label>
+          <input type="email" id="reg-email" class="auth-input" placeholder="email@veritext.ai" required autocomplete="email">
+        </div>
+        <div class="auth-form-group">
+          <label for="reg-password">Mật khẩu (tối thiểu 6 ký tự):</label>
+          <input type="password" id="reg-password" class="auth-input" placeholder="••••••••" minlength="6" required autocomplete="new-password">
+        </div>
+        <div class="auth-form-group">
+          <label>Vai trò người dùng (Phân quyền):</label>
+          <div class="role-selector-group">
+            <label class="role-radio-label active" id="label-role-student">
+              <input type="radio" name="reg-role" value="student" checked>
+              <span>🎓 Sinh viên</span>
+            </label>
+            <label class="role-radio-label" id="label-role-teacher">
+              <input type="radio" name="reg-role" value="teacher">
+              <span>👨‍🏫 Giảng viên</span>
+            </label>
+          </div>
+        </div>
+        <button type="submit" id="btn-submit-register" class="btn-auth-primary">
+          <span>✨ Tạo Tài Khoản Mới</span>
+        </button>
+      </form>
+    </div>
+  </div>
 
   <!-- Clean Minimalist Footer -->
   <footer class="footer">

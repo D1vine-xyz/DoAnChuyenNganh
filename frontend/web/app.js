@@ -8,6 +8,32 @@ const API_BASE = window.location.protocol === "file:" ? "http://localhost:8000" 
 // Global State
 let currentScanId = null;
 let currentUploadedFile = null;
+let currentUser = null;
+
+function getAuthHeaders() {
+  const token = localStorage.getItem("veritext_token");
+  return token ? { "Authorization": `Bearer ${token}` } : {};
+}
+
+// DOM Elements - Auth & Roles
+const btnOpenAuth = document.getElementById("btn-open-auth");
+const userProfileBox = document.getElementById("user-profile-box");
+const userRoleBadge = document.getElementById("user-role-badge");
+const userDisplayName = document.getElementById("user-display-name");
+const btnLogout = document.getElementById("btn-logout");
+
+const authModal = document.getElementById("auth-modal");
+const btnCloseAuthModal = document.getElementById("btn-close-auth-modal");
+const tabBtnLogin = document.getElementById("tab-btn-login");
+const tabBtnRegister = document.getElementById("tab-btn-register");
+const formLogin = document.getElementById("form-login");
+const formRegister = document.getElementById("form-register");
+const authAlert = document.getElementById("auth-alert");
+
+const btnQuickTeacher = document.getElementById("btn-quick-teacher");
+const btnQuickStudent = document.getElementById("btn-quick-student");
+const labelRoleStudent = document.getElementById("label-role-student");
+const labelRoleTeacher = document.getElementById("label-role-teacher");
 
 // DOM Elements - Navigation
 const navTabs = document.querySelectorAll(".nav-tab");
@@ -163,6 +189,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   checkServerHealth();
   updateTextCounts();
+  initAuth();
 
   // Tự động kiểm tra định kỳ trạng thái máy chủ
   let healthInterval = setInterval(async () => {
@@ -387,6 +414,7 @@ btnSubmit.addEventListener("click", async () => {
     try {
       const res = await fetch(`${API_BASE}/api/v1/detect/upload`, {
         method: "POST",
+        headers: getAuthHeaders(),
         body: formData,
       });
 
@@ -435,7 +463,7 @@ btnSubmit.addEventListener("click", async () => {
   try {
     const res = await fetch(`${API_BASE}/api/v1/detect/web`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({
         text: rawText,
         threshold: threshold,
@@ -610,7 +638,9 @@ btnExportPdf.addEventListener("click", () => {
 async function loadHistoryAndStats() {
   try {
     // 1. Thống kê KPI
-    const statsRes = await fetch(`${API_BASE}/api/v1/stats`);
+    const statsRes = await fetch(`${API_BASE}/api/v1/stats`, {
+      headers: getAuthHeaders(),
+    });
     if (statsRes.ok) {
       const stats = await statsRes.json();
       kpiTotalScans.textContent = stats.total_scans.toLocaleString();
@@ -620,10 +650,12 @@ async function loadHistoryAndStats() {
     }
 
     // 2. Bảng dữ liệu
-    const histRes = await fetch(`${API_BASE}/api/v1/history?limit=30`);
+    const histRes = await fetch(`${API_BASE}/api/v1/history?limit=30`, {
+      headers: getAuthHeaders(),
+    });
     if (histRes.ok) {
       const data = await histRes.json();
-      renderHistoryTable(data.history || []);
+      renderHistoryTable(data.history || [], data.current_user);
     }
   } catch (err) {
     console.error("Lỗi nạp lịch sử:", err);
@@ -632,13 +664,17 @@ async function loadHistoryAndStats() {
 
 btnRefreshHistory.addEventListener("click", loadHistoryAndStats);
 
-function renderHistoryTable(items) {
+function renderHistoryTable(items, user) {
   historyTableBody.innerHTML = "";
   if (!items || items.length === 0) {
+    const isStudent = user && user.role === "student";
+    const msg = isStudent
+      ? "Bạn chưa có lượt thẩm định nào. Hãy nhập văn bản ở tab 'Thẩm Định Văn Bản' để kiểm tra!"
+      : "Chưa có lượt thẩm định nào được lưu. Hãy thực hiện kiểm tra ở Tab Thẩm Định!";
     historyTableBody.innerHTML = `
       <tr>
         <td colspan="8" class="text-center" style="padding: 30px; color: var(--text-muted);">
-          Chưa có lượt thẩm định nào được lưu. Hãy thực hiện kiểm tra ở Tab Thẩm Định!
+          ${msg}
         </td>
       </tr>
     `;
@@ -654,7 +690,12 @@ function renderHistoryTable(items) {
     tr.innerHTML = `
       <td><b>#${item.id}</b></td>
       <td style="color: var(--text-secondary); font-size: 12px;">${item.timestamp}</td>
-      <td><b>${escapeHtml(item.title || item.filename || "Văn bản")}</b></td>
+      <td>
+        <b>${escapeHtml(item.title || item.filename || "Văn bản")}</b>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+          👤 Người nộp: <b>${escapeHtml(item.author_name || "Khách")}</b>
+        </div>
+      </td>
       <td>${item.word_count} từ</td>
       <td><span class="data-badge ${badgeClass}">${badgeText}</span></td>
       <td><b style="font-family: var(--font-mono);">${(item.ai_probability * 100).toFixed(1)}%</b></td>
@@ -675,7 +716,9 @@ window.downloadPdf = function(id) {
 
 window.viewHistoryItem = async function(id) {
   try {
-    const res = await fetch(`${API_BASE}/api/v1/history/${id}`);
+    const res = await fetch(`${API_BASE}/api/v1/history/${id}`, {
+      headers: getAuthHeaders(),
+    });
     if (res.ok) {
       const data = await res.json();
       currentScanId = id;
@@ -709,7 +752,10 @@ window.viewHistoryItem = async function(id) {
 window.deleteHistoryItem = async function(id) {
   if (!confirm(`Bạn có chắc chắn muốn xóa lượt quét #${id} không?`)) return;
   try {
-    const res = await fetch(`${API_BASE}/api/v1/history/${id}`, { method: "DELETE" });
+    const res = await fetch(`${API_BASE}/api/v1/history/${id}`, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    });
     if (res.ok) {
       loadHistoryAndStats();
     }
@@ -722,4 +768,240 @@ function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
+}
+
+// ==============================================================================
+// 6. XÁC THỰC NGƯỜI DÙNG & PHÂN QUYỀN (JWT AUTHENTICATION & RBAC)
+// ==============================================================================
+
+function initAuth() {
+  const savedUser = localStorage.getItem("veritext_user");
+  const savedToken = localStorage.getItem("veritext_token");
+  if (savedUser && savedToken) {
+    try {
+      currentUser = JSON.parse(savedUser);
+      updateAuthUI(currentUser);
+      checkUserToken();
+    } catch (e) {
+      handleLogout();
+    }
+  }
+
+  if (btnOpenAuth) {
+    btnOpenAuth.addEventListener("click", () => showAuthModal("login"));
+  }
+  if (btnCloseAuthModal) {
+    btnCloseAuthModal.addEventListener("click", hideAuthModal);
+  }
+  if (authModal) {
+    authModal.addEventListener("click", (e) => {
+      if (e.target === authModal) hideAuthModal();
+    });
+  }
+
+  if (tabBtnLogin && tabBtnRegister) {
+    tabBtnLogin.addEventListener("click", () => switchAuthTab("login"));
+    tabBtnRegister.addEventListener("click", () => switchAuthTab("register"));
+  }
+
+  const roleRadios = document.querySelectorAll('input[name="reg-role"]');
+  roleRadios.forEach((r) => {
+    r.addEventListener("change", () => {
+      if (labelRoleStudent && labelRoleTeacher) {
+        labelRoleStudent.classList.toggle("active", r.value === "student");
+        labelRoleTeacher.classList.toggle("active", r.value === "teacher");
+      }
+    });
+  });
+
+  if (btnQuickTeacher) {
+    btnQuickTeacher.addEventListener("click", async () => {
+      document.getElementById("login-email").value = "giangvien@veritext.ai";
+      document.getElementById("login-password").value = "123456";
+      await handleLogin("giangvien@veritext.ai", "123456");
+    });
+  }
+  if (btnQuickStudent) {
+    btnQuickStudent.addEventListener("click", async () => {
+      document.getElementById("login-email").value = "sinhvien@veritext.ai";
+      document.getElementById("login-password").value = "123456";
+      await handleLogin("sinhvien@veritext.ai", "123456");
+    });
+  }
+
+  if (formLogin) {
+    formLogin.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = document.getElementById("login-email").value.trim();
+      const password = document.getElementById("login-password").value;
+      await handleLogin(email, password);
+    });
+  }
+
+  if (formRegister) {
+    formRegister.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fullName = document.getElementById("reg-fullname").value.trim();
+      const email = document.getElementById("reg-email").value.trim();
+      const password = document.getElementById("reg-password").value;
+      const role = document.querySelector('input[name="reg-role"]:checked')?.value || "student";
+      await handleRegister(fullName, email, password, role);
+    });
+  }
+
+  if (btnLogout) {
+    btnLogout.addEventListener("click", handleLogout);
+  }
+}
+
+async function checkUserToken() {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/auth/me`, {
+      headers: getAuthHeaders(),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      currentUser = data.user;
+      localStorage.setItem("veritext_user", JSON.stringify(currentUser));
+      updateAuthUI(currentUser);
+    } else {
+      handleLogout();
+    }
+  } catch (e) {}
+}
+
+function showAuthModal(tab = "login") {
+  if (!authModal) return;
+  authModal.classList.remove("hidden");
+  switchAuthTab(tab);
+  clearAuthAlert();
+}
+
+function hideAuthModal() {
+  if (!authModal) return;
+  authModal.classList.add("hidden");
+  clearAuthAlert();
+}
+
+function switchAuthTab(tab) {
+  if (tab === "login") {
+    tabBtnLogin.classList.add("active");
+    tabBtnRegister.classList.remove("active");
+    formLogin.classList.remove("hidden");
+    formRegister.classList.add("hidden");
+  } else {
+    tabBtnLogin.classList.remove("active");
+    tabBtnRegister.classList.add("active");
+    formLogin.classList.add("hidden");
+    formRegister.classList.remove("hidden");
+  }
+  clearAuthAlert();
+}
+
+function showAuthAlert(msg, isSuccess = false) {
+  if (!authAlert) return;
+  authAlert.textContent = msg;
+  authAlert.className = "auth-alert " + (isSuccess ? "auth-alert-success" : "auth-alert-error");
+  authAlert.classList.remove("hidden");
+}
+
+function clearAuthAlert() {
+  if (!authAlert) return;
+  authAlert.classList.add("hidden");
+  authAlert.textContent = "";
+}
+
+async function handleLogin(email, password) {
+  const submitBtn = document.getElementById("btn-submit-login");
+  if (submitBtn) submitBtn.disabled = true;
+  clearAuthAlert();
+
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || "Đăng nhập thất bại.");
+    }
+
+    localStorage.setItem("veritext_token", data.access_token);
+    localStorage.setItem("veritext_user", JSON.stringify(data.user));
+    currentUser = data.user;
+    updateAuthUI(currentUser);
+
+    showAuthAlert("Đăng nhập thành công! Đang chuyển hướng...", true);
+    setTimeout(() => {
+      hideAuthModal();
+      loadHistoryAndStats();
+    }, 600);
+  } catch (err) {
+    showAuthAlert(err.message || "Lỗi đăng nhập.");
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
+async function handleRegister(fullName, email, password, role) {
+  const submitBtn = document.getElementById("btn-submit-register");
+  if (submitBtn) submitBtn.disabled = true;
+  clearAuthAlert();
+
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ full_name: fullName, email, password, role }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || "Đăng ký thất bại.");
+    }
+
+    localStorage.setItem("veritext_token", data.access_token);
+    localStorage.setItem("veritext_user", JSON.stringify(data.user));
+    currentUser = data.user;
+    updateAuthUI(currentUser);
+
+    showAuthAlert("Đăng ký tài khoản thành công!", true);
+    setTimeout(() => {
+      hideAuthModal();
+      loadHistoryAndStats();
+    }, 600);
+  } catch (err) {
+    showAuthAlert(err.message || "Lỗi đăng ký.");
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
+function handleLogout() {
+  localStorage.removeItem("veritext_token");
+  localStorage.removeItem("veritext_user");
+  currentUser = null;
+  updateAuthUI(null);
+  loadHistoryAndStats();
+}
+
+function updateAuthUI(user) {
+  if (user) {
+    if (btnOpenAuth) btnOpenAuth.classList.add("hidden");
+    if (userProfileBox) userProfileBox.classList.remove("hidden");
+    const isTeacher = user.role === "teacher";
+    if (userRoleBadge) {
+      userRoleBadge.textContent = isTeacher ? "👨‍🏫" : "🎓";
+      userRoleBadge.title = isTeacher ? "Giảng viên" : "Sinh viên";
+    }
+    if (userDisplayName) {
+      userDisplayName.textContent = user.full_name || user.email;
+      userDisplayName.title = `${user.full_name} (${isTeacher ? "Giảng viên" : "Sinh viên"})`;
+    }
+  } else {
+    if (btnOpenAuth) btnOpenAuth.classList.remove("hidden");
+    if (userProfileBox) userProfileBox.classList.add("hidden");
+  }
 }
