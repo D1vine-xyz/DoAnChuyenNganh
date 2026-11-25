@@ -247,9 +247,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (targetId === "tab-history") {
         loadHistoryAndStats();
+      } else if (targetId === "tab-classroom") {
+        syncClassroomAccessUI();
       }
     });
   });
+
+  initClassroomBatchUI();
 });
 
 async function checkServerHealth() {
@@ -1228,4 +1232,389 @@ function updateAuthUI(user) {
     if (btnOpenAuth) btnOpenAuth.classList.remove("hidden");
     if (userProfileBox) userProfileBox.classList.add("hidden");
   }
+  syncClassroomAccessUI();
 }
+
+
+// ==============================================================================
+// 7. CHẤM BÀI LỚP HỌC (.ZIP / MULTI-FILE) & XUẤT BẢNG ĐIỂM EXCEL/CSV
+// ==============================================================================
+
+let selectedBatchFiles = [];
+let activeBatchDetail = null;
+let activeBatchRiskFilter = "all";
+
+const classroomTeacherGate = document.getElementById("classroom-teacher-gate");
+const classroomWorkspace = document.getElementById("classroom-workspace");
+const btnGateTeacherLogin = document.getElementById("btn-gate-teacher-login");
+const btnGateOpenModal = document.getElementById("btn-gate-open-modal");
+
+const batchNameInput = document.getElementById("batch-name-input");
+const batchPresetSelect = document.getElementById("batch-preset-select");
+const batchFilterQuotes = document.getElementById("batch-filter-quotes");
+const batchFilterReferences = document.getElementById("batch-filter-references");
+const batchDropZone = document.getElementById("batch-drop-zone");
+const batchFileInput = document.getElementById("batch-file-input");
+const batchSelectedWrap = document.getElementById("batch-selected-wrap");
+const batchSelectedCount = document.getElementById("batch-selected-count");
+const batchSelectedChips = document.getElementById("batch-selected-chips");
+const btnClearBatchFiles = document.getElementById("btn-clear-batch-files");
+const btnStartBatchScan = document.getElementById("btn-start-batch-scan");
+const batchSpinner = document.getElementById("batch-spinner");
+
+const batchResultPanel = document.getElementById("batch-result-panel");
+const batchResultTitle = document.getElementById("batch-result-title");
+const batchResultMeta = document.getElementById("batch-result-meta");
+const btnExportXlsx = document.getElementById("btn-export-xlsx");
+const btnExportCsv = document.getElementById("btn-export-csv");
+const bkpiTotal = document.getElementById("bkpi-total");
+const bkpiHigh = document.getElementById("bkpi-high");
+const bkpiMod = document.getElementById("bkpi-mod");
+const bkpiSafe = document.getElementById("bkpi-safe");
+const bkpiBypass = document.getElementById("bkpi-bypass");
+const batchSkippedBox = document.getElementById("batch-skipped-box");
+const batchSkippedText = document.getElementById("batch-skipped-text");
+const batchSubmissionsTbody = document.getElementById("batch-submissions-tbody");
+const batchRiskFilters = document.querySelectorAll(".batch-risk-filter");
+const savedBatchesList = document.getElementById("saved-batches-list");
+const btnRefreshBatches = document.getElementById("btn-refresh-batches");
+
+const TIER_SHORT_LABELS = {
+  AI_PURE: "🤖 AI toàn phần",
+  HYBRID_MIXED: "🧩 Văn bản lai",
+  AI_ASSISTED: "✍️ AI biên tập",
+  HUMAN_PURE: "👤 Tự viết",
+};
+
+function syncClassroomAccessUI() {
+  const isTeacher = currentUser && currentUser.role === "teacher";
+  if (classroomTeacherGate) classroomTeacherGate.classList.toggle("hidden", !!isTeacher);
+  if (classroomWorkspace) classroomWorkspace.classList.toggle("hidden", !isTeacher);
+  if (isTeacher) {
+    loadSavedBatches();
+  }
+}
+
+function initClassroomBatchUI() {
+  if (btnGateTeacherLogin) {
+    btnGateTeacherLogin.addEventListener("click", async () => {
+      await handleLogin("giangvien@veritext.ai", "123456");
+      syncClassroomAccessUI();
+    });
+  }
+  if (btnGateOpenModal) {
+    btnGateOpenModal.addEventListener("click", () => showAuthModal("login"));
+  }
+
+  if (batchDropZone && batchFileInput) {
+    batchDropZone.addEventListener("click", () => batchFileInput.click());
+    batchDropZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      batchDropZone.classList.add("dragover");
+    });
+    batchDropZone.addEventListener("dragleave", () => {
+      batchDropZone.classList.remove("dragover");
+    });
+    batchDropZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      batchDropZone.classList.remove("dragover");
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        addBatchFiles(Array.from(e.dataTransfer.files));
+      }
+    });
+    batchFileInput.addEventListener("change", () => {
+      if (batchFileInput.files && batchFileInput.files.length > 0) {
+        addBatchFiles(Array.from(batchFileInput.files));
+        batchFileInput.value = "";
+      }
+    });
+  }
+
+  if (btnClearBatchFiles) {
+    btnClearBatchFiles.addEventListener("click", () => {
+      selectedBatchFiles = [];
+      renderSelectedBatchFiles();
+    });
+  }
+
+  if (btnStartBatchScan) {
+    btnStartBatchScan.addEventListener("click", runClassroomBatchScan);
+  }
+
+  if (btnExportXlsx) {
+    btnExportXlsx.addEventListener("click", () => {
+      if (activeBatchDetail) downloadBatchExport(activeBatchDetail.id, "xlsx");
+    });
+  }
+  if (btnExportCsv) {
+    btnExportCsv.addEventListener("click", () => {
+      if (activeBatchDetail) downloadBatchExport(activeBatchDetail.id, "csv");
+    });
+  }
+
+  batchRiskFilters.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      activeBatchRiskFilter = btn.dataset.risk || "all";
+      batchRiskFilters.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      if (activeBatchDetail) renderBatchSubmissionsTable(activeBatchDetail.submissions || []);
+    });
+  });
+
+  if (btnRefreshBatches) {
+    btnRefreshBatches.addEventListener("click", loadSavedBatches);
+  }
+}
+
+function addBatchFiles(fileList) {
+  const allowed = ["zip", "docx", "doc", "pdf", "txt"];
+  fileList.forEach((f) => {
+    const ext = (f.name.split(".").pop() || "").toLowerCase();
+    if (!allowed.includes(ext)) return;
+    if (!selectedBatchFiles.some((x) => x.name === f.name && x.size === f.size)) {
+      selectedBatchFiles.push(f);
+    }
+  });
+  renderSelectedBatchFiles();
+}
+
+function renderSelectedBatchFiles() {
+  if (!batchSelectedWrap || !batchSelectedChips) return;
+  if (selectedBatchFiles.length === 0) {
+    batchSelectedWrap.classList.add("hidden");
+    batchSelectedChips.innerHTML = "";
+    return;
+  }
+  batchSelectedWrap.classList.remove("hidden");
+  if (batchSelectedCount) {
+    batchSelectedCount.textContent = `Đã chọn ${selectedBatchFiles.length} tệp sẵn sàng chấm`;
+  }
+  batchSelectedChips.innerHTML = "";
+  selectedBatchFiles.forEach((f) => {
+    const chip = document.createElement("span");
+    chip.className = "batch-file-chip";
+    const icon = f.name.toLowerCase().endsWith(".zip") ? "📦" : "📄";
+    chip.textContent = `${icon} ${f.name} (${(f.size / 1024).toFixed(1)} KB)`;
+    batchSelectedChips.appendChild(chip);
+  });
+}
+
+async function runClassroomBatchScan() {
+  if (!currentUser || currentUser.role !== "teacher") {
+    alert("Vui lòng đăng nhập tài khoản Giảng viên để chấm bài lớp học.");
+    return;
+  }
+  if (selectedBatchFiles.length === 0) {
+    alert("Vui lòng kéo thả tệp .ZIP hoặc chọn ít nhất 1 tệp bài nộp của sinh viên!");
+    return;
+  }
+
+  const preset = batchPresetSelect ? batchPresetSelect.value : "balanced";
+  const presetThresholds = { strict: 0.3, balanced: 0.5, lenient: 0.7 };
+  const formData = new FormData();
+  formData.append("batch_name", (batchNameInput && batchNameInput.value.trim()) || "Đợt chấm bài lớp học");
+  formData.append("threshold", presetThresholds[preset] || 0.5);
+  formData.append("strictness_preset", preset);
+  formData.append("filter_quotes", batchFilterQuotes ? batchFilterQuotes.checked : false);
+  formData.append("filter_references", batchFilterReferences ? batchFilterReferences.checked : true);
+  selectedBatchFiles.forEach((file) => formData.append("files", file));
+
+  btnStartBatchScan.disabled = true;
+  const txtEl = btnStartBatchScan.querySelector(".btn-text");
+  if (txtEl) txtEl.textContent = "Đang giải nén & chấm toàn lớp...";
+  if (batchSpinner) batchSpinner.classList.remove("hidden");
+
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/classroom/batch-scan`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: formData,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.detail || `Lỗi HTTP ${res.status}`);
+    }
+
+    selectedBatchFiles = [];
+    renderSelectedBatchFiles();
+    renderBatchDetail(data.batch, data.skipped_files || []);
+    loadSavedBatches();
+  } catch (err) {
+    alert("Lỗi chấm bài lớp học: " + err.message);
+  } finally {
+    btnStartBatchScan.disabled = false;
+    if (txtEl) txtEl.textContent = "🚀 Bắt Đầu Chấm Cả Lớp";
+    if (batchSpinner) batchSpinner.classList.add("hidden");
+  }
+}
+
+function renderBatchDetail(batch, skippedFiles = []) {
+  if (!batch || !batchResultPanel) return;
+  activeBatchDetail = batch;
+  activeBatchRiskFilter = "all";
+  batchRiskFilters.forEach((b) => b.classList.toggle("active", b.dataset.risk === "all"));
+
+  batchResultPanel.classList.remove("hidden");
+  if (batchResultTitle) batchResultTitle.textContent = `📊 ${batch.batch_name}`;
+  if (batchResultMeta) {
+    batchResultMeta.textContent = `Mã đợt #${batch.id} • Giảng viên: ${batch.teacher_name} • ${batch.created_at} • AI trung bình lớp: ${(batch.avg_ai_probability * 100).toFixed(1)}%`;
+  }
+
+  if (bkpiTotal) bkpiTotal.textContent = batch.total_files;
+  if (bkpiHigh) bkpiHigh.textContent = batch.high_risk_count;
+  if (bkpiMod) bkpiMod.textContent = batch.moderate_risk_count;
+  if (bkpiSafe) bkpiSafe.textContent = batch.safe_count;
+  if (bkpiBypass) bkpiBypass.textContent = batch.bypass_count || 0;
+
+  if (batchSkippedBox && batchSkippedText) {
+    if (skippedFiles && skippedFiles.length > 0) {
+      batchSkippedBox.classList.remove("hidden");
+      batchSkippedText.textContent = `Đã bỏ qua ${skippedFiles.length} tệp không hợp lệ: ` +
+        skippedFiles.slice(0, 4).map((s) => `${s.filename} (${s.reason})`).join(" • ");
+    } else {
+      batchSkippedBox.classList.add("hidden");
+    }
+  }
+
+  renderBatchSubmissionsTable(batch.submissions || []);
+  batchResultPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function renderBatchSubmissionsTable(submissions) {
+  if (!batchSubmissionsTbody) return;
+  const filtered = submissions.filter((s) => {
+    if (activeBatchRiskFilter === "all") return true;
+    if (activeBatchRiskFilter === "bypass") return !!s.has_bypass_warning;
+    return s.risk_level === activeBatchRiskFilter;
+  });
+
+  batchSubmissionsTbody.innerHTML = "";
+  if (filtered.length === 0) {
+    batchSubmissionsTbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding: 20px; color: var(--text-muted);">Không có bài nộp nào thuộc nhóm lọc này.</td></tr>`;
+    return;
+  }
+
+  filtered.forEach((s, idx) => {
+    const tr = document.createElement("tr");
+    const riskClass = s.risk_level === "high" ? "risk-high" : s.risk_level === "moderate" ? "risk-moderate" : "risk-safe";
+    const riskText = s.risk_level === "high" ? "🔴 Nguy cơ cao" : s.risk_level === "moderate" ? "🟡 Cần xem xét" : "🟢 An toàn";
+    const langTag = s.language === "vi" ? "🇻🇳 VI" : "🇬🇧 EN";
+    const bypassBadge = s.has_bypass_warning ? `<span class="badge-bypass-table">⚠️ Bypass</span>` : "";
+    const tierText = TIER_SHORT_LABELS[s.authorship_tier] || s.verdict;
+    const burstStr = s.burstiness_score !== null && s.burstiness_score !== undefined ? `${s.burstiness_score}/100` : "--";
+
+    tr.innerHTML = `
+      <td><b>${idx + 1}</b></td>
+      <td>
+        <b>${escapeHtml(s.student_label || s.title)}</b>${bypassBadge}
+        <div style="font-size: 11px; color: var(--text-muted);">${s.word_count} từ • ${escapeHtml(s.title)}</div>
+      </td>
+      <td>${langTag}</td>
+      <td><b style="font-family: var(--font-mono);">${(s.ai_probability * 100).toFixed(1)}%</b></td>
+      <td><span class="risk-pill ${riskClass}">${riskText}</span></td>
+      <td style="font-size: 12px;">${escapeHtml(tierText)}</td>
+      <td style="font-family: var(--font-mono); font-size: 12px;">${burstStr}</td>
+      <td style="text-align: right;">
+        <button class="table-btn" onclick="downloadPdf(${s.scan_id})">📥 PDF</button>
+        <button class="table-btn" onclick="viewHistoryItem(${s.scan_id})">👁️ Xem</button>
+      </td>
+    `;
+    batchSubmissionsTbody.appendChild(tr);
+  });
+}
+
+async function loadSavedBatches() {
+  if (!savedBatchesList || !currentUser || currentUser.role !== "teacher") return;
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/classroom/batches`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const batches = data.batches || [];
+
+    if (batches.length === 0) {
+      savedBatchesList.innerHTML = `<p style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 18px;">Chưa có đợt chấm bài lớp học nào. Hãy kéo thả tệp .ZIP ở trên để bắt đầu!</p>`;
+      return;
+    }
+
+    savedBatchesList.innerHTML = "";
+    batches.forEach((b) => {
+      const row = document.createElement("div");
+      row.className = "saved-batch-row";
+      row.innerHTML = `
+        <div class="saved-batch-info">
+          <strong>#${b.id} • ${escapeHtml(b.batch_name)}</strong>
+          <div class="saved-batch-stats">
+            🕒 ${b.created_at} • 📄 ${b.total_files} bài •
+            🔴 ${b.high_risk_count} cao • 🟡 ${b.moderate_risk_count} nghi vấn • 🟢 ${b.safe_count} an toàn
+            ${b.bypass_count ? ` • ⚠️ ${b.bypass_count} Bypass` : ""}
+          </div>
+        </div>
+        <div class="saved-batch-actions">
+          <button class="table-btn" onclick="openClassroomBatch(${b.id})">👁️ Mở bảng điểm</button>
+          <button class="table-btn" onclick="downloadBatchExport(${b.id}, 'xlsx')">📊 Excel</button>
+          <button class="table-btn text-danger" onclick="deleteClassroomBatch(${b.id})">🗑️</button>
+        </div>
+      `;
+      savedBatchesList.appendChild(row);
+    });
+  } catch (err) {
+    console.error("Lỗi nạp đợt chấm lớp học:", err);
+  }
+}
+
+window.openClassroomBatch = async function(batchId) {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/classroom/batches/${batchId}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error("Không thể tải chi tiết đợt chấm.");
+    const detail = await res.json();
+    renderBatchDetail(detail, []);
+  } catch (err) {
+    alert(err.message);
+  }
+};
+
+window.deleteClassroomBatch = async function(batchId) {
+  if (!confirm(`Bạn có chắc muốn xóa đợt chấm lớp học #${batchId}?`)) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/classroom/batches/${batchId}`, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    });
+    if (res.ok) {
+      if (activeBatchDetail && activeBatchDetail.id === batchId && batchResultPanel) {
+        batchResultPanel.classList.add("hidden");
+        activeBatchDetail = null;
+      }
+      loadSavedBatches();
+    }
+  } catch (err) {
+    alert("Lỗi xóa đợt chấm: " + err.message);
+  }
+};
+
+window.downloadBatchExport = async function(batchId, fmt = "xlsx") {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/classroom/batches/${batchId}/export?format=${fmt}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Không thể xuất bảng điểm.");
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Bang_Diem_Kiem_Dinh_Lop_${String(batchId).padStart(4, "0")}.${fmt}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  } catch (err) {
+    alert("Lỗi xuất bảng điểm: " + err.message);
+  }
+};

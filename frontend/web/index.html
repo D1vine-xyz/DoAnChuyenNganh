@@ -40,7 +40,8 @@
 
       <nav class="nav-tabs">
         <button class="nav-tab active" data-tab="tab-inspect">Thẩm Định Văn Bản</button>
-        <button class="nav-tab" data-tab="tab-history">Lịch Sử & Thống Kê</button>
+        <button class="nav-tab" data-tab="tab-classroom">🏫 Chấm Bài Lớp Học</button>
+        <button class="nav-tab" data-tab="tab-history">Lịch Sử &amp; Thống Kê</button>
         <button class="nav-tab" data-tab="tab-architecture">Kiến Trúc Hệ Thống</button>
       </nav>
 
@@ -353,6 +354,175 @@
 
       </div>
 
+    </section>
+
+    <!-- ==================================================================== -->
+    <!-- TAB 1B: CHẤM BÀI LỚP HỌC (.ZIP / MULTI-FILE + XUẤT EXCEL) -->
+    <!-- ==================================================================== -->
+    <section id="tab-classroom" class="tab-pane">
+      <div class="classroom-layout">
+
+        <!-- RBAC Gate (Hiển thị nếu chưa đăng nhập bằng tài khoản Giảng viên) -->
+        <div id="classroom-teacher-gate" class="teacher-gate-card">
+          <div class="gate-icon">👨‍🏫</div>
+          <h2>Khu Vực Chấm Bài Hàng Loạt Dành Riêng Cho Giảng Viên</h2>
+          <p>
+            Tính năng tải lên tệp <b>.ZIP</b> bài nộp cả lớp (từ Moodle / Google Classroom), chấm tự động hàng loạt,
+            xếp hạng rủi ro và <b>Xuất Bảng Điểm Excel (.XLSX / .CSV)</b> được bảo vệ bằng phân quyền <b>RBAC (Teacher Only)</b>.
+          </p>
+          <div class="gate-actions">
+            <button type="button" id="btn-gate-teacher-login" class="btn-submit-main">
+              <span>⚡ Đăng nhập nhanh Giảng viên mẫu (TS. Hoàng Văn Thầy)</span>
+            </button>
+            <button type="button" id="btn-gate-open-modal" class="btn-action-pill">
+              <span>🔐 Mở hộp thoại Đăng nhập</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Classroom Workspace (Chỉ hiển thị khi đã đăng nhập vai trò Giảng viên) -->
+        <div id="classroom-workspace" class="hidden">
+
+          <!-- Card 1: Upload ZIP / Multi-file -->
+          <div class="classroom-card">
+            <div class="classroom-card-header">
+              <div>
+                <h3>🏫 Tạo Đợt Chấm Bài Cả Lớp (.ZIP hoặc Nhiều Tệp)</h3>
+                <p>Kéo thả 1 tệp nén <b>.ZIP</b> tải từ LMS hoặc chọn đồng thời nhiều bài tiểu luận (.docx, .doc, .pdf, .txt).</p>
+              </div>
+            </div>
+
+            <div class="batch-form-grid">
+              <div class="batch-field">
+                <label for="batch-name-input">Tên môn học / Đợt nộp bài:</label>
+                <input type="text" id="batch-name-input" class="auth-input" placeholder="Ví dụ: Lớp K16 - Kỹ thuật Phần mềm - Tiểu luận giữa kỳ" value="Lớp K16 - Tiểu luận Giữa kỳ">
+              </div>
+              <div class="batch-field">
+                <label for="batch-preset-select">Chế độ ngưỡng chấm:</label>
+                <select id="batch-preset-select" class="auth-input">
+                  <option value="strict">🛡️ Khóa luận / Nghiên cứu (Nghiêm ngặt - 30%)</option>
+                  <option value="balanced" selected>⚖️ Tiểu luận môn học (Cân bằng - 50%)</option>
+                  <option value="lenient">🔍 Bài tập tham khảo (Nới lỏng - 70%)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="batch-options-row">
+              <label class="filter-checkbox-label">
+                <input type="checkbox" id="batch-filter-quotes">
+                <span>Bỏ trích dẫn trong ngoặc kép "..."</span>
+              </label>
+              <label class="filter-checkbox-label">
+                <input type="checkbox" id="batch-filter-references" checked>
+                <span>Bỏ mục Tài liệu tham khảo / References</span>
+              </label>
+            </div>
+
+            <div id="batch-drop-zone" class="batch-drop-zone">
+              <input type="file" id="batch-file-input" accept=".zip,.docx,.doc,.pdf,.txt" multiple class="hidden">
+              <div class="batch-drop-icon">📦</div>
+              <div class="batch-drop-title">Kéo thả tệp <b>.ZIP</b> cả lớp hoặc nhấp để chọn nhiều tệp bài nộp</div>
+              <div class="batch-drop-sub">Hỗ trợ .ZIP, .DOCX, .DOC, .PDF, .TXT • Tối đa 100 tệp/đợt • Tự động quét Anti-Bypass &amp; XAI</div>
+            </div>
+
+            <div id="batch-selected-wrap" class="batch-selected-wrap hidden">
+              <div class="batch-selected-head">
+                <span id="batch-selected-count">Đã chọn 0 tệp</span>
+                <button type="button" id="btn-clear-batch-files" class="btn-text-only text-danger">🗑️ Xóa danh sách chọn</button>
+              </div>
+              <div id="batch-selected-chips" class="batch-selected-chips"></div>
+            </div>
+
+            <div class="batch-submit-bar">
+              <button type="button" id="btn-start-batch-scan" class="btn-submit-main">
+                <span class="btn-text">🚀 Bắt Đầu Chấm Cả Lớp</span>
+                <div id="batch-spinner" class="spinner hidden"></div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Card 2: Kết quả đợt chấm & Bảng xếp hạng rủi ro -->
+          <div id="batch-result-panel" class="classroom-card hidden">
+            <div class="batch-result-header">
+              <div>
+                <h3 id="batch-result-title">Kết quả đợt chấm</h3>
+                <span id="batch-result-meta" class="batch-result-meta"></span>
+              </div>
+              <div class="batch-export-actions">
+                <button type="button" id="btn-export-xlsx" class="btn-export-excel">📊 Xuất Excel (.XLSX)</button>
+                <button type="button" id="btn-export-csv" class="btn-action-pill">📄 Xuất CSV</button>
+              </div>
+            </div>
+
+            <div class="batch-kpi-row">
+              <div class="batch-kpi-box">
+                <span class="batch-kpi-label">Tổng số bài</span>
+                <strong id="bkpi-total">0</strong>
+              </div>
+              <div class="batch-kpi-box kpi-high">
+                <span class="batch-kpi-label">🔴 Nguy cơ cao</span>
+                <strong id="bkpi-high">0</strong>
+              </div>
+              <div class="batch-kpi-box kpi-mod">
+                <span class="batch-kpi-label">🟡 Cần xem xét</span>
+                <strong id="bkpi-mod">0</strong>
+              </div>
+              <div class="batch-kpi-box kpi-safe">
+                <span class="batch-kpi-label">🟢 An toàn</span>
+                <strong id="bkpi-safe">0</strong>
+              </div>
+              <div class="batch-kpi-box kpi-bypass">
+                <span class="batch-kpi-label">⚠️ Dính Bypass</span>
+                <strong id="bkpi-bypass">0</strong>
+              </div>
+            </div>
+
+            <div id="batch-skipped-box" class="filter-info-banner hidden">
+              <span>⚠️</span>
+              <span id="batch-skipped-text"></span>
+            </div>
+
+            <div class="batch-filter-bar">
+              <span class="controls-label">Lọc danh sách:</span>
+              <button type="button" class="preset-pill-btn batch-risk-filter active" data-risk="all">Tất cả</button>
+              <button type="button" class="preset-pill-btn batch-risk-filter" data-risk="high">🔴 Nguy cơ cao</button>
+              <button type="button" class="preset-pill-btn batch-risk-filter" data-risk="moderate">🟡 Cần xem xét</button>
+              <button type="button" class="preset-pill-btn batch-risk-filter" data-risk="bypass">⚠️ Dính Bypass</button>
+              <button type="button" class="preset-pill-btn batch-risk-filter" data-risk="safe">🟢 An toàn</button>
+            </div>
+
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>STT</th>
+                    <th>Sinh Viên / Tệp Nộp</th>
+                    <th>Ngôn Ngữ</th>
+                    <th>Xác Suất AI</th>
+                    <th>Rủi Ro</th>
+                    <th>Phân Loại 4 Mức</th>
+                    <th>Burstiness</th>
+                    <th style="text-align: right;">Thao Tác</th>
+                  </tr>
+                </thead>
+                <tbody id="batch-submissions-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Card 3: Danh sách các đợt chấm lớp học đã lưu -->
+          <div class="classroom-card">
+            <div class="history-card-header" style="padding: 0 0 14px 0; border-bottom: 1px solid var(--border-light); margin-bottom: 14px;">
+              <h3>📚 Các Đợt Chấm Lớp Học Đã Lưu (SQL Server)</h3>
+              <button type="button" id="btn-refresh-batches" class="btn-action-pill">🔄 Làm mới</button>
+            </div>
+            <div id="saved-batches-list" class="saved-batches-list">
+              <p style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 18px;">Chưa có đợt chấm bài lớp học nào.</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
     </section>
 
     <!-- ==================================================================== -->

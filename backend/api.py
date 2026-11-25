@@ -30,6 +30,7 @@ from inference import AITextDetector
 import database as db
 import auth
 import text_forensics as tfx
+import batch_processor as bp
 from auth import get_current_user, get_current_user_optional, require_role
 from file_parser import extract_text_from_file
 from pdf_report import generate_pdf_report
@@ -381,6 +382,8 @@ def _execute_full_analysis_and_save(
     filter_quotes: bool = False,
     filter_references: bool = False,
     current_user: Optional[Dict[str, Any]] = None,
+    batch_id: Optional[int] = None,
+    student_label: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Helper dùng chung: Tiền kiểm Anti-Bypass -> Lọc học thuật -> Suy luận Song ngữ (AI + Cấp câu)
@@ -438,6 +441,7 @@ def _execute_full_analysis_and_save(
 
     bypass_public = {k: v for k, v in bypass_raw.items() if k != "sanitized_text"}
     filter_public = {k: v for k, v in filter_raw.items() if k != "filtered_text"}
+    risk_level = bp.classify_risk_level(overall_pred["ai_probability"], bypass_public["has_bypass_warning"])
 
     auto_title = title or (f"Tài liệu: {filename}" if filename else sanitized_text[:45] + ("..." if len(sanitized_text) > 45 else ""))
 
@@ -473,6 +477,9 @@ def _execute_full_analysis_and_save(
         bypass_details=json.dumps(bypass_public, ensure_ascii=False) if bypass_public["has_bypass_warning"] else None,
         authorship_tier=authorship_tier["code"],
         xai_metrics=xai_metrics,
+        batch_id=batch_id,
+        student_label=student_label,
+        risk_level=risk_level,
     )
 
     overall_pred["preset_used"] = preset_label
@@ -480,6 +487,7 @@ def _execute_full_analysis_and_save(
     return {
         "scan_id": scan_id,
         "overall": overall_pred,
+        "risk_level": risk_level,
         "authorship_tier": authorship_tier,
         "bypass_report": bypass_public,
         "filter_report": filter_public,
@@ -731,6 +739,187 @@ async def export_pdf_report(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi khởi tạo tệp PDF: {str(e)}",
         )
+
+
+# ==============================================================================
+# 4. CLASSROOM BATCH GRADING & EXCEL/CSV EXPORT ENDPOINTS (TEACHER RBAC)
+# ==============================================================================
+
+@app.post("/api/v1/classroom/batch-scan", tags=["Classroom Grading"])
+async def classroom_batch_scan(
+    batch_name: str = Form("Đợt chấm bài lớp học"),
+    threshold: float = Form(0.5),
+    strictness_preset: Optional[str] = Form(None),
+    filter_quotes: bool = Form(False),
+    filter_references: bool = Form(True),
+    files: List[UploadFile] = File(...),
+    current_user: Dict[str, Any] = Depends(require_role(["teacher"])),
+):
+    """
+    Chấm bài hàng loạt cả lớp dành riêng cho Giảng viên (RBAC role='teacher'):
+    - Tiếp nhận 1 tệp .ZIP (nén từ LMS/Classroom/Moodle) hoặc chọn nhiều tệp (.docx, .doc, .pdf, .txt).
+    - Tự động giải nén an toàn, chạy Anti-Bypass + Lọc học thuật + AI Song ngữ + XAI cho từng bài.
+    - Lưu vào bảng classroom_batches & detection_history trong SQL Server và xếp hạng rủi ro giảm dần.
+    """
+    if detector_instance is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Mô hình AI chưa sẵn sàng.",
+        )
+
+    if not files:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Vui lòng tải lên ít nhất 1 tệp bài nộp hoặc 1 tệp .ZIP.",
+        )
+
+    t0 = time.time()
+    uploaded_items = []
+    for f in files:
+        content = await f.read()
+        uploaded_items.append((f.filename or "untitled.txt", content))
+
+    valid_docs, skipped_files = bp.extract_files_from_uploads(uploaded_items)
+    if not valid_docs:
+        reasons = "; ".join(f"{s['filename']}: {s['reason']}" for s in skipped_files[:5])
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Không trích xuất được bài nộp hợp lệ nào. Chi tiết: {reasons or 'Tệp rỗng hoặc sai định dạng.'}",
+        )
+
+    batch_id = db.create_classroom_batch(
+        teacher_id=current_user["id"],
+        batch_name=batch_name.strip() or "Đợt chấm bài lớp học",
+    )
+
+    high_risk = 0
+    moderate_risk = 0
+    safe_cnt = 0
+    bypass_cnt = 0
+    prob_sum = 0.0
+
+    for doc in valid_docs:
+        try:
+            res = _execute_full_analysis_and_save(
+                clean_text=doc["text"],
+                threshold=threshold,
+                title=doc["filename"],
+                filename=doc["filename"],
+                strictness_preset=strictness_preset,
+                filter_quotes=filter_quotes,
+                filter_references=filter_references,
+                current_user=current_user,
+                batch_id=batch_id,
+                student_label=doc["student_label"],
+            )
+            r_level = res["risk_level"]
+            if r_level == "high":
+                high_risk += 1
+            elif r_level == "moderate":
+                moderate_risk += 1
+            else:
+                safe_cnt += 1
+
+            if res["bypass_report"]["has_bypass_warning"]:
+                bypass_cnt += 1
+            prob_sum += float(res["overall"]["ai_probability"])
+        except Exception as e:
+            skipped_files.append({"filename": doc["filename"], "reason": f"Lỗi phân tích AI: {str(e)}"})
+
+    processed_count = high_risk + moderate_risk + safe_cnt
+    avg_prob = (prob_sum / processed_count) if processed_count > 0 else 0.0
+
+    db.finalize_classroom_batch(
+        batch_id=batch_id,
+        total_files=processed_count,
+        high_risk_count=high_risk,
+        moderate_risk_count=moderate_risk,
+        safe_count=safe_cnt,
+        bypass_count=bypass_cnt,
+        avg_ai_probability=avg_prob,
+    )
+
+    batch_detail = db.get_classroom_batch_detail(batch_id)
+    total_time_ms = round((time.time() - t0) * 1000, 2)
+
+    return {
+        "success": True,
+        "batch": batch_detail,
+        "skipped_files": skipped_files,
+        "total_processing_time_ms": total_time_ms,
+    }
+
+
+@app.get("/api/v1/classroom/batches", tags=["Classroom Grading"])
+async def list_classroom_batches(
+    limit: int = Query(30, ge=1, le=100),
+    current_user: Dict[str, Any] = Depends(require_role(["teacher"])),
+):
+    """Lấy danh sách các đợt chấm bài lớp học đã lưu (Chỉ Giảng viên)."""
+    batches = db.get_classroom_batches(limit=limit)
+    return {"total": len(batches), "batches": batches}
+
+
+@app.get("/api/v1/classroom/batches/{batch_id}", tags=["Classroom Grading"])
+async def get_classroom_batch(
+    batch_id: int,
+    current_user: Dict[str, Any] = Depends(require_role(["teacher"])),
+):
+    """Xem chi tiết một đợt chấm bài lớp học kèm danh sách xếp hạng sinh viên."""
+    detail = db.get_classroom_batch_detail(batch_id)
+    if not detail:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy đợt chấm bài này.")
+    return detail
+
+
+@app.delete("/api/v1/classroom/batches/{batch_id}", tags=["Classroom Grading"])
+async def remove_classroom_batch(
+    batch_id: int,
+    current_user: Dict[str, Any] = Depends(require_role(["teacher"])),
+):
+    """Xóa một đợt chấm bài lớp học khỏi CSDL."""
+    deleted = db.delete_classroom_batch(batch_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy đợt chấm để xóa.")
+    return {"success": True, "deleted_batch_id": batch_id}
+
+
+@app.get("/api/v1/classroom/batches/{batch_id}/export", tags=["Classroom Grading"])
+async def export_classroom_batch_grades(
+    batch_id: int,
+    format: str = Query("xlsx", pattern="^(xlsx|csv)$"),
+    current_user: Optional[Dict[str, Any]] = Depends(auth.get_current_user_from_header_or_query),
+):
+    """
+    Xuất Bảng Điểm Kiểm Định Toàn Lớp dạng Excel (.xlsx tô màu rủi ro) hoặc CSV (UTF-8 BOM).
+    Yêu cầu quyền Giảng viên (role='teacher').
+    """
+    if not current_user or current_user.get("role") != "teacher":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ tài khoản Giảng viên mới có quyền xuất bảng điểm lớp học!",
+        )
+
+    batch_detail = db.get_classroom_batch_detail(batch_id)
+    if not batch_detail:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy đợt chấm bài này.")
+
+    if format == "csv":
+        csv_bytes = bp.generate_batch_csv_bytes(batch_detail)
+        fname = f"Bang_Diem_Kiem_Dinh_Lop_{batch_id:04d}.csv"
+        return Response(
+            content=csv_bytes,
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f"attachment; filename={fname}"},
+        )
+
+    xlsx_bytes = bp.generate_batch_excel_bytes(batch_detail)
+    fname = f"Bang_Diem_Kiem_Dinh_Lop_{batch_id:04d}.xlsx"
+    return Response(
+        content=xlsx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fname}"},
+    )
 
 
 if __name__ == "__main__":

@@ -315,6 +315,87 @@ class TestDetectionAPI(unittest.TestCase):
         # Dọn bản ghi test
         self.client.delete(f"/api/v1/history/{scan_id}")
 
+    def test_13_classroom_batch_zip_rbac_and_excel_export(self):
+        """Kiểm tra toàn luồng Giai đoạn 2: Chặn Sinh viên (403), Giảng viên chấm .ZIP, lưu SQL & Xuất Excel/CSV."""
+        import zipfile
+
+        # 1. Lấy token Sinh viên và Giảng viên
+        s_token = self.client.post("/api/v1/auth/login", json={
+            "email": "sinhvien@veritext.ai", "password": "123456"
+        }).json()["access_token"]
+        t_token = self.client.post("/api/v1/auth/login", json={
+            "email": "giangvien@veritext.ai", "password": "123456"
+        }).json()["access_token"]
+
+        # Tạo 1 file .ZIP mẫu 2 bài nộp (1 bài cài ký tự ẩn Bypass, 1 bài tự viết)
+        zip_buf = io.BytesIO()
+        with zipfile.ZipFile(zip_buf, "w") as zf:
+            zf.writestr(
+                "22110001_SV_Bypass.txt",
+                "Trí\u200b tuệ\u200b nhân t\u0430o đóng v\u0430i trò then chốt trong bối cảnh hiện nay. Không thể phủ nhận lợi ích vượt trội.".encode("utf-8"),
+            )
+            zf.writestr(
+                "22110002_SV_Human.txt",
+                "Last weekend my friends and I went hiking near the lake and cooked instant noodles by the trail.".encode("utf-8"),
+            )
+        zip_bytes = zip_buf.getvalue()
+
+        # 2. Sinh viên gọi API chấm lớp học phải bị từ chối 403 Forbidden
+        s_resp = self.client.post(
+            "/api/v1/classroom/batch-scan",
+            files=[("files", ("test_lop.zip", io.BytesIO(zip_bytes), "application/zip"))],
+            data={"batch_name": "Unauthorized Batch"},
+            headers={"Authorization": f"Bearer {s_token}"},
+        )
+        self.assertEqual(s_resp.status_code, 403)
+
+        # 3. Giảng viên chấm file .ZIP thành công
+        t_resp = self.client.post(
+            "/api/v1/classroom/batch-scan",
+            files=[("files", ("test_lop.zip", io.BytesIO(zip_bytes), "application/zip"))],
+            data={"batch_name": "K16 Test Batch", "strictness_preset": "balanced", "filter_references": "true"},
+            headers={"Authorization": f"Bearer {t_token}"},
+        )
+        self.assertEqual(t_resp.status_code, 200)
+        b_data = t_resp.json()["batch"]
+        batch_id = b_data["id"]
+        self.assertEqual(b_data["total_files"], 2)
+        self.assertGreaterEqual(b_data["bypass_count"], 1)
+        self.assertEqual(len(b_data["submissions"]), 2)
+        # Bài dính bypass phải được xếp lên đầu danh sách rủi ro
+        self.assertTrue(b_data["submissions"][0]["has_bypass_warning"])
+
+        # 4. Xuất Excel (.xlsx) và CSV (.csv) thành công với token Giảng viên
+        xlsx_res = self.client.get(
+            f"/api/v1/classroom/batches/{batch_id}/export?format=xlsx",
+            headers={"Authorization": f"Bearer {t_token}"},
+        )
+        self.assertEqual(xlsx_res.status_code, 200)
+        self.assertTrue(xlsx_res.content[:2] == b"PK")
+
+        csv_res = self.client.get(
+            f"/api/v1/classroom/batches/{batch_id}/export?format=csv",
+            headers={"Authorization": f"Bearer {t_token}"},
+        )
+        self.assertEqual(csv_res.status_code, 200)
+        self.assertTrue(csv_res.content.startswith(b"\xef\xbb\xbf"))
+
+        # 5. Sinh viên không được xuất bảng điểm Excel (403)
+        s_export = self.client.get(
+            f"/api/v1/classroom/batches/{batch_id}/export?format=xlsx",
+            headers={"Authorization": f"Bearer {s_token}"},
+        )
+        self.assertEqual(s_export.status_code, 403)
+
+        # 6. Dọn sạch đợt test và 2 bản ghi scan con
+        for sub in b_data["submissions"]:
+            self.client.delete(f"/api/v1/history/{sub['scan_id']}", headers={"Authorization": f"Bearer {t_token}"})
+        del_batch = self.client.delete(
+            f"/api/v1/classroom/batches/{batch_id}",
+            headers={"Authorization": f"Bearer {t_token}"},
+        )
+        self.assertEqual(del_batch.status_code, 200)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -143,8 +143,41 @@ def init_db(force: bool = False):
                     high_risk_count INT NOT NULL DEFAULT 0,
                     moderate_risk_count INT NOT NULL DEFAULT 0,
                     safe_count INT NOT NULL DEFAULT 0,
+                    bypass_count INT NOT NULL DEFAULT 0,
+                    avg_ai_probability FLOAT NOT NULL DEFAULT 0.0,
                     created_at DATETIME2 DEFAULT GETDATE()
                 );
+            END;
+        """)
+
+        # Nâng cấp schema classroom_batches & liên kết batch_id từ detection_history
+        for col_name, col_def in [
+            ("bypass_count", "INT NOT NULL DEFAULT 0"),
+            ("avg_ai_probability", "FLOAT NOT NULL DEFAULT 0.0"),
+        ]:
+            cursor.execute(f"""
+                IF COL_LENGTH('classroom_batches', '{col_name}') IS NULL
+                BEGIN
+                    ALTER TABLE classroom_batches ADD {col_name} {col_def};
+                END;
+            """)
+
+        for col_name, col_def in [
+            ("batch_id", "INT NULL"),
+            ("student_label", "NVARCHAR(255) NULL"),
+            ("risk_level", "NVARCHAR(20) NULL"),
+        ]:
+            cursor.execute(f"""
+                IF COL_LENGTH('detection_history', '{col_name}') IS NULL
+                BEGIN
+                    ALTER TABLE detection_history ADD {col_name} {col_def};
+                END;
+            """)
+
+        cursor.execute("""
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_detection_history_batch_id' AND object_id = OBJECT_ID('detection_history'))
+            BEGIN
+                CREATE INDEX IX_detection_history_batch_id ON detection_history(batch_id);
             END;
         """)
         conn.commit()
@@ -295,8 +328,11 @@ def save_scan(
     bypass_details: Optional[str] = None,
     authorship_tier: Optional[str] = None,
     xai_metrics: Optional[Dict[str, Any]] = None,
+    batch_id: Optional[int] = None,
+    student_label: Optional[str] = None,
+    risk_level: Optional[str] = None,
 ) -> int:
-    """Lưu trữ một lượt quét mới vào CSDL SQL Server gắn liền với tài khoản (nếu có)."""
+    """Lưu trữ một lượt quét mới vào CSDL SQL Server gắn liền với tài khoản (và đợt chấm lớp học nếu có)."""
     snippet = full_text[:180] + ("..." if len(full_text) > 180 else "")
     sentences_data_json = json.dumps(details_json.get("sentences", []), ensure_ascii=False)
     model_breakdown_json = json.dumps(details_json.get("model_breakdown", {}), ensure_ascii=False)
@@ -314,10 +350,11 @@ def save_scan(
                 perplexity_score, burstiness_score,
                 has_bypass_warning, bypass_details,
                 authorship_tier, xai_metrics,
+                batch_id, student_label, risk_level,
                 inference_time_ms
             )
             OUTPUT INSERTED.id
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, (
             user_id,
             title or filename or "Văn bản không tên",
@@ -339,6 +376,9 @@ def save_scan(
             bypass_details,
             authorship_tier,
             xai_metrics_json,
+            batch_id,
+            student_label,
+            risk_level,
             round(float(inference_time_ms), 2),
         ))
         inserted_id = cursor.fetchone()[0]
@@ -545,6 +585,173 @@ def get_statistics(user_id: Optional[int] = None, role: Optional[str] = None) ->
             "avg_inference_time_ms": round(avg_time, 1),
             "total_words_scanned": total_words,
         }
+
+
+# ==============================================================================
+# 3. QUẢN LÝ ĐỢT CHẤM BÀI LỚP HỌC (CLASSROOM BATCHES)
+# ==============================================================================
+
+def create_classroom_batch(teacher_id: int, batch_name: str) -> int:
+    """Tạo một đợt chấm bài lớp học mới trong SQL Server."""
+    clean_name = (batch_name or "Đợt chấm bài lớp học").strip()[:250]
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO classroom_batches (teacher_id, batch_name)
+            OUTPUT INSERTED.id
+            VALUES (?, ?);
+        """, (teacher_id, clean_name))
+        batch_id = cursor.fetchone()[0]
+        conn.commit()
+        return int(batch_id)
+
+
+def finalize_classroom_batch(
+    batch_id: int,
+    total_files: int,
+    high_risk_count: int,
+    moderate_risk_count: int,
+    safe_count: int,
+    bypass_count: int,
+    avg_ai_probability: float,
+) -> None:
+    """Cập nhật số liệu thống kê tổng hợp sau khi quét xong toàn bộ các tệp của lớp."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE classroom_batches
+            SET total_files = ?,
+                high_risk_count = ?,
+                moderate_risk_count = ?,
+                safe_count = ?,
+                bypass_count = ?,
+                avg_ai_probability = ?
+            WHERE id = ?;
+        """, (
+            int(total_files),
+            int(high_risk_count),
+            int(moderate_risk_count),
+            int(safe_count),
+            int(bypass_count),
+            round(float(avg_ai_probability), 4),
+            int(batch_id),
+        ))
+        conn.commit()
+
+
+def get_classroom_batches(teacher_id: Optional[int] = None, limit: int = 30) -> List[Dict[str, Any]]:
+    """Lấy danh sách các đợt chấm bài lớp học gần nhất."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        base_sql = """
+            SELECT b.id, b.teacher_id, u.full_name as teacher_name, b.batch_name,
+                   b.total_files, b.high_risk_count, b.moderate_risk_count, b.safe_count,
+                   b.bypass_count, b.avg_ai_probability, b.created_at
+            FROM classroom_batches b
+            LEFT JOIN users u ON b.teacher_id = u.id
+        """
+        if teacher_id is not None:
+            cursor.execute(
+                base_sql + " WHERE b.teacher_id = ? ORDER BY b.id DESC OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY;",
+                (teacher_id, limit),
+            )
+        else:
+            cursor.execute(
+                base_sql + " ORDER BY b.id DESC OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY;",
+                (limit,),
+            )
+        rows = cursor.fetchall()
+        batches = []
+        for r in rows:
+            batches.append({
+                "id": r[0],
+                "teacher_id": r[1],
+                "teacher_name": r[2] or "Giảng viên",
+                "batch_name": r[3],
+                "total_files": int(r[4] or 0),
+                "high_risk_count": int(r[5] or 0),
+                "moderate_risk_count": int(r[6] or 0),
+                "safe_count": int(r[7] or 0),
+                "bypass_count": int(r[8] or 0),
+                "avg_ai_probability": round(float(r[9] or 0.0), 4),
+                "created_at": r[10].strftime("%Y-%m-%d %H:%M:%S") if r[10] else "",
+            })
+        return batches
+
+
+def get_classroom_batch_detail(batch_id: int) -> Optional[Dict[str, Any]]:
+    """Lấy thông tin tổng quan đợt chấm kèm danh sách bài sinh viên xếp hạng rủi ro giảm dần."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT b.id, b.teacher_id, u.full_name as teacher_name, b.batch_name,
+                   b.total_files, b.high_risk_count, b.moderate_risk_count, b.safe_count,
+                   b.bypass_count, b.avg_ai_probability, b.created_at
+            FROM classroom_batches b
+            LEFT JOIN users u ON b.teacher_id = u.id
+            WHERE b.id = ?;
+        """, (batch_id,))
+        b = cursor.fetchone()
+        if not b:
+            return None
+
+        cursor.execute("""
+            SELECT id, title, student_label, language, label, ai_probability, human_probability,
+                   confidence, word_count, perplexity_score, burstiness_score,
+                   has_bypass_warning, authorship_tier, risk_level, inference_time_ms, created_at
+            FROM detection_history
+            WHERE batch_id = ?
+            ORDER BY has_bypass_warning DESC, ai_probability DESC, id ASC;
+        """, (batch_id,))
+        scan_rows = cursor.fetchall()
+        submissions = []
+        for s in scan_rows:
+            ai_prob = float(s[5] or 0.0)
+            has_bp = bool(s[11])
+            r_level = s[13] or ("high" if (ai_prob >= 0.75 or has_bp) else "moderate" if ai_prob >= 0.45 else "safe")
+            submissions.append({
+                "scan_id": s[0],
+                "title": s[1],
+                "student_label": s[2] or s[1],
+                "language": s[3] or "en",
+                "verdict": s[4],
+                "ai_probability": ai_prob,
+                "human_probability": float(s[6] or (1.0 - ai_prob)),
+                "confidence": s[7],
+                "word_count": int(s[8] or 0),
+                "perplexity_score": s[9],
+                "burstiness_score": s[10],
+                "has_bypass_warning": has_bp,
+                "authorship_tier": s[12] or "",
+                "risk_level": r_level,
+                "inference_time_ms": float(s[14] or 0.0),
+                "created_at": s[15].strftime("%Y-%m-%d %H:%M:%S") if s[15] else "",
+            })
+
+        return {
+            "id": b[0],
+            "teacher_id": b[1],
+            "teacher_name": b[2] or "Giảng viên",
+            "batch_name": b[3],
+            "total_files": int(b[4] or len(submissions)),
+            "high_risk_count": int(b[5] or 0),
+            "moderate_risk_count": int(b[6] or 0),
+            "safe_count": int(b[7] or 0),
+            "bypass_count": int(b[8] or 0),
+            "avg_ai_probability": round(float(b[9] or 0.0), 4),
+            "created_at": b[10].strftime("%Y-%m-%d %H:%M:%S") if b[10] else "",
+            "submissions": submissions,
+        }
+
+
+def delete_classroom_batch(batch_id: int) -> bool:
+    """Xóa một đợt chấm lớp học và gỡ liên kết batch_id khỏi bảng detection_history."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE detection_history SET batch_id = NULL WHERE batch_id = ?;", (batch_id,))
+        cursor.execute("DELETE FROM classroom_batches WHERE id = ?;", (batch_id,))
+        conn.commit()
+        return cursor.rowcount > 0
 
 
 # Tự động khởi tạo database khi import
