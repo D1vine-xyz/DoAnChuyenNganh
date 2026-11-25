@@ -262,6 +262,59 @@ class TestDetectionAPI(unittest.TestCase):
         )
         self.assertEqual(del_res.status_code, 200)
 
+    def test_12_forensics_bypass_filters_and_xai_pdf(self):
+        """Kiểm tra toàn luồng Giai đoạn 1: Anti-Bypass + Lọc Tài liệu tham khảo + XAI + Lưu SQL + Xuất PDF."""
+        poisoned_vi = (
+            "Trí\u200b tuệ\u200b nhân t\u0430o đóng v\u0430i trò then chốt trong bối cảnh hiện nay. "
+            "Không thể phủ nhận rằng các mô hình ngôn ngữ lớn mang lại nhiều lợi ích vượt trội. "
+            "Tóm lại, việc xây dựng hệ thống kiểm định là vô cùng cấp thiết.\n\n"
+            "Tài liệu tham khảo:\n"
+            "[1] Vaswani et al. (2017). Attention Is All You Need."
+        )
+        res = self.client.post("/api/v1/detect/web", json={
+            "text": poisoned_vi,
+            "threshold": 0.5,
+            "strictness_preset": "strict",
+            "filter_quotes": True,
+            "filter_references": True,
+            "title": "Test Phase 1 Bypass & XAI",
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+
+        # 1. Anti-Bypass phải bật cảnh báo
+        self.assertTrue(data["bypass_report"]["has_bypass_warning"])
+        self.assertGreaterEqual(data["bypass_report"]["zero_width_count"], 2)
+        self.assertGreaterEqual(data["bypass_report"]["homoglyph_count"], 2)
+
+        # 2. Bộ lọc học thuật phải cắt mục Tài liệu tham khảo
+        self.assertTrue(data["filter_report"]["references_stripped"])
+
+        # 3. Preset strict phải đặt threshold = 0.30
+        self.assertAlmostEqual(data["overall"]["threshold_used"], 0.30)
+
+        # 4. XAI metrics & 4-tier authorship phải đầy đủ
+        self.assertIn("burstiness_score", data["xai_metrics"])
+        self.assertIn("perplexity_score", data["xai_metrics"])
+        self.assertGreaterEqual(data["xai_metrics"]["ai_cliche_count"], 3)
+        self.assertIn(data["authorship_tier"]["code"], ("AI_PURE", "HYBRID_MIXED", "AI_ASSISTED", "HUMAN_PURE"))
+
+        # 5. Đọc lại từ SQL Server và xuất PDF có chứa XAI + Anti-Bypass
+        scan_id = data["scan_id"]
+        detail = self.client.get(f"/api/v1/history/{scan_id}").json()
+        self.assertTrue(detail["has_bypass_warning"])
+        self.assertIsNotNone(detail["burstiness_score"])
+        self.assertIsNotNone(detail["perplexity_score"])
+        self.assertIsNotNone(detail["xai_metrics"])
+
+        pdf_res = self.client.get(f"/api/v1/report/pdf/{scan_id}")
+        self.assertEqual(pdf_res.status_code, 200)
+        self.assertEqual(pdf_res.headers.get("content-type"), "application/pdf")
+        self.assertGreater(len(pdf_res.content), 2000)
+
+        # Dọn bản ghi test
+        self.client.delete(f"/api/v1/history/{scan_id}")
+
 
 if __name__ == "__main__":
     unittest.main()

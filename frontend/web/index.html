@@ -122,6 +122,26 @@
           ></textarea>
         </div>
 
+        <!-- Academic Presets & Smart Filter Bar -->
+        <div class="academic-controls-bar">
+          <div class="preset-group">
+            <span class="controls-label">Chế độ chấm:</span>
+            <button type="button" class="preset-pill-btn" data-preset="strict" data-val="30" title="Khóa luận / Nghiên cứu: Ngưỡng 30% (Nghiêm ngặt)">🛡️ Khóa luận (30%)</button>
+            <button type="button" class="preset-pill-btn active" data-preset="balanced" data-val="50" title="Tiểu luận môn học: Ngưỡng 50% (Cân bằng)">⚖️ Tiểu luận (50%)</button>
+            <button type="button" class="preset-pill-btn" data-preset="lenient" data-val="70" title="Bài tập tham khảo: Ngưỡng 70% (Nới lỏng)">🔍 Tham khảo (70%)</button>
+          </div>
+          <div class="filter-toggles-group">
+            <label class="filter-checkbox-label" title="Tự động bỏ qua các đoạn trích dẫn nguyên văn dài (>= 8 từ) trong ngoặc kép để tránh chấm oan">
+              <input type="checkbox" id="chk-filter-quotes">
+              <span>Bỏ trích dẫn "..."</span>
+            </label>
+            <label class="filter-checkbox-label" title="Tự động loại bỏ phần Tài liệu tham khảo / References ở cuối bài">
+              <input type="checkbox" id="chk-filter-references" checked>
+              <span>Bỏ Tài liệu tham khảo</span>
+            </label>
+          </div>
+        </div>
+
         <!-- Bottom bar inside card -->
         <div class="card-bottom-bar">
           <div class="bottom-left-actions">
@@ -137,6 +157,7 @@
             <button id="btn-sample-human" class="btn-text-only" type="button" title="Mẫu tiếng Anh do Người viết">👤 Mẫu Người (EN)</button>
             <button id="btn-sample-ai-vi" class="btn-text-only" type="button" title="Mẫu tiếng Việt do ChatGPT sinh">🇻🇳 Mẫu AI (VI)</button>
             <button id="btn-sample-human-vi" class="btn-text-only" type="button" title="Mẫu tiếng Việt báo chí chính thống">🇻🇳 Mẫu Người (VI)</button>
+            <button id="btn-sample-bypass" class="btn-text-only" type="button" title="Mẫu AI bị cài ký tự tàng hình Zero-Width & chữ Cyrillic giả mạo để thử Anti-Bypass">🕵️ Mẫu Lách Luật</button>
             <button id="btn-clear" class="btn-text-only text-danger" type="button">🗑️ Xóa</button>
           </div>
 
@@ -186,6 +207,29 @@
           </div>
         </div>
 
+        <!-- Anti-Bypass Alert Banner (Hidden unless anomalies found) -->
+        <div id="bypass-warning-banner" class="bypass-warning-banner hidden">
+          <div class="bypass-banner-head">
+            <span class="bypass-icon">🚨</span>
+            <strong id="bypass-banner-title">CẢNH BÁO TIỂU XẢO QUA MẶT AI (ANTI-BYPASS DETECTED)</strong>
+            <span id="bypass-risk-badge" class="bypass-risk-badge">HIGH</span>
+          </div>
+          <p id="bypass-banner-summary" class="bypass-banner-summary"></p>
+          <div id="bypass-samples-row" class="bypass-samples-row"></div>
+        </div>
+
+        <!-- Academic Filter Info Notice -->
+        <div id="filter-info-banner" class="filter-info-banner hidden">
+          <span>🧹</span>
+          <span id="filter-info-text"></span>
+        </div>
+
+        <!-- 4-Tier Authorship Classification Box -->
+        <div id="authorship-tier-box" class="authorship-tier-box hidden">
+          <span id="authorship-tier-badge" class="authorship-tier-badge">🤖 AI sinh toàn phần</span>
+          <span id="authorship-tier-reason" class="authorship-tier-reason"></span>
+        </div>
+
         <!-- Clean Metric Row -->
         <div class="clean-metrics-row">
           <div class="clean-metric-item">
@@ -204,6 +248,45 @@
             <span class="clean-metric-label">Ngữ cảnh Bao phủ</span>
             <span id="metric-coverage" class="clean-metric-val">1024 Tokens</span>
           </div>
+        </div>
+
+        <!-- Explainable AI (XAI) Linguistic Evidence Box -->
+        <div id="xai-evidence-box" class="xai-evidence-box hidden">
+          <div class="xai-header">
+            <span class="xai-title">🔬 Bằng Chứng Giải Thích Ngôn Ngữ Học (Explainable AI - XAI)</span>
+            <span class="xai-subtitle">Dành cho Giảng viên đối chứng minh bạch</span>
+          </div>
+          <div class="xai-grid">
+            <div class="xai-card">
+              <div class="xai-card-top">
+                <span class="xai-metric-name">Burstiness (Nhịp điệu câu)</span>
+                <span id="xai-burstiness-val" class="xai-metric-num">--/100</span>
+              </div>
+              <div class="xai-bar-track"><div id="xai-burstiness-bar" class="xai-bar-fill" style="width: 0%;"></div></div>
+              <span id="xai-burstiness-label" class="xai-metric-desc">--</span>
+            </div>
+            <div class="xai-card">
+              <div class="xai-card-top">
+                <span class="xai-metric-name">Perplexity Proxy (Độ bất ngờ)</span>
+                <span id="xai-perplexity-val" class="xai-metric-num">--/100</span>
+              </div>
+              <div class="xai-bar-track"><div id="xai-perplexity-bar" class="xai-bar-fill" style="width: 0%;"></div></div>
+              <span id="xai-perplexity-label" class="xai-metric-desc">--</span>
+            </div>
+            <div class="xai-card">
+              <div class="xai-card-top">
+                <span class="xai-metric-name">MATTR (Đa dạng từ vựng)</span>
+                <span id="xai-mattr-val" class="xai-metric-num">--%</span>
+              </div>
+              <div class="xai-bar-track"><div id="xai-mattr-bar" class="xai-bar-fill" style="width: 0%;"></div></div>
+              <span id="xai-mattr-label" class="xai-metric-desc">--</span>
+            </div>
+          </div>
+          <div id="xai-cliches-wrap" class="xai-cliches-wrap hidden">
+            <span class="xai-cliches-title">📌 Cụm từ khuôn mẫu đặc trưng LLM phát hiện:</span>
+            <div id="xai-cliches-row" class="xai-cliches-row"></div>
+          </div>
+          <ul id="xai-bullets-list" class="xai-bullets-list"></ul>
         </div>
 
         <!-- Ensemble / Model Breakdown -->

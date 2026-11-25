@@ -112,13 +112,18 @@ def init_db(force: bool = False):
             END;
         """)
 
-        # Bổ sung cột full_text và index tối ưu truy vấn nếu bảng đã tạo từ trước
-        cursor.execute("""
-            IF COL_LENGTH('detection_history', 'full_text') IS NULL
-            BEGIN
-                ALTER TABLE detection_history ADD full_text NVARCHAR(MAX) NULL;
-            END;
-        """)
+        # Bổ sung các cột nâng cấp (full_text, authorship_tier, xai_metrics) và index nếu bảng đã tạo từ trước
+        for col_name, col_def in [
+            ("full_text", "NVARCHAR(MAX) NULL"),
+            ("authorship_tier", "NVARCHAR(60) NULL"),
+            ("xai_metrics", "NVARCHAR(MAX) NULL"),
+        ]:
+            cursor.execute(f"""
+                IF COL_LENGTH('detection_history', '{col_name}') IS NULL
+                BEGIN
+                    ALTER TABLE detection_history ADD {col_name} {col_def};
+                END;
+            """)
         cursor.execute("""
             IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_detection_history_user_id' AND object_id = OBJECT_ID('detection_history'))
             BEGIN
@@ -288,11 +293,14 @@ def save_scan(
     burstiness_score: Optional[float] = None,
     has_bypass_warning: bool = False,
     bypass_details: Optional[str] = None,
+    authorship_tier: Optional[str] = None,
+    xai_metrics: Optional[Dict[str, Any]] = None,
 ) -> int:
     """Lưu trữ một lượt quét mới vào CSDL SQL Server gắn liền với tài khoản (nếu có)."""
     snippet = full_text[:180] + ("..." if len(full_text) > 180 else "")
     sentences_data_json = json.dumps(details_json.get("sentences", []), ensure_ascii=False)
     model_breakdown_json = json.dumps(details_json.get("model_breakdown", {}), ensure_ascii=False)
+    xai_metrics_json = json.dumps(xai_metrics, ensure_ascii=False) if xai_metrics else None
     sentence_count = len(details_json.get("sentences", []))
 
     with get_connection() as conn:
@@ -305,10 +313,11 @@ def save_scan(
                 model_breakdown, sentences_data,
                 perplexity_score, burstiness_score,
                 has_bypass_warning, bypass_details,
+                authorship_tier, xai_metrics,
                 inference_time_ms
             )
             OUTPUT INSERTED.id
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, (
             user_id,
             title or filename or "Văn bản không tên",
@@ -328,6 +337,8 @@ def save_scan(
             burstiness_score,
             1 if has_bypass_warning else 0,
             bypass_details,
+            authorship_tier,
+            xai_metrics_json,
             round(float(inference_time_ms), 2),
         ))
         inserted_id = cursor.fetchone()[0]
@@ -345,27 +356,23 @@ def get_history(limit: int = 50, offset: int = 0, user_id: Optional[int] = None,
     with get_connection() as conn:
         cursor = conn.cursor()
 
-        if role == "student" and user_id is not None:
-            query = """
+        select_cols = """
                 SELECT h.id, h.created_at, h.title, h.text_snippet, h.word_count, h.char_count,
                        h.ai_probability, h.label, h.confidence, h.inference_time_ms,
                        h.language, h.perplexity_score, h.burstiness_score, h.has_bypass_warning,
-                       u.full_name as author_name, u.role as author_role
+                       u.full_name as author_name, u.role as author_role, h.authorship_tier
                 FROM detection_history h
                 LEFT JOIN users u ON h.user_id = u.id
+        """
+        if role == "student" and user_id is not None:
+            query = select_cols + """
                 WHERE h.user_id = ?
                 ORDER BY h.id DESC
                 OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
             """
             cursor.execute(query, (user_id, offset, limit))
         else:
-            query = """
-                SELECT h.id, h.created_at, h.title, h.text_snippet, h.word_count, h.char_count,
-                       h.ai_probability, h.label, h.confidence, h.inference_time_ms,
-                       h.language, h.perplexity_score, h.burstiness_score, h.has_bypass_warning,
-                       u.full_name as author_name, u.role as author_role
-                FROM detection_history h
-                LEFT JOIN users u ON h.user_id = u.id
+            query = select_cols + """
                 ORDER BY h.id DESC
                 OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
             """
@@ -391,6 +398,7 @@ def get_history(limit: int = 50, offset: int = 0, user_id: Optional[int] = None,
                 "has_bypass_warning": bool(r[13]),
                 "author_name": r[14] or "Khách",
                 "author_role": r[15] or "guest",
+                "authorship_tier": r[16] or "",
             })
         return result
 
@@ -416,6 +424,8 @@ def get_scan_by_id(scan_id: int, user_id: Optional[int] = None, role: Optional[s
 
         sentences = []
         model_breakdown = {}
+        xai_metrics = None
+        bypass_report = None
         if row.sentences_data:
             try:
                 sentences = json.loads(row.sentences_data)
@@ -426,9 +436,21 @@ def get_scan_by_id(scan_id: int, user_id: Optional[int] = None, role: Optional[s
                 model_breakdown = json.loads(row.model_breakdown)
             except Exception:
                 model_breakdown = {}
+        raw_xai = getattr(row, "xai_metrics", None)
+        if raw_xai:
+            try:
+                xai_metrics = json.loads(raw_xai)
+            except Exception:
+                xai_metrics = None
+        if row.bypass_details:
+            try:
+                bypass_report = json.loads(row.bypass_details)
+            except Exception:
+                bypass_report = {"has_bypass_warning": bool(row.has_bypass_warning), "summary": str(row.bypass_details)}
 
         created_str = row.created_at.strftime("%Y-%m-%d %H:%M:%S") if row.created_at else ""
         full_text_val = getattr(row, "full_text", None) or row.text_snippet
+        authorship_tier_val = getattr(row, "authorship_tier", None)
 
         return {
             "id": row.id,
@@ -451,12 +473,17 @@ def get_scan_by_id(scan_id: int, user_id: Optional[int] = None, role: Optional[s
             "burstiness_score": row.burstiness_score,
             "has_bypass_warning": bool(row.has_bypass_warning),
             "bypass_details": row.bypass_details,
+            "bypass_report": bypass_report,
+            "authorship_tier": authorship_tier_val,
+            "xai_metrics": xai_metrics,
             "inference_time_ms": row.inference_time_ms,
             "timestamp": created_str,
             "created_at": created_str,
             "details": {
                 "sentences": sentences,
                 "model_breakdown": model_breakdown,
+                "xai_metrics": xai_metrics,
+                "bypass_report": bypass_report,
             }
         }
 

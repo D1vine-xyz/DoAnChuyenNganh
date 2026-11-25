@@ -14,6 +14,7 @@ Các tính năng hệ thống:
 
 import os
 import sys
+import json
 import time
 from typing import Dict, Any, List, Optional
 from contextlib import asynccontextmanager
@@ -28,6 +29,7 @@ from pydantic import BaseModel, Field
 from inference import AITextDetector
 import database as db
 import auth
+import text_forensics as tfx
 from auth import get_current_user, get_current_user_optional, require_role
 from file_parser import extract_text_from_file
 from pdf_report import generate_pdf_report
@@ -143,6 +145,12 @@ class DetectRequest(BaseModel):
         default=None,
         description="Tùy chọn chỉ định ngôn ngữ ('en' hoặc 'vi'). Mặc định None sẽ tự động nhận diện."
     )
+    strictness_preset: Optional[str] = Field(
+        default=None,
+        description="Chế độ ngưỡng theo mục đích: 'strict' (30%), 'balanced' (50%), 'lenient' (70%)."
+    )
+    filter_quotes: bool = Field(default=False, description="Bỏ qua trích dẫn nguyên văn trong ngoặc kép dài")
+    filter_references: bool = Field(default=False, description="Bỏ qua phần Tài liệu tham khảo / References cuối bài")
 
 
 class WebDetectRequest(BaseModel):
@@ -150,6 +158,9 @@ class WebDetectRequest(BaseModel):
     threshold: float = Field(default=0.5, ge=0.0, le=1.0)
     title: Optional[str] = Field(default=None, description="Tiêu đề hoặc tên tài liệu")
     language: Optional[str] = Field(default=None, description="Tùy chọn chỉ định ngôn ngữ ('en' hoặc 'vi')")
+    strictness_preset: Optional[str] = Field(default=None, description="Chế độ ngưỡng: strict / balanced / lenient")
+    filter_quotes: bool = Field(default=False, description="Bỏ qua trích dẫn trong ngoặc kép dài")
+    filter_references: bool = Field(default=False, description="Bỏ qua phần Tài liệu tham khảo cuối bài")
 
 
 class SentenceAnalysisRequest(BaseModel):
@@ -161,6 +172,9 @@ class SentenceAnalysisRequest(BaseModel):
     threshold: float = Field(default=0.5, ge=0.0, le=1.0)
     title: Optional[str] = Field(default=None, description="Tiêu đề tùy chọn cho lượt quét")
     language: Optional[str] = Field(default=None, description="Tùy chọn chỉ định ngôn ngữ ('en' hoặc 'vi')")
+    strictness_preset: Optional[str] = Field(default=None, description="Chế độ ngưỡng: strict / balanced / lenient")
+    filter_quotes: bool = Field(default=False, description="Bỏ qua trích dẫn trong ngoặc kép dài")
+    filter_references: bool = Field(default=False, description="Bỏ qua phần Tài liệu tham khảo cuối bài")
 
 
 class BatchDetectRequest(BaseModel):
@@ -325,12 +339,27 @@ async def detect_text(req: DetectRequest):
         )
 
     try:
+        eff_threshold, preset_label = tfx.resolve_threshold(req.threshold, req.strictness_preset)
+        bypass_raw = tfx.detect_bypass_attempts(clean_text)
+        sanitized_text = bypass_raw["sanitized_text"] or clean_text
+        filter_raw = tfx.apply_academic_filters(
+            sanitized_text,
+            filter_quotes=req.filter_quotes,
+            filter_references=req.filter_references,
+        )
+        eval_text = filter_raw["filtered_text"] or sanitized_text
+
         result = detector_instance.predict(
-            text=clean_text,
-            threshold=req.threshold,
+            text=eval_text,
+            threshold=eff_threshold,
             detailed=req.detailed,
             force_language=req.language,
         )
+        xai_metrics = tfx.analyze_linguistic_xai(eval_text, language=result.get("language", "en"))
+        result["preset_used"] = preset_label
+        result["bypass_report"] = {k: v for k, v in bypass_raw.items() if k != "sanitized_text"}
+        result["filter_report"] = {k: v for k, v in filter_raw.items() if k != "filtered_text"}
+        result["xai_metrics"] = xai_metrics
         return JSONResponse(status_code=status.HTTP_200_OK, content=result)
     except Exception as e:
         raise HTTPException(
@@ -348,21 +377,54 @@ def _execute_full_analysis_and_save(
     title: Optional[str] = None,
     filename: Optional[str] = None,
     language: Optional[str] = None,
+    strictness_preset: Optional[str] = None,
+    filter_quotes: bool = False,
+    filter_references: bool = False,
     current_user: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Helper dùng chung để suy luận tổng thể, bóc tách từng câu và lưu lịch sử vào SQL Server."""
+    """
+    Helper dùng chung: Tiền kiểm Anti-Bypass -> Lọc học thuật -> Suy luận Song ngữ (AI + Cấp câu)
+    -> Phân tích bằng chứng XAI -> Phân loại 4 cấp độ -> Lưu SQL Server VeriTextAI.
+    """
     t0 = time.time()
+
+    # 1. Ngưỡng & Tiền kiểm tra Anti-Bypass (phát hiện + khôi phục văn bản sạch)
+    eff_threshold, preset_label = tfx.resolve_threshold(threshold, strictness_preset)
+    bypass_raw = tfx.detect_bypass_attempts(clean_text)
+    sanitized_text = bypass_raw["sanitized_text"] or clean_text
+
+    # 2. Bộ lọc học thuật (bỏ trích dẫn / tài liệu tham khảo nếu giảng viên bật)
+    filter_raw = tfx.apply_academic_filters(
+        sanitized_text,
+        filter_quotes=filter_quotes,
+        filter_references=filter_references,
+    )
+    eval_text = filter_raw["filtered_text"] or sanitized_text
+
+    # 3. Suy luận AI tổng thể & cấp câu trên văn bản đã làm sạch
     overall_pred = detector_instance.predict(
-        clean_text,
-        threshold=threshold,
+        eval_text,
+        threshold=eff_threshold,
         detailed=True,
         force_language=language,
     )
     sentences = detector_instance.analyze_sentences(
-        clean_text,
-        threshold=threshold,
+        eval_text,
+        threshold=eff_threshold,
         force_language=language,
     )
+
+    # 4. Phân tích bằng chứng ngôn ngữ học (XAI) & phân loại 4 mức can thiệp
+    detected_lang = overall_pred.get("language", "en")
+    xai_metrics = tfx.analyze_linguistic_xai(eval_text, language=detected_lang)
+    authorship_tier = tfx.classify_authorship_tier(
+        overall_ai_prob=overall_pred["ai_probability"],
+        sentences=sentences,
+        threshold=eff_threshold,
+        has_bypass_warning=bypass_raw["has_bypass_warning"],
+        xai_metrics=xai_metrics,
+    )
+
     total_time_ms = round((time.time() - t0) * 1000, 2)
 
     red_count = sum(1 for s in sentences if s["highlight_color"] == "red")
@@ -374,14 +436,17 @@ def _execute_full_analysis_and_save(
     score_roberta = float(ind_models.get("roberta", {}).get("probability", overall_pred["ai_probability"]))
     score_longformer = float(ind_models.get("longformer", {}).get("probability", overall_pred["ai_probability"]))
 
-    auto_title = title or (f"Tài liệu: {filename}" if filename else clean_text[:45] + ("..." if len(clean_text) > 45 else ""))
+    bypass_public = {k: v for k, v in bypass_raw.items() if k != "sanitized_text"}
+    filter_public = {k: v for k, v in filter_raw.items() if k != "filtered_text"}
+
+    auto_title = title or (f"Tài liệu: {filename}" if filename else sanitized_text[:45] + ("..." if len(sanitized_text) > 45 else ""))
 
     scan_id = db.save_scan(
         title=auto_title,
         filename=filename,
         full_text=clean_text,
-        word_count=len(clean_text.split()),
-        char_count=len(clean_text),
+        word_count=len(eval_text.split()),
+        char_count=len(eval_text),
         ai_probability=overall_pred["ai_probability"],
         verdict=overall_pred["label"],
         confidence=overall_pred["confidence"],
@@ -390,19 +455,35 @@ def _execute_full_analysis_and_save(
         score_roberta=score_roberta,
         score_longformer=score_longformer,
         details_json={
-            "language": overall_pred.get("language", "en"),
+            "language": detected_lang,
             "language_label": overall_pred.get("language_label", "Tiếng Anh"),
             "detected_model": overall_pred.get("detected_model", ""),
             "sentences": sentences,
             "model_breakdown": overall_pred.get("model_breakdown"),
+            "xai_metrics": xai_metrics,
+            "bypass_report": bypass_public,
+            "filter_report": filter_public,
+            "authorship_tier": authorship_tier,
         },
         user_id=current_user["id"] if current_user else None,
-        language=overall_pred.get("language", "en"),
+        language=detected_lang,
+        perplexity_score=xai_metrics.get("perplexity_score"),
+        burstiness_score=xai_metrics.get("burstiness_score"),
+        has_bypass_warning=bypass_public["has_bypass_warning"],
+        bypass_details=json.dumps(bypass_public, ensure_ascii=False) if bypass_public["has_bypass_warning"] else None,
+        authorship_tier=authorship_tier["code"],
+        xai_metrics=xai_metrics,
     )
+
+    overall_pred["preset_used"] = preset_label
 
     return {
         "scan_id": scan_id,
         "overall": overall_pred,
+        "authorship_tier": authorship_tier,
+        "bypass_report": bypass_public,
+        "filter_report": filter_public,
+        "xai_metrics": xai_metrics,
         "sentence_summary": {
             "total_sentences": len(sentences),
             "ai_hotspots_red": red_count,
@@ -420,10 +501,7 @@ async def detect_sentences(
     current_user: Optional[Dict[str, Any]] = Depends(auth.get_current_user_optional),
 ):
     """
-    Phân tích diễn giải cấp câu (AI Hotspots) phục vụ Chrome Extension & Web Dashboard:
-    Bóc tách đoạn văn bản thành từng câu độc lập, tính toán xác suất AI
-    và gán nhãn màu cảnh báo (🟢 Xanh: Người viết, 🟡 Vàng: Nghi vấn, 🔴 Đỏ: Chắc chắn AI).
-    Hỗ trợ tự động nhận diện Song ngữ Anh - Việt.
+    Phân tích diễn giải cấp câu (AI Hotspots) + Anti-Bypass + XAI phục vụ Chrome Extension & Web Dashboard.
     """
     if detector_instance is None:
         raise HTTPException(
@@ -444,6 +522,9 @@ async def detect_sentences(
             threshold=req.threshold,
             title=req.title,
             language=req.language,
+            strictness_preset=req.strictness_preset,
+            filter_quotes=req.filter_quotes,
+            filter_references=req.filter_references,
             current_user=current_user,
         )
     except Exception as e:
@@ -459,8 +540,8 @@ async def detect_web(
     current_user: Optional[Dict[str, Any]] = Depends(auth.get_current_user_optional),
 ):
     """
-    Endpoint tối ưu cho Web Dashboard: Phân tích toàn diện cả đoạn văn và từng câu,
-    tự động lưu vào CSDL và trả về ID để hỗ trợ xuất báo cáo PDF.
+    Endpoint tối ưu cho Web Dashboard: Phân tích toàn diện cả đoạn văn, từng câu,
+    Anti-Bypass, Bộ lọc học thuật, XAI và lưu lịch sử vào SQL Server.
     """
     return await detect_sentences(
         SentenceAnalysisRequest(
@@ -468,6 +549,9 @@ async def detect_web(
             threshold=req.threshold,
             title=req.title,
             language=req.language,
+            strictness_preset=req.strictness_preset,
+            filter_quotes=req.filter_quotes,
+            filter_references=req.filter_references,
         ),
         current_user=current_user,
     )
@@ -477,12 +561,15 @@ async def detect_web(
 async def detect_uploaded_file(
     file: UploadFile = File(...),
     threshold: float = Form(0.5),
+    strictness_preset: Optional[str] = Form(None),
+    filter_quotes: bool = Form(False),
+    filter_references: bool = Form(False),
     current_user: Optional[Dict[str, Any]] = Depends(auth.get_current_user_optional),
 ):
     """
     Tiếp nhận tệp tin tải lên (.PDF, .DOCX, .DOC, .TXT):
-    Tự động trích xuất văn bản sạch, tiến hành phân tích Ensemble PLMs / PhoBERT
-    và lưu trữ lịch sử thẩm định kèm tên tệp gốc.
+    Tự động trích xuất văn bản sạch, kiểm tra Anti-Bypass, lọc trích dẫn/tài liệu tham khảo,
+    suy luận AI + XAI và lưu lịch sử thẩm định kèm tên tệp gốc.
     """
     if detector_instance is None:
         raise HTTPException(
@@ -520,6 +607,9 @@ async def detect_uploaded_file(
         clean_text=extracted_text,
         threshold=threshold,
         filename=file.filename,
+        strictness_preset=strictness_preset,
+        filter_quotes=filter_quotes,
+        filter_references=filter_references,
         current_user=current_user,
     )
     res["filename"] = file.filename

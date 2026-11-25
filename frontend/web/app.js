@@ -65,8 +65,42 @@ const btnSampleAi = document.getElementById("btn-sample-ai");
 const btnSampleHuman = document.getElementById("btn-sample-human");
 const btnSampleAiVi = document.getElementById("btn-sample-ai-vi");
 const btnSampleHumanVi = document.getElementById("btn-sample-human-vi");
+const btnSampleBypass = document.getElementById("btn-sample-bypass");
 const btnExportPdf = document.getElementById("btn-export-pdf");
 const resultActions = document.getElementById("result-actions");
+
+// DOM Elements - Academic Presets & Smart Filters
+const presetBtns = document.querySelectorAll(".preset-pill-btn");
+const chkFilterQuotes = document.getElementById("chk-filter-quotes");
+const chkFilterReferences = document.getElementById("chk-filter-references");
+let currentStrictnessPreset = "balanced";
+
+// DOM Elements - Forensics, Anti-Bypass, Authorship Tier & XAI
+const bypassWarningBanner = document.getElementById("bypass-warning-banner");
+const bypassRiskBadge = document.getElementById("bypass-risk-badge");
+const bypassBannerSummary = document.getElementById("bypass-banner-summary");
+const bypassSamplesRow = document.getElementById("bypass-samples-row");
+
+const filterInfoBanner = document.getElementById("filter-info-banner");
+const filterInfoText = document.getElementById("filter-info-text");
+
+const authorshipTierBox = document.getElementById("authorship-tier-box");
+const authorshipTierBadge = document.getElementById("authorship-tier-badge");
+const authorshipTierReason = document.getElementById("authorship-tier-reason");
+
+const xaiEvidenceBox = document.getElementById("xai-evidence-box");
+const xaiBurstinessVal = document.getElementById("xai-burstiness-val");
+const xaiBurstinessBar = document.getElementById("xai-burstiness-bar");
+const xaiBurstinessLabel = document.getElementById("xai-burstiness-label");
+const xaiPerplexityVal = document.getElementById("xai-perplexity-val");
+const xaiPerplexityBar = document.getElementById("xai-perplexity-bar");
+const xaiPerplexityLabel = document.getElementById("xai-perplexity-label");
+const xaiMattrVal = document.getElementById("xai-mattr-val");
+const xaiMattrBar = document.getElementById("xai-mattr-bar");
+const xaiMattrLabel = document.getElementById("xai-mattr-label");
+const xaiClichesWrap = document.getElementById("xai-cliches-wrap");
+const xaiClichesRow = document.getElementById("xai-cliches-row");
+const xaiBulletsList = document.getElementById("xai-bullets-list");
 
 // DOM Elements - Results
 const resultPlaceholder = document.getElementById("result-placeholder");
@@ -257,7 +291,25 @@ function updateTextCounts() {
 }
 
 thresholdRange.addEventListener("input", () => {
-  thresholdVal.textContent = `${thresholdRange.value}%`;
+  const val = parseInt(thresholdRange.value, 10);
+  thresholdVal.textContent = `${val}%`;
+  currentStrictnessPreset = null;
+  presetBtns.forEach((b) => {
+    const match = parseInt(b.dataset.val, 10) === val;
+    b.classList.toggle("active", match);
+    if (match) currentStrictnessPreset = b.dataset.preset;
+  });
+});
+
+presetBtns.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const val = btn.dataset.val;
+    currentStrictnessPreset = btn.dataset.preset;
+    thresholdRange.value = val;
+    thresholdVal.textContent = `${val}%`;
+    presetBtns.forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+  });
 });
 
 // File upload button
@@ -396,6 +448,22 @@ if (btnSampleHumanVi) {
   });
 }
 
+if (btnSampleBypass) {
+  btnSampleBypass.addEventListener("click", () => {
+    // Mẫu AI bị cài ký tự tàng hình Zero-Width (\u200b) + chữ Cyrillic giả Latin (\u0430, \u0435, \u043e) + mục Tài liệu tham khảo
+    textInput.value = (
+      "Trí\u200b tuệ\u200b nhân\u200b t\u0430o (AI) đóng v\u0430i trò then chốt tr\u043eng bối c\u0430nh chuyển đổi số hiện n\u0430y. "
+      + "Không thể phủ nhận rằng các mô hình ngôn ngữ lớn m\u0430ng lại nhiều lợi ích vượt trội ch\u043e giáo dục đại học. "
+      + "Bên cạnh đó, việc ứng dụng công\u200b nghệ\u200b này cũng đặt r\u0430 nhiều thách thức đối với tính trung thực học thuật. "
+      + "Tóm lại, xây dựng hệ thống kiểm định minh bạch là một hướng đi vô cùng cấp thiết.\n\n"
+      + "Tài liệu tham khảo:\n"
+      + "[1] Vaswani et al. (2017). Attention Is All You Need. NeurIPS.\n"
+      + "[2] Nguyen & Nguyen (2020). PhoBERT: Pre-trained language models for Vietnamese."
+    );
+    updateTextCounts();
+  });
+}
+
 
 // ==============================================================================
 // 3. THỰC HIỆN THẨM ĐỊNH (SUBMIT ANALYSIS)
@@ -403,6 +471,8 @@ if (btnSampleHumanVi) {
 
 btnSubmit.addEventListener("click", async () => {
   const threshold = parseFloat(thresholdRange.value) / 100;
+  const filterQuotes = chkFilterQuotes ? chkFilterQuotes.checked : false;
+  const filterReferences = chkFilterReferences ? chkFilterReferences.checked : false;
 
   // Trường hợp 1: Có file đính kèm
   if (currentUploadedFile) {
@@ -410,6 +480,11 @@ btnSubmit.addEventListener("click", async () => {
     const formData = new FormData();
     formData.append("file", currentUploadedFile);
     formData.append("threshold", threshold);
+    if (currentStrictnessPreset) {
+      formData.append("strictness_preset", currentStrictnessPreset);
+    }
+    formData.append("filter_quotes", filterQuotes);
+    formData.append("filter_references", filterReferences);
 
     try {
       const res = await fetch(`${API_BASE}/api/v1/detect/upload`, {
@@ -468,6 +543,9 @@ btnSubmit.addEventListener("click", async () => {
         text: rawText,
         threshold: threshold,
         title: rawText.slice(0, 35) + "...",
+        strictness_preset: currentStrictnessPreset,
+        filter_quotes: filterQuotes,
+        filter_references: filterReferences,
       }),
     });
 
@@ -545,6 +623,9 @@ function renderResults(data) {
     metricCoverage.textContent = overall.text_stats.context_coverage || (isVi ? "256 Tokens (Full)" : "1024 Tokens");
   }
 
+  // 2b. Anti-Bypass Alert, Academic Filter Notice, 4-Tier Authorship & XAI Evidence
+  renderForensicsAndXai(data);
+
   // 3. Model Breakdown
   if (modelsBoxTitle) {
     modelsBoxTitle.textContent = isVi
@@ -595,6 +676,111 @@ function renderResults(data) {
 
   // Smooth scroll into view
   resultContent.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function renderForensicsAndXai(data) {
+  // 1. Anti-Bypass Warning Banner
+  const bypass = data.bypass_report;
+  if (bypassWarningBanner) {
+    if (bypass && bypass.has_bypass_warning) {
+      bypassWarningBanner.classList.remove("hidden");
+      if (bypassRiskBadge) bypassRiskBadge.textContent = `RỦI RO ${bypass.risk_level || "HIGH"}`;
+      if (bypassBannerSummary) bypassBannerSummary.textContent = bypass.summary || "";
+      if (bypassSamplesRow) {
+        bypassSamplesRow.innerHTML = "";
+        (bypass.flagged_samples || []).forEach((s) => {
+          const chip = document.createElement("span");
+          chip.className = "bypass-sample-chip";
+          chip.textContent = s;
+          bypassSamplesRow.appendChild(chip);
+        });
+      }
+    } else {
+      bypassWarningBanner.classList.add("hidden");
+    }
+  }
+
+  // 2. Academic Filter Notice
+  const flt = data.filter_report;
+  if (filterInfoBanner) {
+    if (flt && flt.filter_applied && flt.filter_summary) {
+      filterInfoBanner.classList.remove("hidden");
+      if (filterInfoText) filterInfoText.textContent = flt.filter_summary;
+    } else {
+      filterInfoBanner.classList.add("hidden");
+    }
+  }
+
+  // 3. 4-Tier Authorship Box
+  const tier = data.authorship_tier;
+  if (authorshipTierBox) {
+    if (tier && typeof tier === "object" && tier.label_vi) {
+      authorshipTierBox.classList.remove("hidden");
+      if (authorshipTierBadge) {
+        authorshipTierBadge.textContent = tier.label_vi;
+        authorshipTierBadge.className = `authorship-tier-badge ${tier.badge_class || "tier-assisted"}`;
+      }
+      if (authorshipTierReason) authorshipTierReason.textContent = tier.reason || "";
+    } else {
+      authorshipTierBox.classList.add("hidden");
+    }
+  }
+
+  // 4. Explainable AI (XAI) Evidence Panel
+  const xai = data.xai_metrics;
+  if (xaiEvidenceBox) {
+    if (xai && typeof xai === "object" && xai.burstiness_score !== undefined) {
+      xaiEvidenceBox.classList.remove("hidden");
+      const setBar = (el, val) => {
+        if (!el) return;
+        const pct = Math.max(4, Math.min(100, Number(val) || 0));
+        el.style.width = `${pct}%`;
+        el.className = "xai-bar-fill " + (pct < 38 ? "bar-low" : pct < 62 ? "bar-mid" : "bar-high");
+      };
+
+      if (xaiBurstinessVal) xaiBurstinessVal.textContent = `${xai.burstiness_score}/100`;
+      setBar(xaiBurstinessBar, xai.burstiness_score);
+      if (xaiBurstinessLabel) xaiBurstinessLabel.textContent = xai.burstiness_label || "";
+
+      if (xaiPerplexityVal) xaiPerplexityVal.textContent = `${xai.perplexity_score}/100`;
+      setBar(xaiPerplexityBar, xai.perplexity_score);
+      if (xaiPerplexityLabel) xaiPerplexityLabel.textContent = xai.perplexity_label || "";
+
+      if (xaiMattrVal) xaiMattrVal.textContent = `${xai.lexical_diversity}%`;
+      setBar(xaiMattrBar, xai.lexical_diversity);
+      if (xaiMattrLabel) {
+        const st = xai.sentence_stats || {};
+        xaiMattrLabel.textContent = `TB ${st.avg_length || 0} từ/câu (±${st.std_length || 0} từ)`;
+      }
+
+      if (xaiClichesWrap && xaiClichesRow) {
+        const cliches = xai.ai_cliches || [];
+        if (cliches.length > 0) {
+          xaiClichesWrap.classList.remove("hidden");
+          xaiClichesRow.innerHTML = "";
+          cliches.forEach((c) => {
+            const chip = document.createElement("span");
+            chip.className = "xai-cliche-chip";
+            chip.textContent = `"${c.phrase}" ×${c.count}`;
+            xaiClichesRow.appendChild(chip);
+          });
+        } else {
+          xaiClichesWrap.classList.add("hidden");
+        }
+      }
+
+      if (xaiBulletsList) {
+        xaiBulletsList.innerHTML = "";
+        (xai.explanation_bullets || []).forEach((b) => {
+          const li = document.createElement("li");
+          li.textContent = b;
+          xaiBulletsList.appendChild(li);
+        });
+      }
+    } else {
+      xaiEvidenceBox.classList.add("hidden");
+    }
+  }
 }
 
 function renderSentences(sentences) {
@@ -710,12 +896,13 @@ function renderHistoryTable(items, user) {
     const badgeText = isAi ? "🤖 AI-Generated" : "👤 Human";
 
     const langBadge = item.language === "vi" ? "🇻🇳 VI" : "🇬🇧 EN";
+    const bypassTag = item.has_bypass_warning ? `<span class="badge-bypass-table" title="Phát hiện ký tự ẩn / Cyrillic giả mạo">⚠️ Bypass</span>` : "";
 
     tr.innerHTML = `
       <td><b>#${item.id}</b></td>
       <td style="color: var(--text-secondary); font-size: 12px;">${item.timestamp}</td>
       <td>
-        <b>${escapeHtml(item.title || item.filename || "Văn bản")}</b>
+        <b>${escapeHtml(item.title || item.filename || "Văn bản")}</b>${bypassTag}
         <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
           ${langBadge} • 👤 Người nộp: <b>${escapeHtml(item.author_name || "Khách")}</b>
         </div>
@@ -752,7 +939,7 @@ window.viewHistoryItem = async function(id) {
       const resolvedLabel = data.label || data.verdict;
       const isVi = data.language === "vi";
 
-      // Render lại kết quả trên tab inspect
+      // Render lại kết quả trên tab inspect (bao gồm XAI & Anti-Bypass nếu có)
       renderResults({
         scan_id: id,
         overall: {
@@ -769,6 +956,8 @@ window.viewHistoryItem = async function(id) {
             context_coverage: isVi ? "256 Tokens (PhoBERT)" : "1024 Tokens",
           },
         },
+        bypass_report: data.bypass_report || (data.details ? data.details.bypass_report : null),
+        xai_metrics: data.xai_metrics || (data.details ? data.details.xai_metrics : null),
         sentences: data.details ? data.details.sentences : [],
         total_processing_time_ms: data.inference_time_ms,
       });

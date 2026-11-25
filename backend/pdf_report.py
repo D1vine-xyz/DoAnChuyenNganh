@@ -248,7 +248,83 @@ def generate_pdf_report(scan_data: Dict[str, Any]) -> bytes:
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
     ]))
     story.append(verdict_table)
-    story.append(Spacer(1, 14))
+    story.append(Spacer(1, 10))
+
+    # 3b. Khung Cảnh báo Gian lận Kỹ thuật (Anti-Bypass Alert) nếu phát hiện
+    has_bypass = bool(scan_data.get("has_bypass_warning"))
+    bypass_report = scan_data.get("bypass_report") or scan_data.get("details", {}).get("bypass_report") or {}
+    if has_bypass or bypass_report.get("has_bypass_warning"):
+        bypass_summary = xml_escape(str(bypass_report.get("summary") or "Phát hiện dấu hiệu chèn ký tự ẩn hoặc ký tự đồng hình nhằm qua mặt bộ lọc AI."))
+        flagged = bypass_report.get("flagged_samples") or []
+        flagged_str = f"<br/><b>Từ nghi vấn bị can thiệp:</b> {xml_escape(', '.join(flagged[:6]))}" if flagged else ""
+        bypass_alert_table = Table(
+            [[Paragraph(f"<b>⚠ CẢNH BÁO TIỂU XẢO QUA MẶT AI (ANTI-BYPASS ALERT)</b><br/>{bypass_summary}{flagged_str}", body_style)]],
+            colWidths=[515],
+        )
+        bypass_alert_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#FFF7ED")),
+            ("BOX", (0, 0), (-1, -1), 1.2, colors.HexColor("#EA580C")),
+            ("TOPPADDING", (0, 0), (-1, -1), 7),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ("LEFTPADDING", (0, 0), (-1, -1), 10),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ]))
+        story.append(bypass_alert_table)
+        story.append(Spacer(1, 10))
+
+    # 3c. Bảng Bằng Chứng Giải Thích Ngôn Ngữ Học (Explainable AI - XAI)
+    xai = scan_data.get("xai_metrics") or scan_data.get("details", {}).get("xai_metrics")
+    if isinstance(xai, dict) and xai.get("burstiness_score") is not None:
+        story.append(Paragraph("🔬 <b>Bằng Chứng Giải Thích Ngôn Ngữ Học (Explainable AI - XAI)</b>", section_heading))
+        b_score = xai.get("burstiness_score", 0.0)
+        p_score = xai.get("perplexity_score", 0.0)
+        lex_score = xai.get("lexical_diversity", 0.0)
+        cliches = xai.get("ai_cliches") or []
+        cliche_text = ", ".join(f'"{c["phrase"]}" (x{c["count"]})' for c in cliches[:6]) if cliches else "Không phát hiện cụm từ văn mẫu AI"
+
+        xai_rows = [
+            [
+                Paragraph("<b>Chỉ số ngôn ngữ học</b>", body_bold),
+                Paragraph("<b>Điểm số</b>", body_bold),
+                Paragraph("<b>Diễn giải chuyên môn (Đối chứng)</b>", body_bold),
+            ],
+            [
+                Paragraph("<b>Burstiness</b> (Độ biến thiên nhịp câu)", body_style),
+                Paragraph(f"<b>{b_score}/100</b>", body_style),
+                Paragraph(xml_escape(str(xai.get("burstiness_label", ""))), body_style),
+            ],
+            [
+                Paragraph("<b>Perplexity Proxy</b> (Độ bất ngờ)", body_style),
+                Paragraph(f"<b>{p_score}/100</b>", body_style),
+                Paragraph(xml_escape(str(xai.get("perplexity_label", ""))), body_style),
+            ],
+            [
+                Paragraph("<b>MATTR</b> (Độ đa dạng từ vựng)", body_style),
+                Paragraph(f"<b>{lex_score}%</b>", body_style),
+                Paragraph(f"TB {xai.get('sentence_stats', {}).get('avg_length', 0)} từ/câu (Độ lệch chuẩn ±{xai.get('sentence_stats', {}).get('std_length', 0)})", body_style),
+            ],
+            [
+                Paragraph("<b>Cụm từ mẫu AI</b> (LLM Clichés)", body_style),
+                Paragraph(f"<b>{xai.get('ai_cliche_count', 0)} lượt</b>", body_style),
+                Paragraph(xml_escape(cliche_text), body_style),
+            ],
+        ]
+        xai_table = Table(xai_rows, colWidths=[175, 70, 270])
+        xai_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E293B")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#94A3B8")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#CBD5E1")),
+            ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#F8FAFC")),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story.append(xai_table)
+        story.append(Spacer(1, 12))
+    else:
+        story.append(Spacer(1, 4))
 
     # 4. Bảng phân rã điểm số các mô hình thành phần (Ensemble Decomposition)
     story.append(Paragraph("📊 <b>Đóng Góp Của Mô Hình Đánh Giá (Model Breakdown)</b>", section_heading))
