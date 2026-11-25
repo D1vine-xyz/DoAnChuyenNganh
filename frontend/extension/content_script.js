@@ -10,6 +10,12 @@ let tooltipModal = null;
 let lastSelectedText = "";
 let lastSelectionRange = null;
 
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = String(str ?? "");
+  return div.innerHTML;
+}
+
 // ==============================================================================
 // 1. TẠO VÀ QUẢN LÝ CÁC PHẦN TỬ GIAO DIỆN NỔI (FLOATING UI)
 // ==============================================================================
@@ -101,7 +107,7 @@ async function triggerDetection(text) {
     </div>
     <div class="ai-detect-loading">
       <div class="ai-detect-spinner"></div>
-      <span>Đang phân tích xác suất qua BERT, RoBERTa, Longformer...</span>
+      <span>Đang phân tích văn bản qua PhoBERT / Ensemble PLMs...</span>
     </div>
   `;
   modal.classList.remove("hidden");
@@ -130,7 +136,7 @@ async function triggerDetection(text) {
         <button class="ai-detect-close-btn" id="ai-detect-close">&times;</button>
       </div>
       <div class="ai-detect-error-body">
-        <p>${err.message}</p>
+        <p>${escapeHtml(err.message)}</p>
         <small>Kiểm tra Backend FastAPI tại: <code>http://localhost:8000</code></small>
       </div>
     `;
@@ -163,19 +169,21 @@ function renderModalResults(data) {
   if (data.sentences && data.sentences.length > 0) {
     sentencesHtml = data.sentences.map((s) => {
       return `
-        <div class="ai-detect-sentence-row ${s.highlight_color}">
-          <span class="ai-detect-tag">[${s.ai_percentage} AI]</span>
-          <span>${s.sentence}</span>
+        <div class="ai-detect-sentence-row ${escapeHtml(s.highlight_color)}">
+          <span class="ai-detect-tag">[${escapeHtml(s.ai_percentage)} AI]</span>
+          <span>${escapeHtml(s.sentence)}</span>
         </div>
       `;
     }).join("");
   }
 
+  const langTag = data.overall.language === "vi" ? "🇻🇳 Tiếng Việt (PhoBERT)" : "🇬🇧 Tiếng Anh (Ensemble PLMs)";
+
   modal.innerHTML = `
     <div class="ai-detect-modal-header">
       <div class="ai-detect-brand">
         <span class="ai-detect-icon">🛡️</span>
-        <strong>Kết Quả Phân Tích AI</strong>
+        <strong>Kết Quả Phân Tích AI • ${langTag}</strong>
       </div>
       <button class="ai-detect-close-btn" id="ai-detect-close">&times;</button>
     </div>
@@ -188,8 +196,8 @@ function renderModalResults(data) {
       </div>
 
       <div class="ai-detect-meta">
-        <span>Độ tin cậy: <b>${data.overall.confidence}</b></span>
-        <span>Thời gian: <b>${data.total_processing_time_ms} ms</b></span>
+        <span>Độ tin cậy: <b>${escapeHtml(data.overall.confidence)}</b></span>
+        <span>Thời gian: <b>${escapeHtml(data.total_processing_time_ms)} ms</b></span>
       </div>
 
       <!-- Hotspots -->

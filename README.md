@@ -1,8 +1,8 @@
 # Nghiên cứu Phát hiện Văn bản do LLM sinh sử dụng Mô hình kết hợp Song ngữ (Ensemble PLMs & PhoBERT)
 
-Đồ án chuyên ngành (Chủ đề 6) nghiên cứu và xây dựng hệ thống phát hiện văn bản do các Mô hình Ngôn ngữ Lớn (LLMs như ChatGPT, Gemini) tạo ra, hỗ trợ **Song ngữ Anh - Việt** với kiến trúc Định tuyến Thông minh (Dynamic Language Router):
-- **Tuyến Tiếng Anh**: Kỹ thuật học kết hợp (Ensemble Learning) từ 3 mô hình tiền huấn luyện lớn: **Longformer (1024 tokens)**, **BERT** và **RoBERTa** (Đạt độ chính xác **96.52%**).
-- **Tuyến Tiếng Việt**: Mô hình bản địa hóa chuyên sâu **PhoBERT base v2** (VinAI) kết hợp thuật toán bóc tách từ ghép **PyVi** (Đạt độ chính xác nhãn AI **81.58%**).
+Đồ án chuyên ngành (Chủ đề 6) nghiên cứu và xây dựng hệ thống phát hiện văn bản do các Mô hình Ngôn ngữ Lớn (LLMs như ChatGPT, Gemini) tạo ra, hỗ trợ **Song ngữ Anh - Việt** với kiến trúc Định tuyến Thông minh (Dynamic Language Router), CSDL **Microsoft SQL Server 2022 (`VeriTextAI`)** và **Phân quyền RBAC (JWT + Bcrypt)**:
+- **Tuyến Tiếng Anh**: Kỹ thuật học kết hợp (Ensemble Learning) từ 3 mô hình tiền huấn luyện lớn: **Longformer (1024 tokens)**, **BERT** và **RoBERTa** (Đạt độ chính xác **96.52%**, Precision **98.38%**).
+- **Tuyến Tiếng Việt**: Mô hình bản địa hóa chuyên sâu **PhoBERT base v2** (VinAI) kết hợp tách từ **PyVi** huấn luyện trên bộ dữ liệu **5.000 mẫu** (Đạt **Accuracy 98.93%**, **Recall 100.0%**, **F1-Score 98.94%**, **ROC-AUC 0.9998**).
 
 ---
 
@@ -31,7 +31,9 @@ DoAn/
 │   ├── create_vietnamese_dataset.py   # Script thu thập VnExpress & sinh dữ liệu AI bằng Gemini API
 │   ├── verify_phase4.py               # Kịch bản kiểm thử End-to-End toàn diện 6/6 kịch bản
 │   ├── ensemble.py                    # Pipeline tối ưu hóa trọng số học kết hợp (Nelder-Mead & Stacking)
-│   ├── database.py                    # Quản lý CSDL SQLite lưu trữ lịch sử quét & thống kê KPI
+│   ├── auth.py                        # Xác thực JWT & Phân quyền RBAC (Giảng viên / Sinh viên)
+│   ├── database.py                    # Quản lý CSDL Microsoft SQL Server 2022 (VeriTextAI)
+│   ├── build_vietnamese_5k_dataset.py # Xây dựng & phân tầng bộ dữ liệu Tiếng Việt 5.000 mẫu
 │   ├── file_parser.py                 # Bộ bóc tách tệp tải lên (.txt, .docx, .doc, .pdf)
 │   ├── pdf_report.py                  # Trình sinh chứng nhận thẩm định PDF chuẩn A4 (ReportLab, font ArialVN)
 │   ├── dataset.py                     # PyTorch Dataset, Dynamic Padding Collator & DataLoaders
@@ -328,14 +330,17 @@ uvicorn api:app --host 0.0.0.0 --port 8000 --reload
 | **`GET`** | `/health` | Kiểm tra trạng thái server, thiết bị (CPU/GPU) và tình trạng nạp của 3 mô hình |
 | **`POST`** | `/api/v1/detect` | Dự đoán văn bản đơn lẻ (trả về % AI, nhãn nhị phân, mức tin cậy và phân rã 3 mô hình) |
 | **`POST`** | `/api/v1/detect/sentences` | Bóc tách từng câu và gán mã màu (🟢 Xanh / 🟡 Vàng / 🔴 Đỏ) phục vụ Chrome Extension & Web |
-| **`POST`** | `/api/v1/detect/web` | Endpoint phân tích từ Web Dashboard, tự động lưu lịch sử vào SQLite |
-| **`POST`** | `/api/v1/detect/upload` | Tiếp nhận và bóc tách tệp tải lên (.PDF, .DOCX, .TXT) để thẩm định |
+| **`POST`** | `/api/v1/auth/register` | Đăng ký tài khoản Sinh viên / Giảng viên vào SQL Server `VeriTextAI` |
+| **`POST`** | `/api/v1/auth/login` | Đăng nhập xác thực Bcrypt & cấp JWT Access Token |
+| **`GET`** | `/api/v1/auth/me` | Lấy thông tin người dùng hiện tại từ JWT Token |
+| **`POST`** | `/api/v1/detect/web` | Endpoint phân tích từ Web Dashboard, tự động lưu lịch sử vào SQL Server |
+| **`POST`** | `/api/v1/detect/upload` | Tiếp nhận và bóc tách tệp tải lên (.PDF, .DOCX, .DOC, .TXT) để thẩm định |
 | **`POST`** | `/api/v1/detect/batch` | Phân tích hàng loạt tối đa 50 văn bản trong cùng một request |
-| **`GET`** | `/api/v1/history` | Truy xuất danh sách nhật ký thẩm định từ CSDL SQLite |
-| **`GET`** | `/api/v1/history/{id}` | Lấy chi tiết một lượt thẩm định theo ID |
-| **`DELETE`**| `/api/v1/history/{id}` | Xóa một bản ghi lịch sử khỏi CSDL |
-| **`GET`** | `/api/v1/stats` | Thống kê KPI tổng quan (Tổng số lượt, Tỷ lệ AI %, Độ trễ trung bình) |
-| **`GET`** | `/api/v1/report/pdf/{id}` | **Xuất Báo Cáo Kiểm Định PDF (Audit Certificate)** đóng dấu phân tích chi tiết |
+| **`GET`** | `/api/v1/history` | Truy xuất danh sách nhật ký thẩm định từ SQL Server theo phân quyền RBAC |
+| **`GET`** | `/api/v1/history/{id}` | Lấy chi tiết một lượt thẩm định theo ID (kèm kiểm tra quyền sở hữu) |
+| **`DELETE`**| `/api/v1/history/{id}` | Xóa một bản ghi lịch sử khỏi SQL Server |
+| **`GET`** | `/api/v1/stats` | Thống kê KPI tổng quan theo vai trò người dùng |
+| **`GET`** | `/api/v1/report/pdf/{id}` | **Xuất Báo Cáo Kiểm Định PDF (Audit Certificate)** có kiểm tra RBAC |
 
 ### 🧪 Kiểm Thử Tích Hợp (Integration Tests):
 Đã xây dựng bộ kiểm thử tự động [`test_api.py`](file:///c:/DoAn/backend/test_api.py) kiểm tra trọn vẹn cả 8 luồng nghiệp vụ:
@@ -357,9 +362,10 @@ Hệ thống được nâng cấp thành một **Ứng dụng Phần mềm Thẩ
    * Cung cấp 3 Tab nghiệp vụ: **🔍 Thẩm Định Văn Bản**, **📊 Lịch Sử Quét & Thống Kê KPI**, và **🏗️ Kiến Trúc Hệ Thống**.
 2. **Kéo Thả Tải Tệp Đa Định Dạng (.PDF, .DOCX, .TXT)**:
    * Module [`file_parser.py`](file:///c:/DoAn/backend/file_parser.py) tự động phân tích nhị phân, bóc tách chuỗi văn bản sạch từ bài báo cáo docx hoặc tệp sách điện tử PDF mà không cần phần mềm bên thứ ba.
-3. **Cơ Sở Dữ Liệu SQLite & Nhật Ký Thẩm Định (`database.py`)**:
-   * Tự động lưu trữ chi tiết từng lượt quét vào file CSDL SQLite [`backend/output/scan_history.db`](file:///c:/DoAn/backend/output/scan_history.db).
-   * Bảng Dashboard cho phép xem lại chi tiết, tính toán tỷ lệ văn bản AI, tổng số từ đã kiểm định và thời gian phản hồi trung bình.
+3. **Cơ Sở Dữ Liệu Microsoft SQL Server 2022 & Phân Quyền RBAC (`database.py`, `auth.py`)**:
+   * Lưu trữ tập trung trong cơ sở dữ liệu **`VeriTextAI`** trên Microsoft SQL Server 2022 (`pyodbc` + `ODBC Driver 17`) với 3 bảng: `users`, `detection_history`, `classroom_batches`.
+   * Xác thực người dùng bằng **JWT (`PyJWT`)** và mã hóa mật khẩu **Bcrypt (12 rounds)**; Sinh viên chỉ xem được bài của mình, Giảng viên xem được toàn bộ bài nộp trong hệ thống.
+   * Bảng Dashboard hiển thị lịch sử đầy đủ, xem lại chi tiết nguyên văn, tính tỷ lệ văn bản AI, tổng số từ và thời gian phản hồi trung bình.
 4. **Xuất Báo Cáo Chứng Thực Kiểm Định PDF (`pdf_report.py`)**:
    * Tự động sinh file PDF kích thước A4 chuẩn thẩm mỹ bằng thư viện **ReportLab** có hỗ trợ tiếng Việt Unicode (`ArialVN`).
    * Báo cáo bao gồm: Mã chứng thực (`AUDIT-XXXXXX`), Thời gian thẩm định, Khung kết luận nhãn màu, Bảng phân rã 3 mô hình PLMs và Bảng phân tích từng câu AI Hotspots.
@@ -387,10 +393,8 @@ Toàn bộ tiện ích mở rộng được đóng gói tại thư mục [`front
 1. **Khởi chạy Backend Server:** Nhấp đúp vào file [`start_server.bat`](file:///c:/DoAn/start_server.bat) để khởi động máy chủ tại `http://localhost:8000`.
 2. **Mở trang quản lý Tiện ích của Chrome:** Truy cập đường dẫn `chrome://extensions/` trên thanh địa chỉ trình duyệt.
 3. **Bật Chế độ dành cho nhà phát triển (Developer Mode):** Gạt công tắc ở góc trên bên phải màn hình.
-4. **Tải Tiện ích đã giải nén (Load Unpacked):** Bấm nút `Load unpacked` và trỏ vào thư mục `c:\DoAn\frontend\extension`.
-4. **Tải tiện ích:** Nhấp vào nút **Tải tiện ích đã giải nén (Load unpacked)** ở góc trên bên trái.
-5. **Chọn thư mục:** Chọn thư mục `c:\DoAn\extension` (thư mục chứa file `manifest.json`).
-6. **Ghim tiện ích:** Nhấp vào biểu tượng mảnh ghép trên thanh công cụ của Chrome và bấm ghim biểu tượng **AI Text Detector** để sử dụng mọi lúc!
+4. **Tải Tiện ích đã giải nén (Load Unpacked):** Bấm nút **Load unpacked** và chọn thư mục `c:\DoAn\frontend\extension` (thư mục chứa file `manifest.json`).
+5. **Ghim tiện ích:** Nhấp vào biểu tượng mảnh ghép trên thanh công cụ của Chrome và bấm ghim biểu tượng **VeriText AI** để sử dụng mọi lúc!
 
 ---
 
@@ -404,8 +408,8 @@ Hệ thống được nâng cấp toàn diện lên kiến trúc **Song ngữ An
 - **Tuyến Tiếng Việt (PhoBERT v2 & PyVi):**
   - Mô hình nền tảng: `vinai/phobert-base-v2` (Bộ từ vựng BPE 64.000 tokens bản địa hóa).
   - Phân đoạn từ: Tích hợp thư viện `pyvi` liên kết từ ghép tự động (`trí_tuệ nhân_tạo`).
-  - Tập dữ liệu: 1.000 mẫu cặp đôi (500 bài báo VnExpress + 500 bài Gemini sinh đối ứng), chia `GroupShuffleSplit` (Train 700, Val 150, Test 150).
-  - Hiệu năng trên tập Test độc lập: **Precision AI 81.58%**, **Accuracy 66.0%**, **AUC-ROC 0.67**.
+  - Tập dữ liệu: **5.000 mẫu đa nguồn cân bằng 50/50** (2.500 Người viết vs 2.500 AI sinh từ VnExpress, Gemini Paraphrase và Benchmark Tiếng Việt đa lĩnh vực), chia phân tầng (Train 3.500, Val 750, Test 750).
+  - Hiệu năng trên tập Test độc lập (750 mẫu): **Accuracy 98.93%**, **Precision 97.91%**, **Recall 100.0%**, **F1-Score 98.94%**, **ROC-AUC 0.9998**.
 - **Tuyến Tiếng Anh (Ensemble 3 PLMs):**
   - Weighted Soft Voting: Longformer (48.65%) + BERT (33.96%) + RoBERTa (17.38%).
   - Đạt **Accuracy 96.52%**, **F1-Score 95.84%** và **AUC-ROC 0.9852**.
@@ -415,7 +419,7 @@ Hệ thống được nâng cấp toàn diện lên kiến trúc **Song ngữ An
 | Ngôn ngữ | Mô hình đảm nhiệm | Tập dữ liệu huấn luyện | Cửa sổ ngữ cảnh | Chỉ số chính (Test Set) |
 | :--- | :--- | :--- | :---: | :---: |
 | 🇬🇧 **Tiếng Anh** | Ensemble (Longformer + BERT + RoBERTa) | GossipCop++ & LIAR (19.148 mẫu) | 1.024 tokens | **Accuracy: 96.52%** \| **F1: 95.84%** |
-| 🇻🇳 **Tiếng Việt** | PhoBERT base v2 + PyVi | VnExpress & Gemini (1.000 mẫu cặp) | 256 tokens | **Precision AI: 81.58%** \| **AUC: 0.67** |
+| 🇻🇳 **Tiếng Việt** | PhoBERT base v2 + PyVi | Đa nguồn Tiếng Việt (5.000 mẫu) | 256 tokens | **Accuracy: 98.93%** \| **Recall: 100.0%** \| **AUC: 0.9998** |
 
 ---
 

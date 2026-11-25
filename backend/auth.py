@@ -5,31 +5,28 @@ Module Xác thực & Quản lý Phiên Người Dùng (JWT Authentication & RBAC
 
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 import jwt
-from fastapi import HTTPException, status, Header, Depends
+from fastapi import HTTPException, status, Header, Depends, Query
 
-# Khóa bí mật ký JWT (Bảo mật học thuật)
+# Khóa bí mật ký JWT (ưu tiên biến môi trường, fallback key mặc định cho môi trường local)
 JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "veritext-ai-super-secret-jwt-key-2026-academic-thesis")
 JWT_ALGORITHM = "HS256"
-JWT_ACCESS_TOKEN_EXPIRE_DAYS = 7  # Token có hiệu lực 7 ngày cho tiện người dùng
+JWT_ACCESS_TOKEN_EXPIRE_DAYS = 7  # Token có hiệu lực 7 ngày
 
 
 def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
     """Tạo mã JWT Access Token với payload chứa ID, email và vai trò người dùng."""
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(days=JWT_ACCESS_TOKEN_EXPIRE_DAYS)
+    now = datetime.now(timezone.utc)
+    expire = now + (expires_delta if expires_delta else timedelta(days=JWT_ACCESS_TOKEN_EXPIRE_DAYS))
 
     to_encode.update({
         "exp": expire,
-        "iat": datetime.utcnow(),
+        "iat": now,
     })
-    encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
 
 def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
@@ -86,6 +83,25 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     return current_user
+
+
+async def get_current_user_from_header_or_query(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    token: Optional[str] = Query(None, description="Optional JWT token for direct download links"),
+) -> Optional[Dict[str, Any]]:
+    """Hỗ trợ xác thực qua Header hoặc query ?token= (dùng riêng cho xuất file PDF trực tiếp)."""
+    raw_token = extract_bearer_token(authorization) or token
+    if not raw_token:
+        return None
+    payload = decode_access_token(raw_token)
+    if not payload:
+        return None
+    return {
+        "id": payload.get("id"),
+        "email": payload.get("email"),
+        "full_name": payload.get("full_name"),
+        "role": payload.get("role", "student"),
+    }
 
 
 def require_role(allowed_roles: List[str]):

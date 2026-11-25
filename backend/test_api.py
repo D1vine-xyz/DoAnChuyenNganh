@@ -188,6 +188,80 @@ class TestDetectionAPI(unittest.TestCase):
         self.assertEqual(data["overall"]["language"], "vi")
         self.assertGreaterEqual(len(data["sentences"]), 2)
 
+        # Kiểm tra xuất PDF tiếng Việt có lưu full_text và XML escape an toàn
+        vi_scan_id = data["scan_id"]
+        pdf_res = self.client.get(f"/api/v1/report/pdf/{vi_scan_id}")
+        self.assertEqual(pdf_res.status_code, 200)
+        self.assertEqual(pdf_res.headers.get("content-type"), "application/pdf")
+
+    def test_11_auth_rbac_pdf_and_language_routing_guard(self):
+        """Kiểm tra đăng nhập RBAC, cô lập PDF/History, lưu full_text và chặn nhận nhầm ngôn ngữ"""
+        # 1. Đăng nhập sinh viên & giảng viên
+        s_res = self.client.post("/api/v1/auth/login", json={
+            "email": "sinhvien@veritext.ai", "password": "123456"
+        })
+        self.assertEqual(s_res.status_code, 200)
+        s_token = s_res.json()["access_token"]
+
+        t_res = self.client.post("/api/v1/auth/login", json={
+            "email": "giangvien@veritext.ai", "password": "123456"
+        })
+        self.assertEqual(t_res.status_code, 200)
+        t_token = t_res.json()["access_token"]
+
+        # 2. Quét văn bản tiếng Anh có chứa tên riêng tiếng Việt & ký tự XML (<tag> & symbol)
+        en_with_vn_name = (
+            "Research by Dr. Nguyễn shows that transformer models with <attention> & self-regulation "
+            "produce remarkably consistent syntactic structures across academic essays."
+        )
+        scan_res = self.client.post(
+            "/api/v1/detect/web",
+            json={"text": en_with_vn_name, "threshold": 0.5, "title": "Paper <A> & B"},
+            headers={"Authorization": f"Bearer {t_token}"},
+        )
+        self.assertEqual(scan_res.status_code, 200)
+        scan_data = scan_res.json()
+        # Phải giữ đúng tuyến Tiếng Anh dù có 1 từ 'Nguyễn'
+        self.assertEqual(scan_data["overall"]["language"], "en")
+        teacher_scan_id = scan_data["scan_id"]
+
+        # 3. Sinh viên KHÔNG được xem chi tiết hoặc tải PDF của giảng viên
+        s_detail = self.client.get(
+            f"/api/v1/history/{teacher_scan_id}",
+            headers={"Authorization": f"Bearer {s_token}"},
+        )
+        self.assertEqual(s_detail.status_code, 404)
+
+        s_pdf = self.client.get(
+            f"/api/v1/report/pdf/{teacher_scan_id}",
+            headers={"Authorization": f"Bearer {s_token}"},
+        )
+        self.assertEqual(s_pdf.status_code, 404)
+
+        # 4. Giảng viên xem được full_text và tải được PDF (kể cả chứa ký tự < > &)
+        t_detail = self.client.get(
+            f"/api/v1/history/{teacher_scan_id}",
+            headers={"Authorization": f"Bearer {t_token}"},
+        )
+        self.assertEqual(t_detail.status_code, 200)
+        detail_json = t_detail.json()
+        self.assertEqual(detail_json["full_text"], en_with_vn_name)
+        self.assertEqual(detail_json["title"], "Paper <A> & B")
+
+        t_pdf = self.client.get(
+            f"/api/v1/report/pdf/{teacher_scan_id}",
+            headers={"Authorization": f"Bearer {t_token}"},
+        )
+        self.assertEqual(t_pdf.status_code, 200)
+        self.assertEqual(t_pdf.headers.get("content-type"), "application/pdf")
+
+        # 5. Dọn bản ghi test để giữ sạch DB
+        del_res = self.client.delete(
+            f"/api/v1/history/{teacher_scan_id}",
+            headers={"Authorization": f"Bearer {t_token}"},
+        )
+        self.assertEqual(del_res.status_code, 200)
+
 
 if __name__ == "__main__":
     unittest.main()

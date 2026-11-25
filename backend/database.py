@@ -41,6 +41,7 @@ def get_connection_string() -> str:
     return f"DRIVER={{{selected_driver}}};SERVER={server};DATABASE={database};Trusted_Connection=yes{trust_cert};"
 
 DB_CONNECTION_STRING = get_connection_string()
+_db_initialized = False
 
 
 @contextmanager
@@ -56,8 +57,12 @@ def get_connection():
         conn.close()
 
 
-def init_db():
-    """Khởi tạo cấu trúc bảng CSDL nếu chưa tồn tại trong VeriTextAI."""
+def init_db(force: bool = False):
+    """Khởi tạo cấu trúc bảng CSDL và nâng cấp schema an toàn trong VeriTextAI."""
+    global _db_initialized
+    if _db_initialized and not force:
+        return
+
     with get_connection() as conn:
         cursor = conn.cursor()
 
@@ -86,6 +91,7 @@ def init_db():
                     user_id INT NULL FOREIGN KEY REFERENCES users(id) ON DELETE SET NULL,
                     title NVARCHAR(255) NULL,
                     text_snippet NVARCHAR(MAX) NOT NULL,
+                    full_text NVARCHAR(MAX) NULL,
                     language NVARCHAR(10) NOT NULL DEFAULT 'en',
                     label NVARCHAR(50) NOT NULL,
                     ai_probability FLOAT NOT NULL,
@@ -103,6 +109,20 @@ def init_db():
                     inference_time_ms FLOAT NOT NULL,
                     created_at DATETIME2 DEFAULT GETDATE()
                 );
+            END;
+        """)
+
+        # Bổ sung cột full_text và index tối ưu truy vấn nếu bảng đã tạo từ trước
+        cursor.execute("""
+            IF COL_LENGTH('detection_history', 'full_text') IS NULL
+            BEGIN
+                ALTER TABLE detection_history ADD full_text NVARCHAR(MAX) NULL;
+            END;
+        """)
+        cursor.execute("""
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_detection_history_user_id' AND object_id = OBJECT_ID('detection_history'))
+            BEGIN
+                CREATE INDEX IX_detection_history_user_id ON detection_history(user_id);
             END;
         """)
 
@@ -124,39 +144,26 @@ def init_db():
         """)
         conn.commit()
 
-    # Nạp 2 tài khoản mẫu nếu chưa có
+    # Nạp 2 tài khoản mẫu nếu chưa có (chỉ check email, không chạy bcrypt lặp lại)
     seed_sample_users()
+    _db_initialized = True
 
 
 def seed_sample_users():
     """Tạo sẵn 2 tài khoản mẫu để demo vấn đáp thuận tiện: 1 Giảng viên + 1 Sinh viên."""
-    try:
-        if not authenticate_user("giangvien@veritext.ai", "123456"):
-            try:
-                create_user(
-                    email="giangvien@veritext.ai",
-                    password="123456",
-                    full_name="TS. Hoàng Văn Thầy (Giảng viên)",
-                    role="teacher"
-                )
-            except Exception:
-                pass
-    except Exception:
-        pass
-
-    try:
-        if not authenticate_user("sinhvien@veritext.ai", "123456"):
-            try:
-                create_user(
-                    email="sinhvien@veritext.ai",
-                    password="123456",
-                    full_name="Nguyễn Văn Sinh Viên (K16)",
-                    role="student"
-                )
-            except Exception:
-                pass
-    except Exception:
-        pass
+    sample_accounts = [
+        ("giangvien@veritext.ai", "123456", "TS. Hoàng Văn Thầy (Giảng viên)", "teacher"),
+        ("sinhvien@veritext.ai", "123456", "Nguyễn Văn Sinh Viên (K16)", "student"),
+    ]
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        for email, pwd, full_name, role in sample_accounts:
+            cursor.execute("SELECT 1 FROM users WHERE email = ?;", (email,))
+            if not cursor.fetchone():
+                try:
+                    create_user(email=email, password=pwd, full_name=full_name, role=role)
+                except Exception:
+                    pass
 
 
 # ==============================================================================
@@ -292,7 +299,7 @@ def save_scan(
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO detection_history (
-                user_id, title, text_snippet, language, label,
+                user_id, title, text_snippet, full_text, language, label,
                 ai_probability, human_probability, confidence,
                 word_count, char_count, sentence_count,
                 model_breakdown, sentences_data,
@@ -301,11 +308,12 @@ def save_scan(
                 inference_time_ms
             )
             OUTPUT INSERTED.id
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, (
             user_id,
             title or filename or "Văn bản không tên",
             snippet,
+            full_text,
             language or "en",
             verdict,
             round(float(ai_probability), 4),
@@ -419,6 +427,9 @@ def get_scan_by_id(scan_id: int, user_id: Optional[int] = None, role: Optional[s
             except Exception:
                 model_breakdown = {}
 
+        created_str = row.created_at.strftime("%Y-%m-%d %H:%M:%S") if row.created_at else ""
+        full_text_val = getattr(row, "full_text", None) or row.text_snippet
+
         return {
             "id": row.id,
             "user_id": row.user_id,
@@ -426,8 +437,10 @@ def get_scan_by_id(scan_id: int, user_id: Optional[int] = None, role: Optional[s
             "author_email": row.author_email or "",
             "title": row.title,
             "text_snippet": row.text_snippet,
+            "full_text": full_text_val,
             "language": row.language,
             "label": row.label,
+            "verdict": row.label,
             "ai_probability": row.ai_probability,
             "human_probability": row.human_probability,
             "confidence": row.confidence,
@@ -439,7 +452,8 @@ def get_scan_by_id(scan_id: int, user_id: Optional[int] = None, role: Optional[s
             "has_bypass_warning": bool(row.has_bypass_warning),
             "bypass_details": row.bypass_details,
             "inference_time_ms": row.inference_time_ms,
-            "created_at": row.created_at.strftime("%Y-%m-%d %H:%M:%S") if row.created_at else "",
+            "timestamp": created_str,
+            "created_at": created_str,
             "details": {
                 "sentences": sentences,
                 "model_breakdown": model_breakdown,
@@ -460,7 +474,7 @@ def delete_scan(scan_id: int, user_id: Optional[int] = None, role: Optional[str]
 
 
 def get_statistics(user_id: Optional[int] = None, role: Optional[str] = None) -> Dict[str, Any]:
-    """Tính toán thống kê Dashboard theo quyền người dùng."""
+    """Tính toán thống kê Dashboard theo quyền người dùng trong 1 truy vấn SQL duy nhất."""
     with get_connection() as conn:
         cursor = conn.cursor()
         where_clause = ""
@@ -469,9 +483,19 @@ def get_statistics(user_id: Optional[int] = None, role: Optional[str] = None) ->
             where_clause = "WHERE user_id = ?"
             params.append(user_id)
 
-        cursor.execute(f"SELECT COUNT(*) FROM detection_history {where_clause};", tuple(params))
-        total = cursor.fetchone()[0]
-
+        cursor.execute(
+            f"""
+            SELECT
+                COUNT(*) AS total,
+                SUM(CASE WHEN label = 'AI-generated' THEN 1 ELSE 0 END) AS ai_cnt,
+                AVG(inference_time_ms) AS avg_time,
+                SUM(word_count) AS total_words
+            FROM detection_history {where_clause};
+            """,
+            tuple(params),
+        )
+        row = cursor.fetchone()
+        total = int(row[0] or 0) if row else 0
         if total == 0:
             return {
                 "total_scans": 0,
@@ -482,20 +506,17 @@ def get_statistics(user_id: Optional[int] = None, role: Optional[str] = None) ->
                 "total_words_scanned": 0,
             }
 
-        ai_where = f"{where_clause} AND" if where_clause else "WHERE"
-        cursor.execute(f"SELECT COUNT(*) FROM detection_history {ai_where} label = 'AI-generated';", tuple(params))
-        ai_cnt = cursor.fetchone()[0]
-
-        cursor.execute(f"SELECT AVG(inference_time_ms), SUM(word_count) FROM detection_history {where_clause};", tuple(params))
-        avg_time, total_words = cursor.fetchone()
+        ai_cnt = int(row[1] or 0)
+        avg_time = float(row[2] or 0.0)
+        total_words = int(row[3] or 0)
 
         return {
             "total_scans": total,
             "ai_count": ai_cnt,
             "human_count": total - ai_cnt,
             "ai_percentage": round((ai_cnt / total) * 100, 1),
-            "avg_inference_time_ms": round(avg_time or 0.0, 1),
-            "total_words_scanned": int(total_words or 0),
+            "avg_inference_time_ms": round(avg_time, 1),
+            "total_words_scanned": total_words,
         }
 
 

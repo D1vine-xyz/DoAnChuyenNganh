@@ -455,7 +455,7 @@ btnSubmit.addEventListener("click", async () => {
   // Trường hợp 2: Nhập văn bản trực tiếp
   const rawText = textInput.value.trim();
   if (rawText.length < 10) {
-    alert("Vui lòng nhập hoặc dán ít nhất 10 ký tự tiếng Anh để hệ thống phân tích.");
+    alert("Vui lòng nhập hoặc dán ít nhất 10 ký tự (tiếng Anh hoặc tiếng Việt) để hệ thống phân tích.");
     return;
   }
 
@@ -490,7 +490,7 @@ function setLoading(isLoading) {
   btnSubmit.disabled = isLoading;
   const btnText = btnSubmit.querySelector(".btn-text");
   if (isLoading) {
-    btnText.textContent = "Đang kiểm tra qua 3 PLMs...";
+    btnText.textContent = "Đang phân tích văn bản AI...";
     spinner.classList.remove("hidden");
   } else {
     btnText.textContent = "Kiểm tra nội dung AI";
@@ -621,13 +621,35 @@ function renderSentences(sentences) {
   });
 }
 
+async function openAuthenticatedPdf(scanId) {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/report/pdf/${scanId}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      let errDetail = "Không thể xuất báo cáo PDF.";
+      try {
+        const err = await res.json();
+        errDetail = err.detail || errDetail;
+      } catch (e) {}
+      throw new Error(errDetail);
+    }
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    window.open(blobUrl, "_blank");
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+  } catch (err) {
+    alert("Lỗi xuất báo cáo PDF: " + err.message);
+  }
+}
+
 // Export PDF Button
 btnExportPdf.addEventListener("click", () => {
   if (!currentScanId) {
     alert("Chưa có lượt quét nào để xuất báo cáo PDF.");
     return;
   }
-  window.open(`${API_BASE}/api/v1/report/pdf/${currentScanId}`, "_blank");
+  openAuthenticatedPdf(currentScanId);
 });
 
 
@@ -687,13 +709,15 @@ function renderHistoryTable(items, user) {
     const badgeClass = isAi ? "badge-ai-table" : "badge-human-table";
     const badgeText = isAi ? "🤖 AI-Generated" : "👤 Human";
 
+    const langBadge = item.language === "vi" ? "🇻🇳 VI" : "🇬🇧 EN";
+
     tr.innerHTML = `
       <td><b>#${item.id}</b></td>
       <td style="color: var(--text-secondary); font-size: 12px;">${item.timestamp}</td>
       <td>
         <b>${escapeHtml(item.title || item.filename || "Văn bản")}</b>
         <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
-          👤 Người nộp: <b>${escapeHtml(item.author_name || "Khách")}</b>
+          ${langBadge} • 👤 Người nộp: <b>${escapeHtml(item.author_name || "Khách")}</b>
         </div>
       </td>
       <td>${item.word_count} từ</td>
@@ -711,7 +735,7 @@ function renderHistoryTable(items, user) {
 }
 
 window.downloadPdf = function(id) {
-  window.open(`${API_BASE}/api/v1/report/pdf/${id}`, "_blank");
+  openAuthenticatedPdf(id);
 };
 
 window.viewHistoryItem = async function(id) {
@@ -722,20 +746,28 @@ window.viewHistoryItem = async function(id) {
     if (res.ok) {
       const data = await res.json();
       currentScanId = id;
-      textInput.value = data.full_text || "";
+      textInput.value = data.full_text || data.text_snippet || "";
       updateTextCounts();
+
+      const resolvedLabel = data.label || data.verdict;
+      const isVi = data.language === "vi";
 
       // Render lại kết quả trên tab inspect
       renderResults({
         scan_id: id,
         overall: {
-          label: data.verdict,
+          label: resolvedLabel,
+          language: data.language || "en",
           ai_probability: data.ai_probability,
-          human_probability: 1.0 - data.ai_probability,
+          human_probability: data.human_probability ?? (1.0 - data.ai_probability),
           confidence: data.confidence,
           inference_time_ms: data.inference_time_ms,
           model_breakdown: data.details ? data.details.model_breakdown : null,
-          text_stats: { word_count: data.word_count, char_count: data.char_count, context_coverage: "1024 Tokens" },
+          text_stats: {
+            word_count: data.word_count,
+            char_count: data.char_count,
+            context_coverage: isVi ? "256 Tokens (PhoBERT)" : "1024 Tokens",
+          },
         },
         sentences: data.details ? data.details.sentences : [],
         total_processing_time_ms: data.inference_time_ms,
@@ -743,6 +775,9 @@ window.viewHistoryItem = async function(id) {
 
       // Switch to Inspect Tab
       document.querySelector('[data-tab="tab-inspect"]').click();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      alert(err.detail || "Không thể tải chi tiết lượt quét này.");
     }
   } catch (err) {
     alert("Không thể tải chi tiết: " + err.message);

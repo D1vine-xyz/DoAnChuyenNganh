@@ -27,6 +27,16 @@ import numpy as np
 import joblib
 from transformers import AutoTokenizer
 
+try:
+    from pyvi import ViTokenizer as _ViTokenizer
+except ImportError:
+    _ViTokenizer = None
+
+try:
+    import langdetect as _langdetect
+except ImportError:
+    _langdetect = None
+
 from models import build_model
 
 
@@ -40,27 +50,27 @@ VIETNAMESE_DIACRITICS = set(
 def detect_language(text: str) -> str:
     """
     Tự động nhận diện ngôn ngữ của văn bản đầu vào:
-    1. Quét ký tự dấu đặc trưng Tiếng Việt (siêu tốc < 0.05ms, độ chính xác cao).
-    2. Fallback sử dụng thư viện `langdetect` nếu văn bản không dấu.
+    1. Đếm mật độ ký tự dấu đặc trưng Tiếng Việt (tránh nhận nhầm bài tiếng Anh có 1 tên riêng tiếng Việt).
+    2. Fallback sử dụng `langdetect` nếu văn bản tiếng Việt không dấu hoặc biên độ thấp.
     Trả về 'vi' (Tiếng Việt) hoặc 'en' (Tiếng Anh/mặc định).
     """
     clean = text.strip()
     if not clean:
         return "en"
 
-    # Bước 1: Quét ký tự dấu Tiếng Việt
-    if any(ch in VIETNAMESE_DIACRITICS for ch in clean):
+    # Bước 1: Kiểm tra mật độ ký tự dấu Tiếng Việt
+    vi_chars = sum(1 for ch in clean if ch in VIETNAMESE_DIACRITICS)
+    alpha_chars = sum(1 for ch in clean if ch.isalpha())
+    if vi_chars >= 2 and (vi_chars / max(alpha_chars, 1)) >= 0.02:
         return "vi"
 
-    # Bước 2: Quét fallback bằng langdetect cho văn bản không dấu hoặc ngắn
-    try:
-        import langdetect
-        sample = clean[:300]
-        detected = langdetect.detect(sample)
-        if detected == "vi":
-            return "vi"
-    except Exception:
-        pass
+    # Bước 2: Fallback bằng langdetect cho văn bản không dấu hoặc đoạn ngắn
+    if _langdetect is not None:
+        try:
+            if _langdetect.detect(clean[:400]) == "vi":
+                return "vi"
+        except Exception:
+            pass
 
     return "en"
 
@@ -138,57 +148,13 @@ class AITextDetector:
             except Exception as e:
                 print(f"[!] Không thể nạp Tokenizer PhoBERT: {e}")
 
-        # 3. Nạp mô hình BERT (Tiếng Anh)
-        self.model_bert = None
-        bert_path = os.path.join(self.models_dir, "bert_best.pt")
-        if load_bert and os.path.exists(bert_path):
-            print(f"[*] Nạp checkpoint BERT từ: {bert_path}")
-            self.model_bert = build_model("bert").to(self.device)
-            ckpt = torch.load(bert_path, map_location=self.device, weights_only=False)
-            state_dict = ckpt["model_state_dict"] if (isinstance(ckpt, dict) and "model_state_dict" in ckpt) else ckpt
-            self.model_bert.load_state_dict(state_dict)
-            self.model_bert.eval()
-            print("  [v] BERT sẵn sàng.")
-
-        # 4. Nạp mô hình RoBERTa (Tiếng Anh)
-        self.model_roberta = None
-        roberta_path = os.path.join(self.models_dir, "roberta_best.pt")
-        if load_roberta and os.path.exists(roberta_path):
-            print(f"[*] Nạp checkpoint RoBERTa từ: {roberta_path}")
-            self.model_roberta = build_model("roberta").to(self.device)
-            ckpt = torch.load(roberta_path, map_location=self.device, weights_only=False)
-            state_dict = ckpt["model_state_dict"] if (isinstance(ckpt, dict) and "model_state_dict" in ckpt) else ckpt
-            self.model_roberta.load_state_dict(state_dict)
-            self.model_roberta.eval()
-            print("  [v] RoBERTa sẵn sàng.")
-
-        # 5. Nạp mô hình Longformer (Tiếng Anh 1024 tokens)
-        self.model_longformer = None
-        longformer_path = os.path.join(self.models_dir, "longformer_best.pt")
-        if load_longformer and os.path.exists(longformer_path):
-            print(f"[*] Nạp checkpoint Longformer từ: {longformer_path}")
-            self.model_longformer = build_model("longformer").to(self.device)
-            ckpt = torch.load(longformer_path, map_location=self.device, weights_only=False)
-            state_dict = ckpt["model_state_dict"] if (isinstance(ckpt, dict) and "model_state_dict" in ckpt) else ckpt
-            self.model_longformer.load_state_dict(state_dict)
-            self.model_longformer.eval()
-            print("  [v] Longformer sẵn sàng.")
-
-        # 6. Nạp mô hình PhoBERT (Tiếng Việt)
-        self.model_phobert = None
-        phobert_path = os.path.join(self.models_dir, "phobert_best.pt")
-        if load_phobert and os.path.exists(phobert_path):
-            print(f"[*] Nạp checkpoint PhoBERT từ: {phobert_path}")
-            try:
-                self.model_phobert = build_model("phobert").to(self.device)
-                ckpt = torch.load(phobert_path, map_location=self.device, weights_only=False)
-                state_dict = ckpt["model_state_dict"] if (isinstance(ckpt, dict) and "model_state_dict" in ckpt) else ckpt
-                self.model_phobert.load_state_dict(state_dict)
-                self.model_phobert.eval()
-                print("  [v] PhoBERT sẵn sàng (Chuyên trách phát hiện văn bản Tiếng Việt).")
-            except Exception as e:
-                print(f"[!] Lỗi nạp mô hình PhoBERT: {e}")
-                self.model_phobert = None
+        # 3-6. Nạp các mô hình thành phần qua helper chung
+        self.model_bert = self._load_model_component("bert", "bert_best.pt", "BERT") if load_bert else None
+        self.model_roberta = self._load_model_component("roberta", "roberta_best.pt", "RoBERTa") if load_roberta else None
+        self.model_longformer = self._load_model_component("longformer", "longformer_best.pt", "Longformer") if load_longformer else None
+        self.model_phobert = self._load_model_component(
+            "phobert", "phobert_best.pt", "PhoBERT (Chuyên trách phát hiện văn bản Tiếng Việt)"
+        ) if load_phobert else None
 
         # 7. Nạp cấu hình trọng số Ensemble tối ưu Tiếng Anh
         weights_file = os.path.join(self.models_dir, "ensemble_weights.json")
@@ -220,88 +186,139 @@ class AITextDetector:
 
         print("=" * 70 + "\n")
 
+    def _load_model_component(self, model_type: str, ckpt_name: str, display_name: str):
+        """Nạp checkpoint PyTorch cho một mô hình thành phần."""
+        ckpt_path = os.path.join(self.models_dir, ckpt_name)
+        if not os.path.exists(ckpt_path):
+            return None
+        print(f"[*] Nạp checkpoint {display_name.split(' ')[0]} từ: {ckpt_path}")
+        try:
+            model = build_model(model_type).to(self.device)
+            ckpt = torch.load(ckpt_path, map_location=self.device, weights_only=False)
+            state_dict = ckpt["model_state_dict"] if (isinstance(ckpt, dict) and "model_state_dict" in ckpt) else ckpt
+            model.load_state_dict(state_dict)
+            model.eval()
+            print(f"  [v] {display_name} sẵn sàng.")
+            return model
+        except Exception as e:
+            print(f"[!] Lỗi nạp mô hình {display_name}: {e}")
+            return None
+
+    def _run_batch_inference(
+        self,
+        model,
+        tokenizer,
+        texts: List[str],
+        max_length: int,
+        use_token_type_ids: bool = False,
+        use_global_attention: bool = False,
+        batch_size: int = 16,
+    ) -> np.ndarray:
+        """Chạy suy luận theo mini-batch (tự động bật FP16 autocast nếu dùng CUDA)."""
+        if model is None or tokenizer is None or not texts:
+            return np.full(len(texts), 0.5)
+
+        all_probs = []
+        for start in range(0, len(texts), batch_size):
+            chunk = texts[start:start + batch_size]
+            encoded = tokenizer(
+                chunk,
+                padding=True,
+                truncation=True,
+                max_length=max_length,
+                return_tensors="pt",
+            ).to(self.device)
+
+            kwargs = {
+                "input_ids": encoded["input_ids"],
+                "attention_mask": encoded["attention_mask"],
+            }
+            if use_token_type_ids and "token_type_ids" in encoded:
+                kwargs["token_type_ids"] = encoded["token_type_ids"]
+            if use_global_attention:
+                global_mask = torch.zeros_like(encoded["input_ids"])
+                global_mask[:, 0] = 1
+                kwargs["global_attention_mask"] = global_mask
+
+            with torch.inference_mode():
+                with torch.amp.autocast("cuda", enabled=self.use_fp16):
+                    logits = model(**kwargs)
+                probs = torch.sigmoid(logits).float().cpu().numpy().flatten()
+            all_probs.append(probs)
+
+        return np.concatenate(all_probs) if all_probs else np.array([])
+
     def _predict_bert(self, texts: List[str]) -> np.ndarray:
         """Dự đoán xác suất theo batch cho BERT (max 512 tokens)."""
-        encoded = self.tokenizer_bert(
-            texts,
-            padding=True,
-            truncation=True,
-            max_length=512,
-            return_tensors="pt",
-        ).to(self.device)
-
-        with torch.no_grad():
-            logits = self.model_bert(
-                input_ids=encoded["input_ids"],
-                attention_mask=encoded["attention_mask"],
-                token_type_ids=encoded.get("token_type_ids"),
-            )
-            probs = torch.sigmoid(logits).cpu().numpy().flatten()
-        return probs
+        return self._run_batch_inference(
+            self.model_bert, self.tokenizer_bert, texts, max_length=512, use_token_type_ids=True
+        )
 
     def _predict_roberta(self, texts: List[str]) -> np.ndarray:
         """Dự đoán xác suất theo batch cho RoBERTa (max 512 tokens)."""
-        encoded = self.tokenizer_roberta(
-            texts,
-            padding=True,
-            truncation=True,
-            max_length=512,
-            return_tensors="pt",
-        ).to(self.device)
-
-        with torch.no_grad():
-            logits = self.model_roberta(
-                input_ids=encoded["input_ids"],
-                attention_mask=encoded["attention_mask"],
-            )
-            probs = torch.sigmoid(logits).cpu().numpy().flatten()
-        return probs
+        return self._run_batch_inference(
+            self.model_roberta, self.tokenizer_roberta, texts, max_length=512
+        )
 
     def _predict_longformer(self, texts: List[str]) -> np.ndarray:
         """Dự đoán xác suất theo batch cho Longformer (max 1024 tokens + global attention)."""
-        encoded = self.tokenizer_longformer(
-            texts,
-            padding=True,
-            truncation=True,
-            max_length=1024,
-            return_tensors="pt",
-        ).to(self.device)
+        return self._run_batch_inference(
+            self.model_longformer, self.tokenizer_longformer, texts, max_length=1024, use_global_attention=True
+        )
 
-        global_attention_mask = torch.zeros_like(encoded["input_ids"])
-        global_attention_mask[:, 0] = 1
+    def _segment_vietnamese(self, texts: List[str]) -> List[str]:
+        """Tách từ tiếng Việt bằng PyVi (nếu khả dụng)."""
+        if _ViTokenizer is None:
+            return texts
+        return [_ViTokenizer.tokenize(t) for t in texts]
 
-        with torch.no_grad():
-            logits = self.model_longformer(
-                input_ids=encoded["input_ids"],
-                attention_mask=encoded["attention_mask"],
-                global_attention_mask=global_attention_mask,
-            )
-            probs = torch.sigmoid(logits).cpu().numpy().flatten()
-        return probs
-
-    def _predict_phobert(self, texts: List[str]) -> np.ndarray:
+    def _predict_phobert(self, texts: List[str], pre_segmented: Optional[List[str]] = None) -> np.ndarray:
         """Dự đoán xác suất theo batch cho PhoBERT Tiếng Việt (max 256 tokens)."""
         if self.model_phobert is None or self.tokenizer_phobert is None:
             return np.full(len(texts), 0.5)
 
-        from pyvi import ViTokenizer
-        segmented_texts = [ViTokenizer.tokenize(t) for t in texts]
+        segmented_texts = pre_segmented if pre_segmented is not None else self._segment_vietnamese(texts)
+        return self._run_batch_inference(
+            self.model_phobert, self.tokenizer_phobert, segmented_texts, max_length=256
+        )
 
-        encoded = self.tokenizer_phobert(
-            segmented_texts,
-            padding=True,
-            truncation=True,
-            max_length=256,
-            return_tensors="pt",
-        ).to(self.device)
+    @staticmethod
+    def _compute_confidence(prob: float, threshold: float, is_vi: bool) -> Tuple[str, str]:
+        """Tính nhãn mức độ tin cậy dựa trên khoảng cách so với ngưỡng."""
+        diff = abs(prob - threshold)
+        high_th = 0.35 if is_vi else 0.40
+        med_th = 0.20 if is_vi else 0.25
+        if diff >= high_th:
+            return "Rất cao (Very High)", "VERY_HIGH"
+        if diff >= med_th:
+            return "Cao (High)", "HIGH"
+        if diff >= 0.10:
+            return "Trung bình (Moderate)", "MODERATE"
+        return "Không chắc chắn / Ngưỡng ranh giới (Uncertain)", "LOW"
 
-        with torch.no_grad():
-            logits = self.model_phobert(
-                input_ids=encoded["input_ids"],
-                attention_mask=encoded["attention_mask"],
-            )
-            probs = torch.sigmoid(logits).cpu().numpy().flatten()
-        return probs
+    @staticmethod
+    def _format_sentence_results(sentences: List[str], probs: np.ndarray) -> List[Dict[str, Any]]:
+        """Chuẩn hóa danh sách phân tích cấp câu và màu cảnh báo."""
+        results = []
+        for idx, sentence in enumerate(sentences):
+            prob = float(probs[idx])
+            if prob >= 0.80:
+                color, level = "red", "Chắc chắn AI"
+            elif prob >= 0.50:
+                color, level = "yellow", "Nghi vấn AI"
+            else:
+                color, level = "green", "Văn phong tự nhiên (Người)"
+
+            results.append({
+                "sentence_index": idx + 1,
+                "sentence": sentence,
+                "word_count": len(sentence.split()),
+                "ai_probability": round(prob, 4),
+                "ai_percentage": f"{prob * 100:.1f}%",
+                "highlight_color": color,
+                "assessment": level,
+            })
+        return results
 
     def predict(
         self,
@@ -333,31 +350,16 @@ class AITextDetector:
         # NHÁNH TIẾNG VIỆT (PHOBERT)
         # ======================================================================
         if lang == "vi" and self.model_phobert is not None:
-            from pyvi import ViTokenizer
-            seg_text = ViTokenizer.tokenize(text)
+            seg_text = self._segment_vietnamese(batch_text)[0]
             token_count = len(self.tokenizer_phobert.encode(seg_text, add_special_tokens=False, truncation=False))
 
-            p_phobert = float(self._predict_phobert(batch_text)[0])
+            p_phobert = float(self._predict_phobert(batch_text, pre_segmented=[seg_text])[0])
             final_ai_prob = p_phobert
             is_ai = final_ai_prob >= threshold
 
             label = "AI-generated" if is_ai else "Human-written"
             label_vi = "Do AI sinh (ChatGPT/LLM)" if is_ai else "Do người viết (Human)"
-
-            # Độ tin cậy
-            diff = abs(final_ai_prob - threshold)
-            if diff >= 0.35:
-                confidence = "Rất cao (Very High)"
-                confidence_level = "VERY_HIGH"
-            elif diff >= 0.20:
-                confidence = "Cao (High)"
-                confidence_level = "HIGH"
-            elif diff >= 0.10:
-                confidence = "Trung bình (Moderate)"
-                confidence_level = "MODERATE"
-            else:
-                confidence = "Không chắc chắn / Ngưỡng ranh giới (Uncertain)"
-                confidence_level = "LOW"
+            confidence, confidence_level = self._compute_confidence(final_ai_prob, threshold, is_vi=True)
 
             inference_time_ms = (time.time() - t0) * 1000
 
@@ -384,16 +386,9 @@ class AITextDetector:
 
             if detailed:
                 result["model_breakdown"] = {
-                    "ensemble_weighted": {
-                        "probability": round(p_phobert, 4),
-                        "is_champion": True,
-                    },
-                    "ensemble_simple": {
-                        "probability": round(p_phobert, 4),
-                    },
-                    "ensemble_stacking": {
-                        "probability": round(p_phobert, 4),
-                    },
+                    "ensemble_weighted": {"probability": round(p_phobert, 4), "is_champion": True},
+                    "ensemble_simple": {"probability": round(p_phobert, 4)},
+                    "ensemble_stacking": {"probability": round(p_phobert, 4)},
                     "individual_models": {
                         "phobert": {
                             "probability": round(p_phobert, 4),
@@ -402,21 +397,9 @@ class AITextDetector:
                             "model_name": "PhoBERT base v2",
                         },
                         # Giữ các key bert, roberta, longformer tương thích CSDL và UI cũ
-                        "bert": {
-                            "probability": round(p_phobert, 4),
-                            "weight": 0.0,
-                            "weight_pct": "N/A (Tiếng Việt)",
-                        },
-                        "roberta": {
-                            "probability": round(p_phobert, 4),
-                            "weight": 0.0,
-                            "weight_pct": "N/A (Tiếng Việt)",
-                        },
-                        "longformer": {
-                            "probability": round(p_phobert, 4),
-                            "weight": 0.0,
-                            "weight_pct": "N/A (Tiếng Việt)",
-                        },
+                        "bert": {"probability": round(p_phobert, 4), "weight": 0.0, "weight_pct": "N/A (Tiếng Việt)"},
+                        "roberta": {"probability": round(p_phobert, 4), "weight": 0.0, "weight_pct": "N/A (Tiếng Việt)"},
+                        "longformer": {"probability": round(p_phobert, 4), "weight": 0.0, "weight_pct": "N/A (Tiếng Việt)"},
                     },
                 }
 
@@ -448,27 +431,12 @@ class AITextDetector:
 
         inference_time_ms = (time.time() - t0) * 1000
 
-        # 3. Quyết định phân loại nhị phân
+        # 3. Quyết định phân loại nhị phân & độ tin cậy
         final_ai_prob = p_weighted
         is_ai = final_ai_prob >= threshold
-
         label = "AI-generated" if is_ai else "Human-written"
         label_vi = "Do AI sinh (ChatGPT/LLM)" if is_ai else "Do người viết (Human)"
-
-        # 4. Xác định mức độ tin cậy
-        diff = abs(final_ai_prob - threshold)
-        if diff >= 0.40:
-            confidence = "Rất cao (Very High)"
-            confidence_level = "VERY_HIGH"
-        elif diff >= 0.25:
-            confidence = "Cao (High)"
-            confidence_level = "HIGH"
-        elif diff >= 0.10:
-            confidence = "Trung bình (Moderate)"
-            confidence_level = "MODERATE"
-        else:
-            confidence = "Không chắc chắn / Ngưỡng ranh giới (Uncertain)"
-            confidence_level = "LOW"
+        confidence, confidence_level = self._compute_confidence(final_ai_prob, threshold, is_vi=False)
 
         result = {
             "label": label,
@@ -548,29 +516,7 @@ class AITextDetector:
         # 1. Nếu là Tiếng Việt và PhoBERT đã nạp
         if lang == "vi" and self.model_phobert is not None:
             probs = self._predict_phobert(eval_sentences)
-            sentence_results = []
-            for idx, sentence in enumerate(eval_sentences):
-                prob = float(probs[idx])
-                if prob >= 0.80:
-                    color = "red"
-                    level = "Chắc chắn AI"
-                elif prob >= 0.50:
-                    color = "yellow"
-                    level = "Nghi vấn AI"
-                else:
-                    color = "green"
-                    level = "Văn phong tự nhiên (Người)"
-
-                sentence_results.append({
-                    "sentence_index": idx + 1,
-                    "sentence": sentence,
-                    "word_count": len(sentence.split()),
-                    "ai_probability": round(prob, 4),
-                    "ai_percentage": f"{prob * 100:.1f}%",
-                    "highlight_color": color,
-                    "assessment": level,
-                })
-            return sentence_results
+            return self._format_sentence_results(eval_sentences, probs)
 
         # 2. Nếu là Tiếng Anh: Tối ưu hóa Batch Inference
         p_bert = self._predict_bert(eval_sentences) if self.model_bert else np.full(len(eval_sentences), 0.5)
@@ -589,30 +535,7 @@ class AITextDetector:
             w_roberta = self.weights[1] / w_sum
             p_weighted = w_bert * p_bert + w_roberta * p_roberta
 
-        sentence_results = []
-        for idx, sentence in enumerate(eval_sentences):
-            prob = float(p_weighted[idx])
-            if prob >= 0.80:
-                color = "red"
-                level = "Chắc chắn AI"
-            elif prob >= 0.50:
-                color = "yellow"
-                level = "Nghi vấn AI"
-            else:
-                color = "green"
-                level = "Văn phong tự nhiên (Người)"
-
-            sentence_results.append({
-                "sentence_index": idx + 1,
-                "sentence": sentence,
-                "word_count": len(sentence.split()),
-                "ai_probability": round(prob, 4),
-                "ai_percentage": f"{prob * 100:.1f}%",
-                "highlight_color": color,
-                "assessment": level,
-            })
-
-        return sentence_results
+        return self._format_sentence_results(eval_sentences, p_weighted)
 
     def benchmark_latency(self, num_runs: int = 5) -> Dict[str, Any]:
         """Đo đạc độ trễ suy luận chuẩn khoa học trên cả tiếng Anh và tiếng Việt."""

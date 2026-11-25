@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
     print("  KHỞI ĐỘNG FASTAPI BACKEND SERVER - VERITEXT AI")
     print("=" * 70)
 
-    # Đảm bảo CSDL SQLite đã sẵn sàng
+    # Đảm bảo CSDL Microsoft SQL Server 2022 (VeriTextAI) đã sẵn sàng
     db.init_db()
 
     # Tự động tìm thư mục chứa models_dir ('output')
@@ -159,6 +159,7 @@ class SentenceAnalysisRequest(BaseModel):
         description="Đoạn văn bản cần phân tích và bóc tách từng câu để tô màu.",
     )
     threshold: float = Field(default=0.5, ge=0.0, le=1.0)
+    title: Optional[str] = Field(default=None, description="Tiêu đề tùy chọn cho lượt quét")
     language: Optional[str] = Field(default=None, description="Tùy chọn chỉ định ngôn ngữ ('en' hoặc 'vi')")
 
 
@@ -338,6 +339,81 @@ async def detect_text(req: DetectRequest):
         )
 
 
+MAX_UPLOAD_SIZE_BYTES = 15 * 1024 * 1024  # Giới hạn 15 MB cho tệp tải lên
+
+
+def _execute_full_analysis_and_save(
+    clean_text: str,
+    threshold: float,
+    title: Optional[str] = None,
+    filename: Optional[str] = None,
+    language: Optional[str] = None,
+    current_user: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Helper dùng chung để suy luận tổng thể, bóc tách từng câu và lưu lịch sử vào SQL Server."""
+    t0 = time.time()
+    overall_pred = detector_instance.predict(
+        clean_text,
+        threshold=threshold,
+        detailed=True,
+        force_language=language,
+    )
+    sentences = detector_instance.analyze_sentences(
+        clean_text,
+        threshold=threshold,
+        force_language=language,
+    )
+    total_time_ms = round((time.time() - t0) * 1000, 2)
+
+    red_count = sum(1 for s in sentences if s["highlight_color"] == "red")
+    yellow_count = sum(1 for s in sentences if s["highlight_color"] == "yellow")
+    green_count = sum(1 for s in sentences if s["highlight_color"] == "green")
+
+    ind_models = overall_pred.get("model_breakdown", {}).get("individual_models", {})
+    score_bert = float(ind_models.get("bert", {}).get("probability", overall_pred["ai_probability"]))
+    score_roberta = float(ind_models.get("roberta", {}).get("probability", overall_pred["ai_probability"]))
+    score_longformer = float(ind_models.get("longformer", {}).get("probability", overall_pred["ai_probability"]))
+
+    auto_title = title or (f"Tài liệu: {filename}" if filename else clean_text[:45] + ("..." if len(clean_text) > 45 else ""))
+
+    scan_id = db.save_scan(
+        title=auto_title,
+        filename=filename,
+        full_text=clean_text,
+        word_count=len(clean_text.split()),
+        char_count=len(clean_text),
+        ai_probability=overall_pred["ai_probability"],
+        verdict=overall_pred["label"],
+        confidence=overall_pred["confidence"],
+        inference_time_ms=total_time_ms,
+        score_bert=score_bert,
+        score_roberta=score_roberta,
+        score_longformer=score_longformer,
+        details_json={
+            "language": overall_pred.get("language", "en"),
+            "language_label": overall_pred.get("language_label", "Tiếng Anh"),
+            "detected_model": overall_pred.get("detected_model", ""),
+            "sentences": sentences,
+            "model_breakdown": overall_pred.get("model_breakdown"),
+        },
+        user_id=current_user["id"] if current_user else None,
+        language=overall_pred.get("language", "en"),
+    )
+
+    return {
+        "scan_id": scan_id,
+        "overall": overall_pred,
+        "sentence_summary": {
+            "total_sentences": len(sentences),
+            "ai_hotspots_red": red_count,
+            "ai_suspicious_yellow": yellow_count,
+            "human_green": green_count,
+        },
+        "sentences": sentences,
+        "total_processing_time_ms": total_time_ms,
+    }
+
+
 @app.post("/api/v1/detect/sentences", tags=["Detection"])
 async def detect_sentences(
     req: SentenceAnalysisRequest,
@@ -363,65 +439,13 @@ async def detect_sentences(
         )
 
     try:
-        t0 = time.time()
-        overall_pred = detector_instance.predict(
-            clean_text,
+        return _execute_full_analysis_and_save(
+            clean_text=clean_text,
             threshold=req.threshold,
-            detailed=True,
-            force_language=req.language,
+            title=req.title,
+            language=req.language,
+            current_user=current_user,
         )
-        sentences = detector_instance.analyze_sentences(
-            clean_text,
-            threshold=req.threshold,
-            force_language=req.language,
-        )
-        total_time_ms = round((time.time() - t0) * 1000, 2)
-
-        red_count = sum(1 for s in sentences if s["highlight_color"] == "red")
-        yellow_count = sum(1 for s in sentences if s["highlight_color"] == "yellow")
-        green_count = sum(1 for s in sentences if s["highlight_color"] == "green")
-
-        # Lưu tự động vào CSDL Microsoft SQL Server (VeriTextAI)
-        ind_models = overall_pred.get("model_breakdown", {}).get("individual_models", {})
-        score_bert = float(ind_models.get("bert", {}).get("probability", overall_pred["ai_probability"]))
-        score_roberta = float(ind_models.get("roberta", {}).get("probability", overall_pred["ai_probability"]))
-        score_longformer = float(ind_models.get("longformer", {}).get("probability", overall_pred["ai_probability"]))
-
-        scan_id = db.save_scan(
-            title=clean_text[:40] + "...",
-            full_text=clean_text,
-            word_count=len(clean_text.split()),
-            char_count=len(clean_text),
-            ai_probability=overall_pred["ai_probability"],
-            verdict=overall_pred["label"],
-            confidence=overall_pred["confidence"],
-            inference_time_ms=total_time_ms,
-            score_bert=score_bert,
-            score_roberta=score_roberta,
-            score_longformer=score_longformer,
-            details_json={
-                "language": overall_pred.get("language", "en"),
-                "language_label": overall_pred.get("language_label", "Tiếng Anh"),
-                "detected_model": overall_pred.get("detected_model", ""),
-                "sentences": sentences,
-                "model_breakdown": overall_pred.get("model_breakdown"),
-            },
-            user_id=current_user["id"] if current_user else None,
-            language=overall_pred.get("language", "en"),
-        )
-
-        return {
-            "scan_id": scan_id,
-            "overall": overall_pred,
-            "sentence_summary": {
-                "total_sentences": len(sentences),
-                "ai_hotspots_red": red_count,
-                "ai_suspicious_yellow": yellow_count,
-                "human_green": green_count,
-            },
-            "sentences": sentences,
-            "total_processing_time_ms": total_time_ms,
-        }
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -442,6 +466,7 @@ async def detect_web(
         SentenceAnalysisRequest(
             text=req.text,
             threshold=req.threshold,
+            title=req.title,
             language=req.language,
         ),
         current_user=current_user,
@@ -455,8 +480,8 @@ async def detect_uploaded_file(
     current_user: Optional[Dict[str, Any]] = Depends(auth.get_current_user_optional),
 ):
     """
-    Tiếp nhận tệp tin tải lên (.PDF, .DOCX, .TXT):
-    Tự động trích xuất văn bản sạch, tiến hành phân tích Ensemble PLMs
+    Tiếp nhận tệp tin tải lên (.PDF, .DOCX, .DOC, .TXT):
+    Tự động trích xuất văn bản sạch, tiến hành phân tích Ensemble PLMs / PhoBERT
     và lưu trữ lịch sử thẩm định kèm tên tệp gốc.
     """
     if detector_instance is None:
@@ -470,6 +495,11 @@ async def detect_uploaded_file(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Tệp tin tải lên rỗng (Empty file).",
+        )
+    if len(content_bytes) > MAX_UPLOAD_SIZE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Tệp tin vượt quá kích thước tối đa cho phép (15 MB).",
         )
 
     try:
@@ -486,58 +516,15 @@ async def detect_uploaded_file(
             detail="Nội dung văn bản trong tệp quá ngắn (yêu cầu ít nhất 5 từ).",
         )
 
-    t0 = time.time()
-    overall_pred = detector_instance.predict(extracted_text, threshold=threshold, detailed=True)
-    sentences = detector_instance.analyze_sentences(extracted_text, threshold=threshold)
-    total_time_ms = round((time.time() - t0) * 1000, 2)
-
-    red_count = sum(1 for s in sentences if s["highlight_color"] == "red")
-    yellow_count = sum(1 for s in sentences if s["highlight_color"] == "yellow")
-    green_count = sum(1 for s in sentences if s["highlight_color"] == "green")
-
-    ind_models = overall_pred.get("model_breakdown", {}).get("individual_models", {})
-    score_bert = float(ind_models.get("bert", {}).get("probability", overall_pred["ai_probability"]))
-    score_roberta = float(ind_models.get("roberta", {}).get("probability", overall_pred["ai_probability"]))
-    score_longformer = float(ind_models.get("longformer", {}).get("probability", overall_pred["ai_probability"]))
-
-    scan_id = db.save_scan(
-        title=f"Tài liệu: {file.filename}",
+    res = _execute_full_analysis_and_save(
+        clean_text=extracted_text,
+        threshold=threshold,
         filename=file.filename,
-        full_text=extracted_text,
-        word_count=len(extracted_text.split()),
-        char_count=len(extracted_text),
-        ai_probability=overall_pred["ai_probability"],
-        verdict=overall_pred["label"],
-        confidence=overall_pred["confidence"],
-        inference_time_ms=total_time_ms,
-        score_bert=score_bert,
-        score_roberta=score_roberta,
-        score_longformer=score_longformer,
-        details_json={
-            "language": overall_pred.get("language", "en"),
-            "language_label": overall_pred.get("language_label", "Tiếng Anh"),
-            "detected_model": overall_pred.get("detected_model", ""),
-            "sentences": sentences,
-            "model_breakdown": overall_pred.get("model_breakdown"),
-        },
-        user_id=current_user["id"] if current_user else None,
-        language=overall_pred.get("language", "en"),
+        current_user=current_user,
     )
-
-    return {
-        "scan_id": scan_id,
-        "filename": file.filename,
-        "extracted_text": extracted_text,
-        "overall": overall_pred,
-        "sentence_summary": {
-            "total_sentences": len(sentences),
-            "ai_hotspots_red": red_count,
-            "ai_suspicious_yellow": yellow_count,
-            "human_green": green_count,
-        },
-        "sentences": sentences,
-        "total_processing_time_ms": total_time_ms,
-    }
+    res["filename"] = file.filename
+    res["extracted_text"] = extracted_text
+    return res
 
 
 @app.post("/api/v1/detect/batch", tags=["Detection"])
@@ -624,14 +611,19 @@ async def get_dashboard_stats(
 
 
 @app.get("/api/v1/report/pdf/{scan_id}", tags=["Audit Report"])
-async def export_pdf_report(scan_id: int):
+async def export_pdf_report(
+    scan_id: int,
+    current_user: Optional[Dict[str, Any]] = Depends(auth.get_current_user_from_header_or_query),
+):
     """
     Sinh và tải về Báo Cáo Giám Định Nguồn Gốc Văn Bản dạng PDF (AI Audit Certificate)
-    có đánh số trang, đóng dấu phân rã mô hình và bảng cấp câu AI Hotspots.
+    có đánh số trang, đóng dấu phân rã mô hình và bảng cấp câu AI Hotspots (có kiểm tra RBAC).
     """
-    scan_data = db.get_scan_by_id(scan_id)
+    user_id = current_user["id"] if current_user else None
+    role = current_user["role"] if current_user else None
+    scan_data = db.get_scan_by_id(scan_id, user_id=user_id, role=role)
     if not scan_data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy dữ liệu lượt quét.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy dữ liệu lượt quét hoặc bạn không có quyền truy cập.")
 
     try:
         pdf_bytes = generate_pdf_report(scan_data)

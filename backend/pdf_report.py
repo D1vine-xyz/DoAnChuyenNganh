@@ -7,6 +7,7 @@ import os
 import io
 from datetime import datetime
 from typing import Dict, Any, Optional
+from xml.sax.saxutils import escape as xml_escape
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -145,36 +146,40 @@ def generate_pdf_report(scan_data: Dict[str, Any]) -> bytes:
     story.append(Spacer(1, 10))
     story.append(Paragraph("BÁO CÁO GIÁM ĐỊNH NGUỒN GỐC VĂN BẢN", title_style))
     story.append(Spacer(1, 3))
-    story.append(Paragraph("AI-GENERATED TEXT INSPECTION & AUDIT CERTIFICATE", subtitle_style))
-    story.append(Paragraph("Hệ thống kết hợp mô hình ngôn ngữ lớn: BERT, RoBERTa và Longformer", subtitle_style))
+    story.append(Paragraph("AI-GENERATED TEXT INSPECTION &amp; AUDIT CERTIFICATE", subtitle_style))
+    story.append(Paragraph("Hệ thống Song ngữ: PhoBERT base v2 (Tiếng Việt) &amp; Ensemble PLMs (Tiếng Anh)", subtitle_style))
     story.append(Spacer(1, 12))
 
     # 2. Thông tin thẩm định (Metadata Table)
     scan_id = scan_data.get("id", "N/A")
-    timestamp_str = scan_data.get("timestamp", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    timestamp_str = scan_data.get("timestamp") or scan_data.get("created_at") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     doc_title = scan_data.get("title") or scan_data.get("filename") or "Văn bản phân tích trực tiếp"
+    author_name = scan_data.get("author_name") or "Khách vãng lai"
+    lang_code = scan_data.get("language", "en")
+    is_vi = lang_code == "vi"
     word_count = scan_data.get("word_count", 0)
     char_count = scan_data.get("char_count", 0)
     proc_time = scan_data.get("inference_time_ms", 0.0)
+    method_label = "PhoBERT base v2 + PyVi (Tiếng Việt)" if is_vi else "Weighted Ensemble (3 PLMs - Tiếng Anh)"
 
     meta_table_data = [
         [
             Paragraph("<b>Mã thẩm định:</b>", body_style),
-            Paragraph(f"AUDIT-{scan_id:06d}" if isinstance(scan_id, int) else str(scan_id), body_bold),
+            Paragraph(f"AUDIT-{scan_id:06d}" if isinstance(scan_id, int) else xml_escape(str(scan_id)), body_bold),
             Paragraph("<b>Thời gian thực hiện:</b>", body_style),
-            Paragraph(str(timestamp_str), body_style),
+            Paragraph(xml_escape(str(timestamp_str)), body_style),
         ],
         [
             Paragraph("<b>Tên tài liệu:</b>", body_style),
-            Paragraph(str(doc_title)[:45], body_bold),
+            Paragraph(xml_escape(str(doc_title)[:45]), body_bold),
             Paragraph("<b>Độ dài văn bản:</b>", body_style),
             Paragraph(f"{word_count:,} từ ({char_count:,} ký tự)", body_style),
         ],
         [
             Paragraph("<b>Phương pháp:</b>", body_style),
-            Paragraph("Weighted Ensemble (3 PLMs)", body_style),
-            Paragraph("<b>Thời gian phản hồi:</b>", body_style),
-            Paragraph(f"{proc_time} ms", body_style),
+            Paragraph(method_label, body_style),
+            Paragraph("<b>Người thực hiện:</b>", body_style),
+            Paragraph(f"{xml_escape(str(author_name)[:32])} ({proc_time} ms)", body_style),
         ],
     ]
 
@@ -192,10 +197,11 @@ def generate_pdf_report(scan_data: Dict[str, Any]) -> bytes:
     story.append(Spacer(1, 14))
 
     # 3. Khung kết luận chính thức (Official Verdict Box)
-    is_ai = scan_data.get("verdict") == "AI-generated" or scan_data.get("ai_probability", 0) >= 0.5
+    raw_verdict = scan_data.get("verdict") or scan_data.get("label") or ""
     ai_prob = float(scan_data.get("ai_probability", 0.0))
+    is_ai = raw_verdict == "AI-generated" or (not raw_verdict and ai_prob >= 0.5)
     human_prob = 1.0 - ai_prob
-    confidence = scan_data.get("confidence", "Cao")
+    confidence = xml_escape(str(scan_data.get("confidence", "Cao")))
 
     box_bg = colors.HexColor("#FEF2F2") if is_ai else colors.HexColor("#F0FDF4")
     box_border = colors.HexColor("#EF4444") if is_ai else colors.HexColor("#10B981")
@@ -245,52 +251,69 @@ def generate_pdf_report(scan_data: Dict[str, Any]) -> bytes:
     story.append(Spacer(1, 14))
 
     # 4. Bảng phân rã điểm số các mô hình thành phần (Ensemble Decomposition)
-    story.append(Paragraph("📊 <b>Đóng Góp Của Các Mô Hình Trong Kiến Trúc Học Kết Hợp</b>", section_heading))
+    story.append(Paragraph("📊 <b>Đóng Góp Của Mô Hình Đánh Giá (Model Breakdown)</b>", section_heading))
 
-    score_longformer = scan_data.get("score_longformer", 0.0)
-    score_bert = scan_data.get("score_bert", 0.0)
-    score_roberta = scan_data.get("score_roberta", 0.0)
-
-    # Nếu có breakdown trong details
     details = scan_data.get("details", {})
-    if "model_breakdown" in details:
-        mb = details["model_breakdown"].get("individual_models", {})
-        score_longformer = mb.get("longformer", {}).get("probability", score_longformer)
-        score_bert = mb.get("bert", {}).get("probability", score_bert)
-        score_roberta = mb.get("roberta", {}).get("probability", score_roberta)
+    mb = details.get("model_breakdown", {}).get("individual_models", {})
 
-    breakdown_data = [
-        [
-            Paragraph("<b>Mô hình nền tảng (PLM)</b>", body_bold),
-            Paragraph("<b>Đặc tả kỹ thuật</b>", body_bold),
-            Paragraph("<b>Trọng số đóng góp</b>", body_bold),
-            Paragraph("<b>Xác suất dự đoán AI</b>", body_bold),
-        ],
-        [
-            Paragraph("<b>Longformer</b> (longformer-base-4096)", body_style),
-            Paragraph("Ngữ cảnh 1024 tokens, Sliding Window Attention", body_style),
-            Paragraph("<b>48.65%</b> (Trụ cột)", body_style),
-            Paragraph(f"<b>{score_longformer*100:.2f}%</b>", body_style),
-        ],
-        [
-            Paragraph("<b>BERT</b> (bert-base-uncased)", body_style),
-            Paragraph("Ngữ cảnh 512 tokens, Tối ưu câu đơn và tin ngắn", body_style),
-            Paragraph("<b>33.96%</b>", body_style),
-            Paragraph(f"<b>{score_bert*100:.2f}%</b>", body_style),
-        ],
-        [
-            Paragraph("<b>RoBERTa</b> (roberta-base)", body_style),
-            Paragraph("Ngữ cảnh 512 tokens, Nhạy bén biến thể AI", body_style),
-            Paragraph("<b>17.38%</b>", body_style),
-            Paragraph(f"<b>{score_roberta*100:.2f}%</b>", body_style),
-        ],
-        [
-            Paragraph("<b>Ensemble (Weighted Soft Voting)</b>", body_bold),
-            Paragraph("Dung hợp đa mô hình tối ưu theo hàm Log Loss", body_bold),
-            Paragraph("<b>100.0%</b>", body_bold),
-            Paragraph(f"<b>{ai_prob*100:.2f}% AI</b>", body_bold),
-        ],
-    ]
+    if is_vi:
+        p_phobert = mb.get("phobert", {}).get("probability", ai_prob)
+        breakdown_data = [
+            [
+                Paragraph("<b>Mô hình nền tảng (PLM)</b>", body_bold),
+                Paragraph("<b>Đặc tả kỹ thuật</b>", body_bold),
+                Paragraph("<b>Trọng số đóng góp</b>", body_bold),
+                Paragraph("<b>Xác suất dự đoán AI</b>", body_bold),
+            ],
+            [
+                Paragraph("<b>PhoBERT v2</b> (vinai/phobert-base-v2)", body_style),
+                Paragraph("Ngữ cảnh 256 tokens, Huấn luyện 5.000 mẫu Tiếng Việt (Acc 98.93%)", body_style),
+                Paragraph("<b>100.0%</b> (Chuyên biệt VN)", body_style),
+                Paragraph(f"<b>{p_phobert*100:.2f}%</b>", body_style),
+            ],
+            [
+                Paragraph("<b>PyVi Word Segmenter</b>", body_style),
+                Paragraph("Tách từ ghép tiếng Việt chuẩn hóa BPE 64.000 tokens", body_style),
+                Paragraph("Tiền xử lý", body_style),
+                Paragraph("Hoàn tất", body_style),
+            ],
+        ]
+    else:
+        score_longformer = mb.get("longformer", {}).get("probability", scan_data.get("score_longformer", ai_prob))
+        score_bert = mb.get("bert", {}).get("probability", scan_data.get("score_bert", ai_prob))
+        score_roberta = mb.get("roberta", {}).get("probability", scan_data.get("score_roberta", ai_prob))
+        breakdown_data = [
+            [
+                Paragraph("<b>Mô hình nền tảng (PLM)</b>", body_bold),
+                Paragraph("<b>Đặc tả kỹ thuật</b>", body_bold),
+                Paragraph("<b>Trọng số đóng góp</b>", body_bold),
+                Paragraph("<b>Xác suất dự đoán AI</b>", body_bold),
+            ],
+            [
+                Paragraph("<b>Longformer</b> (longformer-base-4096)", body_style),
+                Paragraph("Ngữ cảnh 1024 tokens, Sliding Window Attention", body_style),
+                Paragraph("<b>48.65%</b> (Trụ cột)", body_style),
+                Paragraph(f"<b>{score_longformer*100:.2f}%</b>", body_style),
+            ],
+            [
+                Paragraph("<b>BERT</b> (bert-base-uncased)", body_style),
+                Paragraph("Ngữ cảnh 512 tokens, Tối ưu câu đơn và tin ngắn", body_style),
+                Paragraph("<b>33.96%</b>", body_style),
+                Paragraph(f"<b>{score_bert*100:.2f}%</b>", body_style),
+            ],
+            [
+                Paragraph("<b>RoBERTa</b> (roberta-base)", body_style),
+                Paragraph("Ngữ cảnh 512 tokens, Nhạy bén biến thể AI", body_style),
+                Paragraph("<b>17.38%</b>", body_style),
+                Paragraph(f"<b>{score_roberta*100:.2f}%</b>", body_style),
+            ],
+            [
+                Paragraph("<b>Ensemble (Weighted Soft Voting)</b>", body_bold),
+                Paragraph("Dung hợp đa mô hình tối ưu theo hàm Log Loss", body_bold),
+                Paragraph("<b>100.0%</b>", body_bold),
+                Paragraph(f"<b>{ai_prob*100:.2f}% AI</b>", body_bold),
+            ],
+        ]
 
     breakdown_table = Table(breakdown_data, colWidths=[165, 180, 85, 85])
     breakdown_table.setStyle(TableStyle([
@@ -329,9 +352,9 @@ def generate_pdf_report(scan_data: Dict[str, Any]) -> bytes:
 
             row = [
                 Paragraph(str(s["sentence_index"]), body_style),
-                Paragraph(f"<b>{s['ai_percentage']}</b>", body_style),
+                Paragraph(f"<b>{xml_escape(str(s['ai_percentage']))}</b>", body_style),
                 Paragraph(f"<font color='{color_hex}'><b>{level_text}</b></font>", body_style),
-                Paragraph(s["sentence"], body_style),
+                Paragraph(xml_escape(str(s["sentence"])), body_style),
             ]
             sent_rows.append(row)
 
@@ -349,11 +372,11 @@ def generate_pdf_report(scan_data: Dict[str, Any]) -> bytes:
         story.append(sent_table)
 
     # 6. Đoạn văn bản mẫu thẩm định (Text Excerpt)
-    full_text = scan_data.get("full_text", "")
+    full_text = scan_data.get("full_text") or scan_data.get("text_snippet") or ""
     if full_text:
         story.append(Spacer(1, 10))
         story.append(Paragraph("📄 <b>Trích Đoạn Văn Bản Được Thẩm Định</b>", section_heading))
-        excerpt = full_text[:600] + ("..." if len(full_text) > 600 else "")
+        excerpt = xml_escape(full_text[:700] + ("..." if len(full_text) > 700 else ""))
         quote_p = Paragraph(f"<i>\"{excerpt}\"</i>", body_style)
         quote_table = Table([[quote_p]], colWidths=[515])
         quote_table.setStyle(TableStyle([

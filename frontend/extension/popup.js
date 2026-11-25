@@ -139,7 +139,7 @@ btnClear.addEventListener("click", () => {
 btnAnalyze.addEventListener("click", async () => {
   const text = textInput.value.trim();
   if (text.length < 10) {
-    showError("Vui lòng nhập ít nhất 10 ký tự tiếng Anh để mô hình phân tích chính xác.");
+    showError("Vui lòng nhập ít nhất 10 ký tự (tiếng Anh hoặc tiếng Việt) để mô hình phân tích chính xác.");
     return;
   }
 
@@ -149,42 +149,30 @@ btnAnalyze.addEventListener("click", async () => {
   const threshold = parseFloat(thresholdSlider.value) / 100;
 
   try {
-    // 1. Gửi request phân tích tổng thể
-    const detectRes = await fetch(`${API_BASE_URL}/api/v1/detect`, {
+    // Gọi 1 endpoint duy nhất trả về cả điểm tổng thể (overall) lẫn phân tích từng câu (AI Hotspots)
+    // Tối ưu gấp đôi tốc độ xử lý so với gọi 2 request tuần tự
+    const res = await fetch(`${API_BASE_URL}/api/v1/detect/sentences`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         text: text,
         threshold: threshold,
-        detailed: true,
       }),
     });
 
-    if (!detectRes.ok) {
-      const errData = await detectRes.json();
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
       throw new Error(errData.detail || "Lỗi xử lý API");
     }
 
-    const detectData = await detectRes.json();
-
-    // 2. Gửi request phân tích từng câu (AI Hotspots)
-    const sentenceRes = await fetch(`${API_BASE_URL}/api/v1/detect/sentences`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        text: text,
-        threshold: threshold,
-      }),
-    });
-
-    if (sentenceRes.ok) {
-      const sData = await sentenceRes.json();
-      currentSentenceData = sData.sentences || [];
-    } else {
-      currentSentenceData = [];
+    const data = await res.json();
+    const overallData = data.overall || data;
+    if (data.total_processing_time_ms && !overallData.inference_time_ms) {
+      overallData.inference_time_ms = data.total_processing_time_ms;
     }
+    currentSentenceData = data.sentences || [];
 
-    renderResults(detectData, currentSentenceData);
+    renderResults(overallData, currentSentenceData);
   } catch (err) {
     showError(err.message || "Không thể phân tích. Kiểm tra lại kết nối server!");
   } finally {

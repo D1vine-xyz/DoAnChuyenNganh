@@ -3,12 +3,20 @@ torch>=2.14.0
 transformers>=5.20.0
 datasets>=5.1.0
 scikit-learn>=1.9.0
+joblib>=1.4.0
+pyvi>=0.1.1
+langdetect>=1.0.9
 
 # Data Processing & Utilities
 pandas>=3.1.0
 numpy>=2.5.0
 tqdm>=4.70.0
 requests>=2.34.0
+
+# Database & Authentication (Microsoft SQL Server + JWT + Bcrypt)
+pyodbc>=5.1.0
+PyJWT>=2.9.0
+bcrypt>=4.2.0
 
 # AI APIs & LLM Generation
 google-generativeai>=0.8.6
@@ -20,4 +28,5 @@ uvicorn>=0.30.0
 python-multipart>=0.0.9
 python-docx>=1.1.0
 pypdf>=4.0.0
+olefile>=0.47
 reportlab>=4.0.0
