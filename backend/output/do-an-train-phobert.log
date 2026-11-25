@@ -1,0 +1,168 @@
+[{"stream_name":"stdout","time":1.267142705,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":1.267177529,"data":"  KAGGLE REMOTE JOB: HUẤN LUYỆN MÔ HÌNH PHOBERT TIẾNG VIỆT (TESLA T4 GPU)\n"}
+,{"stream_name":"stdout","time":1.267200534,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":10.227380076,"data":"[*] Phiên bản PyTorch : 2.11.0+cu130\n"}
+,{"stream_name":"stdout","time":10.475638391,"data":"[*] CUDA Sẵn sàng     : True\n"}
+,{"stream_name":"stdout","time":10.512450707,"data":"[*] Tên GPU           : Tesla T4\n"}
+,{"stream_name":"stdout","time":10.512490181,"data":"[*] Bộ nhớ GPU        : 14.56 GB\n"}
+,{"stream_name":"stdout","time":10.512495533,"data":"[*] Đang cài đặt thư viện pyvi...\n"}
+,{"stream_name":"stdout","time":11.676866077,"data":"Collecting pyvi\n"}
+,{"stream_name":"stdout","time":11.855243629,"data":"  Downloading pyvi-0.1.1-py2.py3-none-any.whl.metadata (2.5 kB)\n"}
+,{"stream_name":"stdout","time":11.874617395,"data":"Requirement already satisfied: scikit-learn in /usr/local/lib/python3.13/dist-packages (from pyvi) (1.6.1)\n"}
+,{"stream_name":"stdout","time":11.913500307,"data":"Collecting sklearn-crfsuite (from pyvi)\n"}
+,{"stream_name":"stdout","time":11.950871968,"data":"  Downloading sklearn_crfsuite-0.5.0-py2.py3-none-any.whl.metadata (4.9 kB)\n"}
+,{"stream_name":"stdout","time":11.969222251,"data":"Requirement already satisfied: numpy\u003e=1.19.5 in /usr/local/lib/python3.13/dist-packages (from scikit-learn-\u003epyvi) (2.1.3)\n"}
+,{"stream_name":"stdout","time":11.969994475,"data":"Requirement already satisfied: scipy\u003e=1.6.0 in /usr/local/lib/python3.13/dist-packages (from scikit-learn-\u003epyvi) (1.16.3)\n"}
+,{"stream_name":"stdout","time":11.970807317,"data":"Requirement already satisfied: joblib\u003e=1.2.0 in /usr/local/lib/python3.13/dist-packages (from scikit-learn-\u003epyvi) (1.6.0)\n"}
+,{"stream_name":"stdout","time":11.971589366,"data":"Requirement already satisfied: threadpoolctl\u003e=3.1.0 in /usr/local/lib/python3.13/dist-packages (from scikit-learn-\u003epyvi) (3.7.0)\n"}
+,{"stream_name":"stdout","time":11.980427892,"data":"Requirement already satisfied: cloudpickle\u003e=3.0 in /usr/local/lib/python3.13/dist-packages (from joblib\u003e=1.2.0-\u003escikit-learn-\u003epyvi) (3.1.2)\n"}
+,{"stream_name":"stdout","time":12.10294955,"data":"Collecting python-crfsuite\u003e=0.9.7 (from sklearn-crfsuite-\u003epyvi)\n"}
+,{"stream_name":"stdout","time":12.139450169,"data":"  Downloading python_crfsuite-0.9.12-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (4.3 kB)\n"}
+,{"stream_name":"stdout","time":12.154079535,"data":"Requirement already satisfied: tabulate\u003e=0.4.2 in /usr/local/lib/python3.13/dist-packages (from sklearn-crfsuite-\u003epyvi) (0.9.0)\n"}
+,{"stream_name":"stdout","time":12.154843176,"data":"Requirement already satisfied: tqdm\u003e=2.0 in /usr/local/lib/python3.13/dist-packages (from sklearn-crfsuite-\u003epyvi) (4.67.3)\n"}
+,{"stream_name":"stdout","time":12.196317922,"data":"Downloading pyvi-0.1.1-py2.py3-none-any.whl (8.5 MB)\n"}
+,{"stream_name":"stdout","time":12.479783464,"data":"   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 8.5/8.5 MB 42.3 MB/s  0:00:00\n"}
+,{"stream_name":"stdout","time":12.51658009,"data":"Downloading sklearn_crfsuite-0.5.0-py2.py3-none-any.whl (10 kB)\n"}
+,{"stream_name":"stdout","time":12.57273727,"data":"Downloading python_crfsuite-0.9.12-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (1.2 MB)\n"}
+,{"stream_name":"stdout","time":12.60318666,"data":"   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.2/1.2 MB 35.9 MB/s  0:00:00\n"}
+,{"stream_name":"stdout","time":14.536700512,"data":"Installing collected packages: python-crfsuite, sklearn-crfsuite, pyvi\n"}
+,{"stream_name":"stdout","time":14.761646434,"data":"\n"}
+,{"stream_name":"stdout","time":14.871036001,"data":"Successfully installed python-crfsuite-0.9.12 pyvi-0.1.1 sklearn-crfsuite-0.5.0\n"}
+,{"stream_name":"stdout","time":15.007939736,"data":"[*] Đang tải mã nguồn từ GitHub: https://github.com/D1vine-xyz/DoAnChuyenNganh.git ...\n"}
+,{"stream_name":"stderr","time":15.040074207,"data":"Cloning into '/tmp/DoAnChuyenNganh'...\n"}
+,{"stream_name":"stderr","time":28.965253874,"data":"Updating files:  19% (28/145)\rUpdating files:  20% (29/145)\rUpdating files:  21% (31/145)\rUpdating files:  22% (32/145)\rUpdating files:  23% (34/145)\rUpdating files:  24% (35/145)\rUpdating files:  25% (37/145)\rUpdating files:  26% (38/145)\rUpdating files:  27% (40/145)\rUpdating files:  28% (41/145)\rUpdating files:  29% (43/145)\rUpdating files:  30% (44/145)\rUpdating files:  31% (45/145)\rUpdating files:  32% (47/145)\rUpdating files:  33% (48/145)\rUpdating files:  34% (50/145)\rUpdating files:  35% (51/145)\rUpdating files:  36% (53/145)\rUpdating files:  37% (54/145)\rUpdating files:  38% (56/145)\rUpdating files:  39% (57/145)\rUpdating files:  40% (58/145)\rUpdating files:  41% (60/145)\rUpdating files:  42% (61/145)\rUpdating files:  43% (63/145)\rUpdating files:  44% (64/145)\rUpdating files:  45% (66/145)\rUpdating files:  46% (67/145)\rUpdating files:  47% (69/145)\rUpdating files:  48% (70/145)\rUpdating files:  49% (72/145)\rUpdating files:  50% (73/145)\rUpdating files:  51% (74/145)\rUpdating files:  52% (76/145)\rUpdating files:  53% (77/145)\rUpdating files:  54% (79/145)\rUpdating files:  55% (80/145)\rUpdating files:  56% (82/145)\rUpdating files:  57% (83/145)\rUpdating files:  58% (85/145)\rUpdating files:  59% (86/145)\rUpdating files:  60% (87/145)\rUpdating files:  61% (89/145)\rUpdating files:  62% (90/145)\rUpdating files:  63% (92/145)\rUpdating files:  64% (93/145)\rUpdating files:  65% (95/145)\rUpdating files:  66% (96/145)\rUpdating files:  67% (98/145)\rUpdating files:  68% (99/145)\rUpdating files:  69% (101/145)\rUpdating files:  70% (102/145)\rUpdating files:  71% (103/145)\rUpdating files:  72% (105/145)\rUpdating files:  73% (106/145)\rUpdating files:  74% (108/145)\rUpdating files:  75% (109/145)\rUpdating files:  76% (111/145)\rUpdating files:  77% (112/145)\rUpdating files:  78% (114/145)\rUpdating files:  79% (115/145)\rUpdating files:  80% (116/145)\rUpdating files:  81% (118/145)\rUpdating files:  82% (119/145)\rUpdating files:  83% (121/145)\rUpdating files:  84% (122/145)\rUpdating files:  85% (124/145)\rUpdating files:  86% (125/145)\rUpdating files:  87% (127/145)\rUpdating files:  88% (128/145)\rUpdating files:  89% (130/145)\rUpdating files:  90% (131/145)\rUpdating files:  91% (132/145)\rUpdating files:  92% (134/145)\rUpdating files:  93% (135/145)\rUpdating files:  94% (137/145)\rUpdating files:  95% (138/145)\rUpdating files:  96% (140/145)\rUpdating files:  97% (141/145)\rUpdating files:  98% (143/145)\rUpdating files:  99% (144/145)\rUpdating files: 100% (145/145)\rUpdating files: 100% (145/145), done.\n"}
+,{"stream_name":"stdout","time":28.969891975,"data":"  [v] Sẵn sàng: data/vietnamese_pre2022_train.csv\n"}
+,{"stream_name":"stdout","time":28.969915261,"data":"  [v] Sẵn sàng: data/vietnamese_pre2022_val.csv\n"}
+,{"stream_name":"stdout","time":28.969920159,"data":"  [v] Sẵn sàng: data/vietnamese_pre2022_test.csv\n"}
+,{"stream_name":"stdout","time":28.969924672,"data":"  [v] Sẵn sàng: train_phobert.py\n"}
+,{"stream_name":"stdout","time":28.969937579,"data":"\n"}
+,{"stream_name":"stdout","time":28.969941283,"data":"[*] BẮT ĐẦU CHẠY HUẤN LUYỆN PHOBERT PRE-2022 ĐA MIỀN TRÊN TESLA T4...\n"}
+,{"stream_name":"stderr","time":58.434742442,"data":"Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.\n"}
+,{"stream_name":"stdout","time":93.275894457,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":93.275929411,"data":"  HUẤN LUYỆN MÔ HÌNH PHOBERT TIẾNG VIỆT (vinai/phobert-base-v2)\n"}
+,{"stream_name":"stdout","time":93.275935822,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":93.275940608,"data":"[*] Thiết bị thực thi        : cuda (FP16 AMP: True)\n"}
+,{"stream_name":"stdout","time":93.27594596,"data":"[*] Siêu tham số             : Epochs=4, Batch=16, LR=2e-05, MaxLen=256, LabelSmooth=0.05\n"}
+,{"stream_name":"stdout","time":93.275951824,"data":"[*] Đang đọc dữ liệu từ:\n"}
+,{"stream_name":"stdout","time":93.275957152,"data":"    - Train: /tmp/DoAnChuyenNganh/backend/data/vietnamese_pre2022_train.csv\n"}
+,{"stream_name":"stdout","time":93.275961826,"data":"    - Val  : /tmp/DoAnChuyenNganh/backend/data/vietnamese_pre2022_val.csv\n"}
+,{"stream_name":"stdout","time":93.275966262,"data":"    - Test : /tmp/DoAnChuyenNganh/backend/data/vietnamese_pre2022_test.csv\n"}
+,{"stream_name":"stdout","time":93.275970779,"data":"  - Tập Train : 5,600 mẫu | Tập Val: 1,200 mẫu | Tập Test: 1,200 mẫu\n"}
+,{"stream_name":"stdout","time":93.275976086,"data":"[*] Đang tải Tokenizer PhoBERT: vinai/phobert-base-v2 ...\n"}
+,{"stream_name":"stdout","time":93.275982014,"data":"    -\u003e Đã tiền xử lý PyVi + PhoBERT Tokenizer cho 5,600 mẫu trong 20.3s\n"}
+,{"stream_name":"stdout","time":93.275987752,"data":"    -\u003e Đã tiền xử lý PyVi + PhoBERT Tokenizer cho 1,200 mẫu trong 4.2s\n"}
+,{"stream_name":"stdout","time":93.275992998,"data":"    -\u003e Đã tiền xử lý PyVi + PhoBERT Tokenizer cho 1,200 mẫu trong 4.3s\n"}
+,{"stream_name":"stdout","time":93.2760071,"data":"[*] Đang nạp mô hình PhoBERT backbone...\n"}
+,{"stream_name":"stderr","time":93.295855537,"data":"\rLoading weights:   0%|          | 0/197 [00:00\u003c?, ?it/s]\rLoading weights: 100%|██████████| 197/197 [00:00\u003c00:00, 11482.30it/s]\n"}
+,{"stream_name":"stderr","time":93.325807746,"data":"[transformers] \u001b[1mRobertaModel LOAD REPORT\u001b[0m from: vinai/phobert-base-v2\n"}
+,{"stream_name":"stderr","time":93.325833776,"data":"Key                       | Status     | \n"}
+,{"stream_name":"stderr","time":93.325839414,"data":"--------------------------+------------+-\n"}
+,{"stream_name":"stderr","time":93.32584414,"data":"lm_head.bias              | UNEXPECTED | \n"}
+,{"stream_name":"stderr","time":93.325848869,"data":"lm_head.dense.weight      | UNEXPECTED | \n"}
+,{"stream_name":"stderr","time":93.325853523,"data":"lm_head.dense.bias        | UNEXPECTED | \n"}
+,{"stream_name":"stderr","time":93.325857945,"data":"lm_head.layer_norm.weight | UNEXPECTED | \n"}
+,{"stream_name":"stderr","time":93.325862466,"data":"lm_head.layer_norm.bias   | UNEXPECTED | \n"}
+,{"stream_name":"stderr","time":93.325867016,"data":"pooler.dense.weight       | MISSING    | \n"}
+,{"stream_name":"stderr","time":93.325871752,"data":"pooler.dense.bias         | MISSING    | \n"}
+,{"stream_name":"stderr","time":93.325876528,"data":"\n"}
+,{"stream_name":"stderr","time":93.325881004,"data":"Notes:\n"}
+,{"stream_name":"stderr","time":93.325885594,"data":"- UNEXPECTED:\tcan be ignored when loading from different task/architecture; not ok if you expect identical arch.\n"}
+,{"stream_name":"stderr","time":93.325903014,"data":"- MISSING:\tthose params were newly initialized because missing from the checkpoint. Consider training on your downstream task.\n"}
+,{"stream_name":"stdout","time":435.742472045,"data":"\n"}
+,{"stream_name":"stdout","time":435.742533181,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":435.742538078,"data":"  BẮT ĐẦU VÒNG LẶP HUẤN LUYỆN (FINE-TUNING + LABEL SMOOTHING)\n"}
+,{"stream_name":"stdout","time":435.742542711,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":435.742546183,"data":"  [Epoch 1/4] Step 50/350 | Batch Loss: 0.4956\n"}
+,{"stream_name":"stdout","time":435.742550948,"data":"  [Epoch 1/4] Step 100/350 | Batch Loss: 0.2961\n"}
+,{"stream_name":"stdout","time":435.74258526,"data":"  [Epoch 1/4] Step 150/350 | Batch Loss: 0.3295\n"}
+,{"stream_name":"stdout","time":435.742590814,"data":"  [Epoch 1/4] Step 200/350 | Batch Loss: 0.1326\n"}
+,{"stream_name":"stdout","time":435.742595656,"data":"  [Epoch 1/4] Step 250/350 | Batch Loss: 0.3479\n"}
+,{"stream_name":"stdout","time":435.74260045,"data":"  [Epoch 1/4] Step 300/350 | Batch Loss: 0.1193\n"}
+,{"stream_name":"stdout","time":435.742605219,"data":"  [Epoch 1/4] Step 350/350 | Batch Loss: 0.1178\n"}
+,{"stream_name":"stdout","time":435.742610116,"data":"\n"}
+,{"stream_name":"stdout","time":435.742614746,"data":"\u003e\u003e [EPOCH 1 KẾT QUẢ] (79.3s)\n"}
+,{"stream_name":"stdout","time":435.742620108,"data":"   Train Loss: 0.2523 | Val Loss: 0.0660\n"}
+,{"stream_name":"stdout","time":435.742630839,"data":"   Accuracy  : 98.33% | Precision: 99.49%\n"}
+,{"stream_name":"stdout","time":435.742634382,"data":"   Recall    : 97.17% | F1-Score : 98.31% | AUC: 0.9967\n"}
+,{"stream_name":"stdout","time":435.742638113,"data":"   🌟 Checkpoint mới tốt nhất! Đã lưu: /tmp/DoAnChuyenNganh/backend/output/phobert_best.pt\n"}
+,{"stream_name":"stdout","time":435.74264164,"data":"---------------------------------------------------------------------------\n"}
+,{"stream_name":"stdout","time":435.742644895,"data":"  [Epoch 2/4] Step 50/350 | Batch Loss: 0.1178\n"}
+,{"stream_name":"stdout","time":435.74264813,"data":"  [Epoch 2/4] Step 100/350 | Batch Loss: 0.2031\n"}
+,{"stream_name":"stdout","time":435.742651319,"data":"  [Epoch 2/4] Step 150/350 | Batch Loss: 0.1509\n"}
+,{"stream_name":"stdout","time":435.742654465,"data":"  [Epoch 2/4] Step 200/350 | Batch Loss: 0.1178\n"}
+,{"stream_name":"stdout","time":435.742657608,"data":"  [Epoch 2/4] Step 250/350 | Batch Loss: 0.1175\n"}
+,{"stream_name":"stdout","time":435.742660808,"data":"  [Epoch 2/4] Step 300/350 | Batch Loss: 0.1183\n"}
+,{"stream_name":"stdout","time":435.742663949,"data":"  [Epoch 2/4] Step 350/350 | Batch Loss: 0.1176\n"}
+,{"stream_name":"stdout","time":435.742684596,"data":"\n"}
+,{"stream_name":"stdout","time":435.742688232,"data":"\u003e\u003e [EPOCH 2 KẾT QUẢ] (79.9s)\n"}
+,{"stream_name":"stdout","time":435.742691773,"data":"   Train Loss: 0.1426 | Val Loss: 0.0576\n"}
+,{"stream_name":"stdout","time":435.742710573,"data":"   Accuracy  : 98.67% | Precision: 98.34%\n"}
+,{"stream_name":"stdout","time":435.742716984,"data":"   Recall    : 99.00% | F1-Score : 98.67% | AUC: 0.9986\n"}
+,{"stream_name":"stdout","time":435.74272275,"data":"   🌟 Checkpoint mới tốt nhất! Đã lưu: /tmp/DoAnChuyenNganh/backend/output/phobert_best.pt\n"}
+,{"stream_name":"stdout","time":435.742729138,"data":"---------------------------------------------------------------------------\n"}
+,{"stream_name":"stdout","time":435.742747794,"data":"  [Epoch 3/4] Step 50/350 | Batch Loss: 0.1176\n"}
+,{"stream_name":"stdout","time":435.742752255,"data":"  [Epoch 3/4] Step 100/350 | Batch Loss: 0.1183\n"}
+,{"stream_name":"stdout","time":435.742756059,"data":"  [Epoch 3/4] Step 150/350 | Batch Loss: 0.1174\n"}
+,{"stream_name":"stdout","time":435.742759682,"data":"  [Epoch 3/4] Step 200/350 | Batch Loss: 0.1576\n"}
+,{"stream_name":"stdout","time":435.742763874,"data":"  [Epoch 3/4] Step 250/350 | Batch Loss: 0.1181\n"}
+,{"stream_name":"stdout","time":435.74276765,"data":"  [Epoch 3/4] Step 300/350 | Batch Loss: 0.1178\n"}
+,{"stream_name":"stdout","time":435.742771521,"data":"  [Epoch 3/4] Step 350/350 | Batch Loss: 0.1179\n"}
+,{"stream_name":"stdout","time":435.742775447,"data":"\n"}
+,{"stream_name":"stdout","time":435.742779405,"data":"\u003e\u003e [EPOCH 3 KẾT QUẢ] (79.8s)\n"}
+,{"stream_name":"stdout","time":435.742783694,"data":"   Train Loss: 0.1229 | Val Loss: 0.0633\n"}
+,{"stream_name":"stdout","time":435.742790974,"data":"   Accuracy  : 98.58% | Precision: 97.40%\n"}
+,{"stream_name":"stdout","time":435.742795818,"data":"   Recall    : 99.83% | F1-Score : 98.60% | AUC: 0.9988\n"}
+,{"stream_name":"stdout","time":435.742800752,"data":"---------------------------------------------------------------------------\n"}
+,{"stream_name":"stdout","time":435.74280579,"data":"  [Epoch 4/4] Step 50/350 | Batch Loss: 0.1174\n"}
+,{"stream_name":"stdout","time":435.74281099,"data":"  [Epoch 4/4] Step 100/350 | Batch Loss: 0.1174\n"}
+,{"stream_name":"stdout","time":435.742815596,"data":"  [Epoch 4/4] Step 150/350 | Batch Loss: 0.1175\n"}
+,{"stream_name":"stdout","time":435.742819952,"data":"  [Epoch 4/4] Step 200/350 | Batch Loss: 0.1175\n"}
+,{"stream_name":"stdout","time":435.742824074,"data":"  [Epoch 4/4] Step 250/350 | Batch Loss: 0.1174\n"}
+,{"stream_name":"stdout","time":435.742828946,"data":"  [Epoch 4/4] Step 300/350 | Batch Loss: 0.1175\n"}
+,{"stream_name":"stdout","time":435.742832704,"data":"  [Epoch 4/4] Step 350/350 | Batch Loss: 0.1176\n"}
+,{"stream_name":"stdout","time":435.742837451,"data":"\n"}
+,{"stream_name":"stdout","time":435.742841771,"data":"\u003e\u003e [EPOCH 4 KẾT QUẢ] (79.6s)\n"}
+,{"stream_name":"stdout","time":435.742846807,"data":"   Train Loss: 0.1191 | Val Loss: 0.0515\n"}
+,{"stream_name":"stdout","time":435.742851256,"data":"   Accuracy  : 99.08% | Precision: 98.36%\n"}
+,{"stream_name":"stdout","time":435.742856106,"data":"   Recall    : 99.83% | F1-Score : 99.09% | AUC: 0.9986\n"}
+,{"stream_name":"stdout","time":435.742860601,"data":"   🌟 Checkpoint mới tốt nhất! Đã lưu: /tmp/DoAnChuyenNganh/backend/output/phobert_best.pt\n"}
+,{"stream_name":"stdout","time":435.742865461,"data":"---------------------------------------------------------------------------\n"}
+,{"stream_name":"stdout","time":435.742869932,"data":"[v] Đã lưu Tokenizer PhoBERT vào: /tmp/DoAnChuyenNganh/backend/output/tokenizer_phobert\n"}
+,{"stream_name":"stdout","time":435.74287468,"data":"\n"}
+,{"stream_name":"stdout","time":435.742878877,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":435.742883571,"data":"  ĐÁNH GIÁ TRÊN TẬP TEST TIẾNG VIỆT ĐỘC LẬP (vietnamese_pre2022_test.csv)\n"}
+,{"stream_name":"stdout","time":435.742888758,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":435.742893657,"data":"  - Accuracy  : 99.08%\n"}
+,{"stream_name":"stdout","time":435.742898308,"data":"  - Precision : 98.52%\n"}
+,{"stream_name":"stdout","time":435.742910038,"data":"  - Recall    : 99.67%\n"}
+,{"stream_name":"stdout","time":435.742914472,"data":"  - F1-Score  : 99.09%\n"}
+,{"stream_name":"stdout","time":435.742918426,"data":"  - AUC-ROC   : 0.9991\n"}
+,{"stream_name":"stdout","time":435.742922489,"data":"\n"}
+,{"stream_name":"stdout","time":435.742926431,"data":"  --- ĐỘ CHÍNH XÁC CHI TIẾT TỪNG THỂ LOẠI (PER-GENRE BREAKDOWN) ---\n"}
+,{"stream_name":"stdout","time":435.74293092,"data":"    • [AI   ] AI_BaoChi_CongNghe       (n= 98): Acc=100.00% | Mean AI Prob= 98.1%\n"}
+,{"stream_name":"stdout","time":435.742935254,"data":"    • [AI   ] AI_HocThuat_GiaiThich    (n=109): Acc=100.00% | Mean AI Prob= 98.1%\n"}
+,{"stream_name":"stdout","time":435.742939483,"data":"    • [AI   ] AI_Paraphrase            (n=123): Acc=100.00% | Mean AI Prob= 98.1%\n"}
+,{"stream_name":"stdout","time":435.742943697,"data":"    • [AI   ] AI_TieuLuan_TongHop      (n=195): Acc= 99.49% | Mean AI Prob= 97.5%\n"}
+,{"stream_name":"stdout","time":435.742948051,"data":"    • [AI   ] AI_VanHoc_Truyen         (n= 75): Acc= 98.67% | Mean AI Prob= 97.3%\n"}
+,{"stream_name":"stdout","time":435.742952389,"data":"    • [Human] BaoChi_TruyenThong       (n=150): Acc= 98.67% | Mean AI Prob=  3.3%\n"}
+,{"stream_name":"stdout","time":435.742956691,"data":"    • [Human] HocThuat_BachKhoa        (n=150): Acc= 98.67% | Mean AI Prob=  3.5%\n"}
+,{"stream_name":"stdout","time":435.742960888,"data":"    • [Human] PhapLuat_ChinhThong      (n= 75): Acc=100.00% | Mean AI Prob=  2.1%\n"}
+,{"stream_name":"stdout","time":435.742965921,"data":"    • [Human] Sach_TriThuc             (n= 90): Acc= 98.89% | Mean AI Prob=  3.3%\n"}
+,{"stream_name":"stdout","time":435.742972142,"data":"    • [Human] TruyenNgan               (n= 30): Acc= 86.67% | Mean AI Prob= 14.6%\n"}
+,{"stream_name":"stdout","time":435.742995422,"data":"    • [Human] VanHoc_KinhDien          (n= 53): Acc=100.00% | Mean AI Prob=  2.8%\n"}
+,{"stream_name":"stdout","time":435.743000906,"data":"    • [Human] VanTho_TruyenThong       (n= 52): Acc=100.00% | Mean AI Prob=  2.1%\n"}
+,{"stream_name":"stdout","time":435.743005249,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":435.743010377,"data":"🎉 HOÀN TẤT HUẤN LUYỆN PHOBERT! Checkpoint: /tmp/DoAnChuyenNganh/backend/output/phobert_best.pt\n"}
+,{"stream_name":"stdout","time":435.743015705,"data":"\n"}
+,{"stream_name":"stdout","time":440.309669931,"data":"  [v] Đã lưu model: /kaggle/working/phobert_best.pt\n"}
+,{"stream_name":"stdout","time":440.309938019,"data":"  [v] Đã lưu kết quả test: /kaggle/working/phobert_test_results.json\n"}
+,{"stream_name":"stdout","time":440.310169772,"data":"===========================================================================\n"}
+,{"stream_name":"stdout","time":440.310180255,"data":"  HOÀN TẤT HUẤN LUYỆN KAGGLE PHOBERT!\n"}
+,{"stream_name":"stdout","time":440.310184547,"data":"===========================================================================\n"}
+,{"stream_name":"stderr","time":443.012614658,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":443.012649525,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":443.285161869,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":443.285187694,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":444.121046342,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":445.204971412,"data":"[NbConvertApp] Writing 287038 bytes to __results__.html\n"}
+]

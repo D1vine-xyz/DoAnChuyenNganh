@@ -355,7 +355,7 @@ def generate_pdf_report(scan_data: Dict[str, Any]) -> bytes:
             ],
             [
                 Paragraph("<b>PhoBERT v2</b> (vinai/phobert-base-v2)", body_style),
-                Paragraph("Ngữ cảnh 256 tokens, Huấn luyện 5.000 mẫu Tiếng Việt (Acc 98.93%)", body_style),
+                Paragraph("Ngữ cảnh 256 tokens, Huấn luyện 8.000 mẫu Pre-2022 12 thể loại (Acc 99.08%)", body_style),
                 Paragraph("<b>100.0%</b> (Chuyên biệt VN)", body_style),
                 Paragraph(f"<b>{p_phobert*100:.2f}%</b>", body_style),
             ],

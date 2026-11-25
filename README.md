@@ -2,7 +2,7 @@
 
 Đồ án chuyên ngành (Chủ đề 6) nghiên cứu và xây dựng hệ thống phát hiện văn bản do các Mô hình Ngôn ngữ Lớn (LLMs như ChatGPT, Gemini) tạo ra, hỗ trợ **Song ngữ Anh - Việt** với kiến trúc Định tuyến Thông minh (Dynamic Language Router), CSDL **Microsoft SQL Server 2022 (`VeriTextAI`)** và **Phân quyền RBAC (JWT + Bcrypt)**:
 - **Tuyến Tiếng Anh**: Kỹ thuật học kết hợp (Ensemble Learning) từ 3 mô hình tiền huấn luyện lớn: **Longformer (1024 tokens)**, **BERT** và **RoBERTa** (Đạt độ chính xác **96.52%**, Precision **98.38%**).
-- **Tuyến Tiếng Việt**: Mô hình bản địa hóa chuyên sâu **PhoBERT base v2** (VinAI) kết hợp tách từ **PyVi** huấn luyện trên bộ dữ liệu **5.000 mẫu** (Đạt **Accuracy 98.93%**, **Recall 100.0%**, **F1-Score 98.94%**, **ROC-AUC 0.9998**).
+- **Tuyến Tiếng Việt**: Mô hình bản địa hóa chuyên sâu **PhoBERT base v2** (VinAI) kết hợp tách từ **PyVi** huấn luyện trên bộ dữ liệu **8.000 mẫu đa thể loại chuẩn Tiền ChatGPT ($\le 2022$)** gồm 12 phân nhóm (Học thuật/Bách khoa, Báo chí, Pháp luật $\le 2022$, Sách tri thức, Văn học kinh điển, Truyện ngắn, Thơ ca cổ điển + Multi-LLM AI & AI Paraphrase), đạt **Accuracy 99.08%**, **Precision 98.52%**, **Recall 99.67%**, **F1-Score 99.09%**, **ROC-AUC 0.9991**.
 
 ---
 
@@ -418,8 +418,8 @@ Hệ thống được nâng cấp toàn diện lên kiến trúc **Song ngữ An
 - **Tuyến Tiếng Việt (PhoBERT v2 & PyVi):**
   - Mô hình nền tảng: `vinai/phobert-base-v2` (Bộ từ vựng BPE 64.000 tokens bản địa hóa).
   - Phân đoạn từ: Tích hợp thư viện `pyvi` liên kết từ ghép tự động (`trí_tuệ nhân_tạo`).
-  - Tập dữ liệu: **5.000 mẫu đa nguồn cân bằng 50/50** (2.500 Người viết vs 2.500 AI sinh từ VnExpress, Gemini Paraphrase và Benchmark Tiếng Việt đa lĩnh vực), chia phân tầng (Train 3.500, Val 750, Test 750).
-  - Hiệu năng trên tập Test độc lập (750 mẫu): **Accuracy 98.93%**, **Precision 97.91%**, **Recall 100.0%**, **F1-Score 98.94%**, **ROC-AUC 0.9998**.
+  - Tập dữ liệu: **8.000 mẫu đa thể loại chuẩn Tiền 2022 (50/50)** — 4.000 mẫu thuần người xuất bản $\le 11/2022$ (`UIT-ViQuAD 2.0`, `VietNews 2019`, `VN-Law <=2022`, Sách tri thức, Văn học Vũ Trọng Phụng, Truyện ngắn, Thơ ca truyền thống $\le 1945$) đối trọng 4.000 mẫu Multi-LLM AI (`kngann2201`, `DeckardLong Generated & Paraphrase`, `BKAI ShareGPT`, `Gemma-3-12B`, `Sailor2-8B`, `Gemini`), chia phân tầng (Train 5.600, Val 1.200, Test 1.200).
+  - Hiệu năng trên tập Test độc lập (1.200 mẫu - 12 thể loại): **Accuracy 99.08%**, **Precision 98.52%**, **Recall 99.67%**, **F1-Score 99.09%**, **ROC-AUC 0.9991** (tăng **+22.9%** so với bản 5K cũ trên kiểm thử đa miền 12 thể loại, đặc biệt Sách tri thức tăng `+85%`, Học thuật/Bách khoa tăng `+60%`, AI Paraphrase tăng `+65%`).
 - **Tuyến Tiếng Anh (Ensemble 3 PLMs):**
   - Weighted Soft Voting: Longformer (48.65%) + BERT (33.96%) + RoBERTa (17.38%).
   - Đạt **Accuracy 96.52%**, **F1-Score 95.84%** và **AUC-ROC 0.9852**.
@@ -429,7 +429,7 @@ Hệ thống được nâng cấp toàn diện lên kiến trúc **Song ngữ An
 | Ngôn ngữ | Mô hình đảm nhiệm | Tập dữ liệu huấn luyện | Cửa sổ ngữ cảnh | Chỉ số chính (Test Set) |
 | :--- | :--- | :--- | :---: | :---: |
 | 🇬🇧 **Tiếng Anh** | Ensemble (Longformer + BERT + RoBERTa) | GossipCop++ & LIAR (19.148 mẫu) | 1.024 tokens | **Accuracy: 96.52%** \| **F1: 95.84%** |
-| 🇻🇳 **Tiếng Việt** | PhoBERT base v2 + PyVi | Đa nguồn Tiếng Việt (5.000 mẫu) | 256 tokens | **Accuracy: 98.93%** \| **Recall: 100.0%** \| **AUC: 0.9998** |
+| 🇻🇳 **Tiếng Việt** | PhoBERT base v2 + PyVi (Label Smoothing) | Đa thể loại Tiền 2022 (8.000 mẫu - 12 thể loại) | 256 tokens | **Accuracy: 99.08%** \| **F1: 99.09%** \| **AUC: 0.9991** |
 
 ---
 

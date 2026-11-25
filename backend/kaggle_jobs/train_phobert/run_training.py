@@ -38,25 +38,38 @@ BACKEND_DIR = os.path.join(CLONE_DIR, "backend")
 os.chdir(BACKEND_DIR)
 sys.path.insert(0, BACKEND_DIR)
 
-# 4. Kiểm tra file dữ liệu
-for f in ["data/vietnamese_train.csv", "data/vietnamese_val.csv", "data/vietnamese_test.csv", "train_phobert.py"]:
+# 4. Kiểm tra file dữ liệu Pre-2022 8K đa thể loại (fallback sang tập 5K cũ nếu chưa có)
+if os.path.exists("data/vietnamese_pre2022_train.csv"):
+    TRAIN_CSV = "data/vietnamese_pre2022_train.csv"
+    VAL_CSV = "data/vietnamese_pre2022_val.csv"
+    TEST_CSV = "data/vietnamese_pre2022_test.csv"
+else:
+    TRAIN_CSV = "data/vietnamese_train.csv"
+    VAL_CSV = "data/vietnamese_val.csv"
+    TEST_CSV = "data/vietnamese_test.csv"
+
+for f in [TRAIN_CSV, VAL_CSV, TEST_CSV, "train_phobert.py"]:
     if os.path.exists(f):
         print(f"  [v] Sẵn sàng: {f}")
     else:
         print(f"  [X] Thiếu: {f}")
 
-# 5. Huấn luyện PhoBERT
+# 5. Huấn luyện PhoBERT (FP16 + Label Smoothing 0.05 + Per-Genre Evaluation)
 OUTPUT_DIR = "/kaggle/working"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-print("\n[*] BẮT ĐẦU CHẠY HUẤN LUYỆN PHOBERT TRÊN TESLA T4...")
+print("\n[*] BẮT ĐẦU CHẠY HUẤN LUYỆN PHOBERT PRE-2022 ĐA MIỀN TRÊN TESLA T4...")
 train_cmd = [
     sys.executable,
     "train_phobert.py",
+    "--train_file", TRAIN_CSV,
+    "--val_file", VAL_CSV,
+    "--test_file", TEST_CSV,
     "--epochs", "4",
     "--batch_size", "16",
     "--lr", "2e-5",
-    "--max_length", "256"
+    "--max_length", "256",
+    "--label_smoothing", "0.05",
 ]
 
 res = subprocess.run(train_cmd)
