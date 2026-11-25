@@ -449,7 +449,13 @@ def change_user_password(user_id: int, old_password: Optional[str], new_password
                 raise ValueError("Mật khẩu hiện tại không chính xác!")
 
         new_hash = hash_password(new_password)
-        cursor.execute("UPDATE users SET password_hash = ? WHERE id = ?;", (new_hash, user_id))
+        if (provider or "local") == "google":
+            cursor.execute(
+                "UPDATE users SET password_hash = ?, auth_provider = 'hybrid' WHERE id = ?;",
+                (new_hash, user_id),
+            )
+        else:
+            cursor.execute("UPDATE users SET password_hash = ? WHERE id = ?;", (new_hash, user_id))
         conn.commit()
 
 
@@ -555,7 +561,13 @@ def get_history(limit: int = 50, offset: int = 0, user_id: Optional[int] = None,
                 FROM detection_history h
                 LEFT JOIN users u ON h.user_id = u.id
         """
-        if role == "student" and user_id is not None:
+        if role in ("teacher", "admin"):
+            query = select_cols + """
+                ORDER BY h.id DESC
+                OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
+            """
+            cursor.execute(query, (offset, limit))
+        elif role == "student" and user_id is not None:
             query = select_cols + """
                 WHERE h.user_id = ?
                 ORDER BY h.id DESC
@@ -563,7 +575,9 @@ def get_history(limit: int = 50, offset: int = 0, user_id: Optional[int] = None,
             """
             cursor.execute(query, (user_id, offset, limit))
         else:
+            # Khách chưa đăng nhập chỉ xem các lượt quét ẩn danh (user_id IS NULL), bảo vệ dữ liệu riêng của GV/SV
             query = select_cols + """
+                WHERE h.user_id IS NULL
                 ORDER BY h.id DESC
                 OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
             """
@@ -608,10 +622,17 @@ def get_scan_by_id(scan_id: int, user_id: Optional[int] = None, role: Optional[s
         if not row:
             return None
 
-        # Sinh viên không được xem bài của sinh viên khác (nếu bài đó gắn user_id khác)
-        if role == "student" and user_id is not None:
-            if row.user_id is not None and row.user_id != user_id:
-                return None
+        # Kiểm tra phân quyền RBAC chặt chẽ:
+        # - Giảng viên / Admin: xem được toàn bộ
+        # - Sinh viên: chỉ xem bài của mình (hoặc bài ẩn danh công khai)
+        # - Khách chưa đăng nhập: chỉ xem bài ẩn danh (user_id IS NULL), không đọc được bài riêng của GV/SV
+        if role not in ("teacher", "admin"):
+            if role == "student" and user_id is not None:
+                if row.user_id is not None and row.user_id != user_id:
+                    return None
+            else:
+                if row.user_id is not None:
+                    return None
 
         sentences = []
         model_breakdown = {}
@@ -680,13 +701,15 @@ def get_scan_by_id(scan_id: int, user_id: Optional[int] = None, role: Optional[s
 
 
 def delete_scan(scan_id: int, user_id: Optional[int] = None, role: Optional[str] = None) -> bool:
-    """Xóa một lượt quét (Sinh viên chỉ được xóa bài của mình, Giảng viên có thể xóa bất kỳ)."""
+    """Xóa một lượt quét (Giảng viên xóa được mọi bài, Sinh viên chỉ xóa bài mình, Khách chỉ xóa bài ẩn danh)."""
     with get_connection() as conn:
         cursor = conn.cursor()
-        if role == "student" and user_id is not None:
+        if role in ("teacher", "admin"):
+            cursor.execute("DELETE FROM detection_history WHERE id = ?;", (scan_id,))
+        elif role == "student" and user_id is not None:
             cursor.execute("DELETE FROM detection_history WHERE id = ? AND user_id = ?;", (scan_id, user_id))
         else:
-            cursor.execute("DELETE FROM detection_history WHERE id = ?;", (scan_id,))
+            cursor.execute("DELETE FROM detection_history WHERE id = ? AND user_id IS NULL;", (scan_id,))
         conn.commit()
         return cursor.rowcount > 0
 
@@ -697,9 +720,13 @@ def get_statistics(user_id: Optional[int] = None, role: Optional[str] = None) ->
         cursor = conn.cursor()
         where_clause = ""
         params = []
-        if role == "student" and user_id is not None:
+        if role in ("teacher", "admin"):
+            where_clause = ""
+        elif role == "student" and user_id is not None:
             where_clause = "WHERE user_id = ?"
             params.append(user_id)
+        else:
+            where_clause = "WHERE user_id IS NULL"
 
         cursor.execute(
             f"""

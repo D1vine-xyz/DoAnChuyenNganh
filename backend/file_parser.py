@@ -16,11 +16,12 @@ def extract_text_from_file(filename: str, content_bytes: bytes) -> Tuple[str, st
     fn_lower = filename.lower()
 
     if fn_lower.endswith(".txt"):
+        # Ưu tiên utf-8-sig trước để tự động loại bỏ BOM hợp lệ của Windows Notepad (tránh báo nhầm Anti-Bypass)
         try:
-            text = content_bytes.decode("utf-8")
+            text = content_bytes.decode("utf-8-sig")
         except UnicodeDecodeError:
             try:
-                text = content_bytes.decode("utf-8-sig")
+                text = content_bytes.decode("utf-8")
             except UnicodeDecodeError:
                 text = content_bytes.decode("latin-1", errors="replace")
         return text.strip(), "txt"
@@ -34,6 +35,21 @@ def extract_text_from_file(filename: str, content_bytes: bytes) -> Tuple[str, st
             text = para.text.strip()
             if text:
                 full_text.append(text)
+        # Bổ sung trích xuất nội dung nằm trong bảng Word (rất phổ biến ở mẫu báo cáo/tiểu luận)
+        seen_cells = set()
+        for table in doc.tables:
+            for row in table.rows:
+                row_parts = []
+                for cell in row.cells:
+                    cell_id = id(cell._tc)
+                    if cell_id in seen_cells:
+                        continue
+                    seen_cells.add(cell_id)
+                    c_text = cell.text.strip()
+                    if c_text:
+                        row_parts.append(c_text)
+                if row_parts:
+                    full_text.append(" ".join(row_parts))
         return "\n\n".join(full_text).strip(), "docx"
 
     elif fn_lower.endswith(".pdf"):

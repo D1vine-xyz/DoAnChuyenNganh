@@ -69,14 +69,26 @@ def view_database():
 
         # 3. BẢNG LÔ BÀI TẬP LỚP HỌC (CLASSROOM_BATCHES)
         print("[+] 3. BẢNG LÔ CHẤM BÀI TẬP LỚP HỌC (TABLE: classroom_batches)")
-        print_separator("-", 80)
-        cursor.execute("SELECT id, teacher_id, batch_name, total_files, created_at FROM classroom_batches;")
+        print_separator("-", 95)
+        cursor.execute("""
+            SELECT b.id, COALESCE(u.full_name, N'Giảng viên'), b.batch_name,
+                   b.total_files, b.high_risk_count, b.moderate_risk_count,
+                   b.safe_count, b.bypass_count, b.avg_ai_probability, b.created_at
+            FROM classroom_batches b
+            LEFT JOIN users u ON b.teacher_id = u.id
+            ORDER BY b.id DESC;
+        """)
         batches = cursor.fetchall()
         if not batches:
             print("  (Chưa có lô bài tập nào - sẵn sàng cho chức năng chấm bài tập hàng loạt)")
         else:
+            print(f"{'ID':<4} | {'TÊN ĐỢT CHẤM':<28} | {'BÀI':<4} | {'CAO/NV/AT':<11} | {'BYPASS':<6} | {'AI TB':<7} | {'THỜI GIAN':<19}")
+            print_separator("-", 95)
             for b in batches:
-                print(b)
+                bid, tname, bname, total, hi, mod, safe, byp, avg_p, created = b
+                bname_short = (bname[:25] + "...") if bname and len(bname) > 25 else (bname or "")
+                created_str = created.strftime("%Y-%m-%d %H:%M:%S") if created else ""
+                print(f"{bid:<4} | {bname_short:<28} | {total:<4} | {hi}/{mod}/{safe:<5} | {byp:<6} | {avg_p*100:>5.1f}% | {created_str:<19}")
         print_separator("=")
 
 if __name__ == "__main__":

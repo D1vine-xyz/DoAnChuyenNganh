@@ -42,11 +42,13 @@ RISK_LABELS_VI = {
 }
 
 
-def classify_risk_level(ai_prob: float, has_bypass_warning: bool = False) -> str:
-    """Phân loại mức độ rủi ro cho bảng xếp hạng giảng viên."""
-    if has_bypass_warning or ai_prob >= 0.75:
+def classify_risk_level(ai_prob: float, has_bypass_warning: bool = False, threshold: float = 0.5) -> str:
+    """Phân loại mức độ rủi ro cho bảng xếp hạng giảng viên (đồng bộ theo ngưỡng chấm)."""
+    high_cut = max(0.75, min(0.90, threshold + 0.25))
+    mod_cut = min(0.45, threshold)
+    if has_bypass_warning or ai_prob >= high_cut:
         return "high"
-    if ai_prob >= 0.45:
+    if ai_prob >= mod_cut:
         return "moderate"
     return "safe"
 
@@ -146,7 +148,15 @@ def extract_files_from_uploads(
                         if info.file_size > MAX_SINGLE_FILE_BYTES:
                             skipped_files.append({"filename": os.path.basename(member_name), "reason": "Tệp trong ZIP > 15 MB."})
                             continue
-                        raw = zf.read(info)
+                        if total_bytes >= MAX_TOTAL_UNCOMPRESSED_BYTES:
+                            skipped_files.append({"filename": os.path.basename(member_name), "reason": "Vượt tổng dung lượng giải nén 100 MB."})
+                            continue
+                        # Đọc giới hạn tối đa MAX_SINGLE_FILE_BYTES + 1 để chống giả mạo header Zip Bomb
+                        with zf.open(info) as member_stream:
+                            raw = member_stream.read(MAX_SINGLE_FILE_BYTES + 1)
+                        if len(raw) > MAX_SINGLE_FILE_BYTES:
+                            skipped_files.append({"filename": os.path.basename(member_name), "reason": "Tệp thực tế trong ZIP vượt quá 15 MB."})
+                            continue
                         _process_single_doc(os.path.basename(member_name), raw)
             except zipfile.BadZipFile:
                 skipped_files.append({"filename": fname, "reason": "Tệp ZIP không hợp lệ hoặc bị hỏng."})

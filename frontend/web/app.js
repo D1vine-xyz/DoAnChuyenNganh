@@ -70,7 +70,7 @@ const btnExportPdf = document.getElementById("btn-export-pdf");
 const resultActions = document.getElementById("result-actions");
 
 // DOM Elements - Academic Presets & Smart Filters
-const presetBtns = document.querySelectorAll(".preset-pill-btn");
+const presetBtns = document.querySelectorAll(".preset-pill-btn[data-preset]");
 const chkFilterQuotes = document.getElementById("chk-filter-quotes");
 const chkFilterReferences = document.getElementById("chk-filter-references");
 let currentStrictnessPreset = "balanced";
@@ -213,7 +213,7 @@ document.addEventListener("DOMContentLoaded", () => {
               pseudoElement: "::view-transition-new(root)",
             }
           );
-        });
+        }).catch(() => {});
       } else {
         // Fallback for browsers without View Transition API
         applyTheme();
@@ -252,6 +252,16 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   });
+
+  // Click logo -> quay về Tab Thẩm định chính
+  const brandHome = document.getElementById("brand-home");
+  if (brandHome) {
+    brandHome.style.cursor = "pointer";
+    brandHome.addEventListener("click", () => {
+      const inspectTab = document.querySelector('[data-tab="tab-inspect"]');
+      if (inspectTab) inspectTab.click();
+    });
+  }
 
   initClassroomBatchUI();
 });
@@ -591,7 +601,7 @@ function renderResults(data) {
   resultActions.classList.remove("hidden");
 
   const overall = data.overall || data;
-  const isAI = overall.label === "AI-generated" || overall.ai_probability >= 0.5;
+  const isAI = overall.label ? overall.label === "AI-generated" : overall.ai_probability >= 0.5;
   const aiPct = (overall.ai_probability * 100).toFixed(1);
   const humanPct = (overall.human_probability * 100).toFixed(1);
 
@@ -715,8 +725,17 @@ function renderForensicsAndXai(data) {
     }
   }
 
-  // 3. 4-Tier Authorship Box
-  const tier = data.authorship_tier;
+  // 3. 4-Tier Authorship Box (hỗ trợ cả object chi tiết lẫn mã chuỗi từ SQL Server)
+  const TIER_META_MAP = {
+    AI_PURE: { label_vi: "🤖 AI sinh toàn phần (Pure AI)", badge_class: "tier-ai-pure" },
+    HYBRID_MIXED: { label_vi: "🧩 Văn bản lai: Trộn Người + AI (Hybrid)", badge_class: "tier-hybrid" },
+    AI_ASSISTED: { label_vi: "✍️ Nghi vấn AI biên tập / Paraphrase", badge_class: "tier-assisted" },
+    HUMAN_PURE: { label_vi: "👤 Tự viết hoàn toàn (Human-Written)", badge_class: "tier-human" },
+  };
+  let tier = data.authorship_tier;
+  if (typeof tier === "string" && TIER_META_MAP[tier]) {
+    tier = { code: tier, ...TIER_META_MAP[tier], reason: "" };
+  }
   if (authorshipTierBox) {
     if (tier && typeof tier === "object" && tier.label_vi) {
       authorshipTierBox.classList.remove("hidden");
@@ -895,7 +914,7 @@ function renderHistoryTable(items, user) {
 
   items.forEach((item) => {
     const tr = document.createElement("tr");
-    const isAi = item.verdict === "AI-generated" || item.ai_probability >= 0.5;
+    const isAi = item.verdict ? item.verdict === "AI-generated" : item.ai_probability >= 0.5;
     const badgeClass = isAi ? "badge-ai-table" : "badge-human-table";
     const badgeText = isAi ? "🤖 AI-Generated" : "👤 Human";
 
@@ -960,6 +979,7 @@ window.viewHistoryItem = async function(id) {
             context_coverage: isVi ? "256 Tokens (PhoBERT)" : "1024 Tokens",
           },
         },
+        authorship_tier: data.authorship_tier || (data.details ? data.details.authorship_tier : null),
         bypass_report: data.bypass_report || (data.details ? data.details.bypass_report : null),
         xai_metrics: data.xai_metrics || (data.details ? data.details.xai_metrics : null),
         sentences: data.details ? data.details.sentences : [],
@@ -1355,6 +1375,14 @@ function initProfileModal() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || "Đổi mật khẩu thất bại.");
         formProfPwd.reset();
+        if (currentUser && currentUser.auth_provider === "google") {
+          currentUser.auth_provider = "hybrid";
+          localStorage.setItem("veritext_user", JSON.stringify(currentUser));
+          const oldPwdGroup = document.getElementById("group-old-password");
+          const oldPwdInput = document.getElementById("prof-old-pwd");
+          if (oldPwdGroup) oldPwdGroup.classList.remove("hidden");
+          if (oldPwdInput) oldPwdInput.required = true;
+        }
         showProfAlert("Đổi mật khẩu thành công!", true);
       } catch (err) {
         showProfAlert(err.message);
@@ -1589,6 +1617,9 @@ function syncClassroomAccessUI() {
   if (classroomWorkspace) classroomWorkspace.classList.toggle("hidden", !isTeacher);
   if (isTeacher) {
     loadSavedBatches();
+  } else {
+    activeBatchDetail = null;
+    if (batchResultPanel) batchResultPanel.classList.add("hidden");
   }
 }
 

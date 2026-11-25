@@ -110,6 +110,18 @@ class TestTextForensics(unittest.TestCase):
         self.assertAlmostEqual(th_bal, 0.50)
         self.assertAlmostEqual(th_len, 0.70)
 
+    def test_07_leading_utf8_bom_not_false_positive(self):
+        """UTF-8 BOM hợp lệ ở đầu file Notepad không bị báo oan là Anti-Bypass, nhưng BOM giữa văn bản vẫn bị bắt."""
+        clean_bom = "\ufeffĐây là một bài tiểu luận sạch được lưu từ Windows Notepad bằng UTF-8 BOM."
+        rep_clean = tfx.detect_bypass_attempts(clean_bom)
+        self.assertFalse(rep_clean["has_bypass_warning"])
+        self.assertEqual(rep_clean["zero_width_count"], 0)
+
+        mid_bom = "Đây là văn bản cố tình chèn\ufeff ký tự ẩn ở giữa câu."
+        rep_mid = tfx.detect_bypass_attempts(mid_bom)
+        self.assertTrue(rep_mid["has_bypass_warning"])
+        self.assertEqual(rep_mid["zero_width_count"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

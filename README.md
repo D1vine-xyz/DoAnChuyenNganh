@@ -12,42 +12,43 @@
 DoAn/
 ├── frontend/                          # Toàn bộ giao diện người dùng (Client-Side)
 │   ├── web/                           # Web Application Dashboard SPA (HTML5, Modern CSS, Vanilla JS)
-│   │   ├── index.html                 # Giao diện chính thẩm định văn bản & dashboard KPI (Hỗ trợ Song ngữ)
-│   │   ├── style.css                  # Thiết kế Glassmorphism, Dark/Light Mode, CSS Variables
-│   │   └── app.js                     # Xử lý logic API, Hotspots highlight, Dark mode transition
-│   ├── extension/                     # Tiện ích mở rộng trình duyệt (Chrome Extension Manifest v3)
-│   │   ├── manifest.json              # Khai báo quyền, Service Worker, Context Menus
-│   │   ├── popup.html / popup.js      # Giao diện Popup quét nhanh & phân rã mô hình song ngữ
-│   │   ├── content_script.js          # Nút bấm nổi thông minh khi bôi đen văn bản trên mọi web
+│   │   ├── index.html                 # Giao diện thẩm định, Chấm bài lớp học (.ZIP), Hồ sơ & Google Sign-In
+│   │   ├── style.css                  # Thiết kế Minimalist Paper, Dark/Light Mode, CSS Variables
+│   │   └── app.js                     # Logic API, Anti-Bypass, XAI, Classroom Batch, Auth & Google GIS
+│   ├── extension/                     # Tiện ích trình duyệt Chrome Extension Manifest v3 (v3.0.0 PRO)
+│   │   ├── manifest.json              # Khai báo quyền, Service Worker, Context Menus (v3.0.0)
+│   │   ├── background.js              # Menu chuột phải: Quét bôi đen & Quét toàn trang LMS
+│   │   ├── popup.html / popup.js      # Popup đăng nhập JWT, Quét toàn trang, Anti-Bypass & XAI rút gọn
+│   │   ├── content_script.js          # Nút nổi bôi đen, Quét toàn trang & Modal đồng bộ SQL Server
 │   │   └── icons/                     # Bộ biểu tượng ứng dụng đa kích thước
 │   └── README.md                      # Hướng dẫn chi tiết sử dụng và cài đặt frontend
 │
 ├── backend/                           # Toàn bộ xử lý máy chủ & mô hình AI (Server & AI Pipeline)
-│   ├── api.py                         # Máy chủ RESTful API FastAPI (Song ngữ, Lifespan, Swagger Docs)
+│   ├── api.py                         # Máy chủ RESTful API FastAPI v3.0 (Non-blocking Threadpool, RBAC)
 │   ├── run_server.py                  # Script khởi động server & tự động mở Web Dashboard
 │   ├── inference.py                   # Bộ suy luận Song ngữ (Language Router, PhoBERT, Ensemble PLMs)
-│   ├── models.py                      # Định nghĩa kiến trúc PyTorch cho BERT, RoBERTa, Longformer, PhoBERT
-│   ├── train_phobert.py               # Pipeline huấn luyện PhoBERT base v2 với PyVi segmentation
-│   ├── create_vietnamese_dataset.py   # Script thu thập VnExpress & sinh dữ liệu AI bằng Gemini API
-│   ├── verify_phase4.py               # Kịch bản kiểm thử End-to-End toàn diện 6/6 kịch bản
-│   ├── ensemble.py                    # Pipeline tối ưu hóa trọng số học kết hợp (Nelder-Mead & Stacking)
-│   ├── auth.py                        # Xác thực JWT & Phân quyền RBAC (Giảng viên / Sinh viên)
+│   ├── text_forensics.py              # Chống lách luật (Anti-Bypass), Lọc học thuật, XAI & 4 cấp độ
+│   ├── batch_processor.py             # Giải nén .ZIP an toàn (chống Zip Slip/Bomb) & Xuất Excel/CSV
+│   ├── auth.py                        # Xác thực JWT, RBAC (Giảng viên/Sinh viên) & Google OAuth 2.0
 │   ├── database.py                    # Quản lý CSDL Microsoft SQL Server 2022 (VeriTextAI)
-│   ├── build_vietnamese_5k_dataset.py # Xây dựng & phân tầng bộ dữ liệu Tiếng Việt 5.000 mẫu
-│   ├── file_parser.py                 # Bộ bóc tách tệp tải lên (.txt, .docx, .doc, .pdf)
-│   ├── pdf_report.py                  # Trình sinh chứng nhận thẩm định PDF chuẩn A4 (ReportLab, font ArialVN)
-│   ├── dataset.py                     # PyTorch Dataset, Dynamic Padding Collator & DataLoaders
-│   ├── test_api.py                    # Suite 10 unit & integration tests kiểm thử toàn bộ luồng song ngữ
-│   ├── requirements.txt               # Danh mục thư viện Python backend (PyTorch, Transformers, PyVi, LangDetect)
-│   ├── data/                          # Thư mục dữ liệu: GossipCop, LIAR, TOEFL, và vietnamese_*.csv
-│   ├── output/                        # Checkpoints (*_best.pt), tokenizers, CSDL SQLite, kết quả đánh giá
+│   ├── file_parser.py                 # Bộ bóc tách tệp tải lên (.txt UTF-8 BOM, .docx + bảng, .doc, .pdf)
+│   ├── pdf_report.py                  # Trình sinh chứng nhận thẩm định PDF A4 (ReportLab, XAI + Anti-Bypass)
+│   ├── models.py                      # Định nghĩa kiến trúc PyTorch cho BERT, RoBERTa, Longformer, PhoBERT
+│   ├── test_forensics.py              # Unit tests cho Anti-Bypass, Bộ lọc học thuật, XAI & 4 cấp độ
+│   ├── test_batch.py                  # Unit tests cho giải nén .ZIP an toàn, .DOCX bảng & xuất Excel/CSV
+│   ├── test_api.py                    # Suite 15 integration tests toàn diện (AI, RBAC, Batch, Auth, Google, Ext)
+│   ├── view_db.py                     # Tiện ích xem nhanh dữ liệu trực tiếp trong SQL Server VeriTextAI
+│   ├── requirements.txt               # Danh mục thư viện Python backend (PyTorch, FastAPI, OpenPyXL, Google-Auth)
+│   ├── data/                          # Thư mục dữ liệu: GossipCop, LIAR, TOEFL, và vietnamese_*.csv (5K)
+│   ├── output/                        # Checkpoints (*_best.pt), tokenizers, kết quả đánh giá
 │   ├── kaggle_jobs/                   # Cấu hình huấn luyện mô hình từ xa trên Kaggle GPU T4
 │   └── scripts/                       # Các kịch bản phụ trợ & kết nối NotebookLM MCP
 │
-├── docs/                              # Tài liệu đồ án, đề bài & báo cáo nghiên cứu
+├── docs/                              # Tài liệu đồ án, đề bài, kế hoạch & bộ mẫu Demo
 │   ├── CHỦ ĐỀ 6.docx                  # Phiếu giao đề tài chính thức của giảng viên
-│   ├── BAO_CAO_TIEN_DO_TUAN_1.md      # Nhật ký tiến độ chi tiết từ Ngày 1 đến Ngày 7
-│   ├── reports/                       # Biểu đồ khoa học phân tích ROC-AUC, Confusion Matrix
+│   ├── KE_HOACH_NANG_CAP_CHUYEN_NGANH.md # Lộ trình nâng cấp 4 giai đoạn VeriText AI PRO
+│   ├── demo_samples/                  # Bộ bài nộp mẫu `Lop_K16_TieuLuan_Demo.zip` (demo 30s trước hội đồng)
+│   └── reports/                       # Biểu đồ khoa học phân tích ROC-AUC, Confusion Matrix
 │   └── ...                            # Các tài liệu nghiên cứu và danh mục tài liệu tham khảo
 │
 ├── start_server.bat                   # 🚀 Script 1-click khởi chạy toàn bộ hệ thống từ thư mục gốc
@@ -332,22 +333,31 @@ uvicorn api:app --host 0.0.0.0 --port 8000 --reload
 | **`POST`** | `/api/v1/detect/sentences` | Bóc tách từng câu và gán mã màu (🟢 Xanh / 🟡 Vàng / 🔴 Đỏ) phục vụ Chrome Extension & Web |
 | **`POST`** | `/api/v1/auth/register` | Đăng ký tài khoản Sinh viên / Giảng viên vào SQL Server `VeriTextAI` |
 | **`POST`** | `/api/v1/auth/login` | Đăng nhập xác thực Bcrypt & cấp JWT Access Token |
+| **`POST`** | `/api/v1/auth/google` | Đăng nhập / Đăng ký 1-Click bằng **Google OAuth 2.0 (ID Token)** |
+| **`GET`** | `/api/v1/auth/config` | Kiểm tra cấu hình Google Sign-In (`GOOGLE_CLIENT_ID`) |
 | **`GET`** | `/api/v1/auth/me` | Lấy thông tin người dùng hiện tại từ JWT Token |
-| **`POST`** | `/api/v1/detect/web` | Endpoint phân tích từ Web Dashboard, tự động lưu lịch sử vào SQL Server |
-| **`POST`** | `/api/v1/detect/upload` | Tiếp nhận và bóc tách tệp tải lên (.PDF, .DOCX, .DOC, .TXT) để thẩm định |
+| **`PUT`** | `/api/v1/auth/profile` | Cập nhật họ tên & vai trò (cấp lại JWT mới) |
+| **`POST`** | `/api/v1/auth/change-password` | Đổi mật khẩu an toàn (xác thực Bcrypt) |
+| **`POST`** | `/api/v1/detect/web` | Phân tích toàn diện (AI Song ngữ + Anti-Bypass + Bộ lọc học thuật + XAI + 4 cấp độ) |
+| **`POST`** | `/api/v1/detect/upload` | Tiếp nhận và bóc tách tệp tải lên (.PDF, .DOCX + bảng, .DOC, .TXT) để thẩm định |
 | **`POST`** | `/api/v1/detect/batch` | Phân tích hàng loạt tối đa 50 văn bản trong cùng một request |
+| **`POST`** | `/api/v1/classroom/batch-scan` | **Chấm bài cả lớp (.ZIP / Multi-file)** — *Teacher RBAC Only* |
+| **`GET`** | `/api/v1/classroom/batches` | Danh sách các đợt chấm lớp học đã lưu trên SQL Server — *Teacher RBAC* |
+| **`GET`** | `/api/v1/classroom/batches/{id}` | Chi tiết bảng xếp hạng rủi ro sinh viên của một đợt chấm — *Teacher RBAC* |
+| **`GET`** | `/api/v1/classroom/batches/{id}/export` | **Xuất Bảng Điểm Excel (`.XLSX` tô màu) / `.CSV` (UTF-8 BOM)** — *Teacher RBAC* |
+| **`DELETE`**| `/api/v1/classroom/batches/{id}` | Xóa một đợt chấm bài lớp học — *Teacher RBAC* |
 | **`GET`** | `/api/v1/history` | Truy xuất danh sách nhật ký thẩm định từ SQL Server theo phân quyền RBAC |
-| **`GET`** | `/api/v1/history/{id}` | Lấy chi tiết một lượt thẩm định theo ID (kèm kiểm tra quyền sở hữu) |
+| **`GET`** | `/api/v1/history/{id}` | Lấy chi tiết một lượt thẩm định theo ID (cô lập nghiêm ngặt theo RBAC) |
 | **`DELETE`**| `/api/v1/history/{id}` | Xóa một bản ghi lịch sử khỏi SQL Server |
 | **`GET`** | `/api/v1/stats` | Thống kê KPI tổng quan theo vai trò người dùng |
-| **`GET`** | `/api/v1/report/pdf/{id}` | **Xuất Báo Cáo Kiểm Định PDF (Audit Certificate)** có kiểm tra RBAC |
+| **`GET`** | `/api/v1/report/pdf/{id}` | **Xuất Báo Cáo Kiểm Định PDF** (kèm Anti-Bypass, XAI & Phân loại 4 cấp độ) |
 
-### 🧪 Kiểm Thử Tích Hợp (Integration Tests):
-Đã xây dựng bộ kiểm thử tự động [`test_api.py`](file:///c:/DoAn/backend/test_api.py) kiểm tra trọn vẹn cả 8 luồng nghiệp vụ:
+### 🧪 Kiểm Thử Tích Hợp & Unit Tests (Automated Testing):
+Toàn bộ hệ thống được bao phủ bởi 3 bộ kiểm thử tự động ([`test_forensics.py`](file:///c:/DoAn/backend/test_forensics.py), [`test_batch.py`](file:///c:/DoAn/backend/test_batch.py), [`test_api.py`](file:///c:/DoAn/backend/test_api.py)):
 ```bash
 cd backend
-python -m unittest test_api.py
-# Ran 8 tests in 22.8s -> OK (100% Passed)
+..\venv\Scripts\python.exe -m unittest test_forensics.py test_batch.py test_api.py -v
+# 100% Passed: Anti-Bypass, XAI, Classroom .ZIP -> Excel, Auth/Google OAuth, RBAC & Extension Sync
 ```
 
 ---

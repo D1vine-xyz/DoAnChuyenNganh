@@ -225,7 +225,7 @@ class TestDetectionAPI(unittest.TestCase):
         self.assertEqual(scan_data["overall"]["language"], "en")
         teacher_scan_id = scan_data["scan_id"]
 
-        # 3. Sinh viên KHÔNG được xem chi tiết hoặc tải PDF của giảng viên
+        # 3. Sinh viên & Khách (chưa đăng nhập) KHÔNG được xem chi tiết, tải PDF hoặc xóa bài riêng của giảng viên
         s_detail = self.client.get(
             f"/api/v1/history/{teacher_scan_id}",
             headers={"Authorization": f"Bearer {s_token}"},
@@ -237,6 +237,15 @@ class TestDetectionAPI(unittest.TestCase):
             headers={"Authorization": f"Bearer {s_token}"},
         )
         self.assertEqual(s_pdf.status_code, 404)
+
+        g_detail = self.client.get(f"/api/v1/history/{teacher_scan_id}")
+        self.assertEqual(g_detail.status_code, 404)
+
+        g_pdf = self.client.get(f"/api/v1/report/pdf/{teacher_scan_id}")
+        self.assertEqual(g_pdf.status_code, 404)
+
+        g_del = self.client.delete(f"/api/v1/history/{teacher_scan_id}")
+        self.assertEqual(g_del.status_code, 404)
 
         # 4. Giảng viên xem được full_text và tải được PDF (kể cả chứa ký tự < > &)
         t_detail = self.client.get(
@@ -487,6 +496,61 @@ class TestDetectionAPI(unittest.TestCase):
         with db_mod.get_connection() as conn:
             conn.cursor().execute("DELETE FROM users WHERE email IN (?, ?);", (test_email, "google_demo@gmail.com"))
             conn.commit()
+
+    def test_15_extension_jwt_sync_and_demo_zip_e2e(self):
+        """Kiểm tra toàn luồng Giai đoạn 3 (Extension JWT sync thật/giả) và chấm thử bộ Demo ZIP thật của Giai đoạn 2."""
+        t_token = self.client.post("/api/v1/auth/login", json={
+            "email": "giangvien@veritext.ai", "password": "123456"
+        }).json()["access_token"]
+
+        # 1. Chrome Extension gửi token hợp lệ -> saved_by_user = True
+        ext_ok = self.client.post(
+            "/api/v1/detect/sentences",
+            json={
+                "text": "Trí tuệ nhân tạo đang hỗ trợ rất lớn trong phân tích văn bản học thuật hiện đại.",
+                "threshold": 0.5,
+                "title": "[LMS/Web] Bài nộp Moodle K16",
+            },
+            headers={"Authorization": f"Bearer {t_token}"},
+        )
+        self.assertEqual(ext_ok.status_code, 200)
+        ok_data = ext_ok.json()
+        self.assertTrue(ok_data["saved_by_user"])
+        self.assertIn("Hoàng Văn Thầy", ok_data["saved_user_name"])
+        self.client.delete(f"/api/v1/history/{ok_data['scan_id']}", headers={"Authorization": f"Bearer {t_token}"})
+
+        # 2. Chrome Extension gửi token giả/hết hạn -> fallback khách an toàn & saved_by_user = False
+        ext_expired = self.client.post(
+            "/api/v1/detect/sentences",
+            json={
+                "text": "This paragraph verifies expired token fallback behavior for Chrome Extension.",
+                "threshold": 0.5,
+            },
+            headers={"Authorization": "Bearer invalid.expired.jwt.token"},
+        )
+        self.assertEqual(ext_expired.status_code, 200)
+        exp_data = ext_expired.json()
+        self.assertFalse(exp_data["saved_by_user"])
+        self.client.delete(f"/api/v1/history/{exp_data['scan_id']}")
+
+        # 3. Chấm toàn bộ file Demo ZIP thật (docs/demo_samples/Lop_K16_TieuLuan_Demo.zip)
+        demo_zip_path = os.path.abspath(os.path.join(BASE_DIR, "..", "docs", "demo_samples", "Lop_K16_TieuLuan_Demo.zip"))
+        if os.path.exists(demo_zip_path):
+            with open(demo_zip_path, "rb") as f:
+                z_res = self.client.post(
+                    "/api/v1/classroom/batch-scan",
+                    files=[("files", ("Lop_K16_TieuLuan_Demo.zip", f, "application/zip"))],
+                    data={"batch_name": "E2E Demo ZIP Audit", "strictness_preset": "balanced"},
+                    headers={"Authorization": f"Bearer {t_token}"},
+                )
+            self.assertEqual(z_res.status_code, 200)
+            batch = z_res.json()["batch"]
+            self.assertGreaterEqual(batch["total_files"], 5)
+            self.assertGreaterEqual(batch["bypass_count"], 1)
+            # Dọn sạch sau test
+            for sub in batch["submissions"]:
+                self.client.delete(f"/api/v1/history/{sub['scan_id']}", headers={"Authorization": f"Bearer {t_token}"})
+            self.client.delete(f"/api/v1/classroom/batches/{batch['id']}", headers={"Authorization": f"Bearer {t_token}"})
 
 
 if __name__ == "__main__":

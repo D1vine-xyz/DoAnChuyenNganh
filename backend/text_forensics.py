@@ -212,6 +212,10 @@ def detect_bypass_attempts(text: str) -> Dict[str, Any]:
             "sanitized_text": "",
         }
 
+    # Bỏ qua duy nhất 1 ký tự UTF-8 BOM hợp lệ ở vị trí đầu file (index 0) để không báo động nhầm file Notepad
+    if text.startswith("\ufeff"):
+        text = text[1:]
+
     zero_width_count = 0
     homoglyph_count = 0
     weird_space_count = 0

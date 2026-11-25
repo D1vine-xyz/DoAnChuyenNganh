@@ -95,6 +95,40 @@ class TestBatchProcessor(unittest.TestCase):
         self.assertIn("22110001 Nguyen Van A", csv_text)
         self.assertIn("AUDIT-000101", csv_text)
 
+    def test_03_docx_tables_utf8_bom_and_demo_zip(self):
+        """Kiểm tra đọc bảng trong .DOCX, xử lý .TXT UTF-8 BOM, phân rủi ro theo ngưỡng và giải nén file Demo ZIP thật."""
+        import docx
+        from file_parser import extract_text_from_file
+
+        # 1. File .TXT có UTF-8 BOM không giữ ký tự \ufeff ở đầu
+        bom_txt = "\ufeffBài tiểu luận kiểm thử định dạng Windows Notepad hợp lệ.".encode("utf-8")
+        txt_out, ext = extract_text_from_file("notepad_bom.txt", bom_txt)
+        self.assertEqual(ext, "txt")
+        self.assertFalse(txt_out.startswith("\ufeff"))
+
+        # 2. File .DOCX chỉ có nội dung trong bảng (Table) vẫn phải trích xuất được
+        doc = docx.Document()
+        tbl = doc.add_table(rows=1, cols=2)
+        tbl.cell(0, 0).text = "Sinh viên: Nguyễn Văn A"
+        tbl.cell(0, 1).text = "Nội dung bài làm nằm hoàn toàn trong bảng biểu học thuật."
+        docx_buf = io.BytesIO()
+        doc.save(docx_buf)
+        docx_text, ext2 = extract_text_from_file("table_essay.docx", docx_buf.getvalue())
+        self.assertEqual(ext2, "docx")
+        self.assertIn("bảng biểu học thuật", docx_text)
+
+        # 3. Phân rủi ro nhất quán theo ngưỡng strict (30%)
+        self.assertEqual(bp.classify_risk_level(0.38, False, threshold=0.30), "moderate")
+        self.assertEqual(bp.classify_risk_level(0.25, False, threshold=0.30), "safe")
+        self.assertEqual(bp.classify_risk_level(0.20, True, threshold=0.50), "high")
+
+        # 4. Giải nén thử bộ dữ liệu Demo vấn đáp thật (docs/demo_samples/Lop_K16_TieuLuan_Demo.zip)
+        demo_zip_path = os.path.abspath(os.path.join(BASE_DIR, "..", "docs", "demo_samples", "Lop_K16_TieuLuan_Demo.zip"))
+        if os.path.exists(demo_zip_path):
+            with open(demo_zip_path, "rb") as f:
+                valid_docs, _ = bp.extract_files_from_uploads([("Lop_K16_TieuLuan_Demo.zip", f.read())])
+            self.assertGreaterEqual(len(valid_docs), 5)
+
 
 if __name__ == "__main__":
     unittest.main()

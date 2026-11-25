@@ -141,6 +141,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (isOnline && currentAuthToken) {
     await verifyStoredSession();
   }
+
+  // Nhấp vào badge trạng thái API để kết nối lại nhanh mà không cần đóng/mở popup
+  apiStatusEl.style.cursor = "pointer";
+  apiStatusEl.title = "Nhấp để kiểm tra lại kết nối Backend FastAPI";
+  apiStatusEl.addEventListener("click", async () => {
+    statusTextEl.textContent = "Đang kiểm tra...";
+    const ok = await checkApiHealth();
+    if (ok && currentAuthToken) {
+      await verifyStoredSession();
+    }
+  });
 });
 
 async function checkApiHealth() {
@@ -350,26 +361,50 @@ function extractMainPageTextFromDOM() {
     rootEl = document.body;
   }
 
-  const clone = rootEl.cloneNode(true);
-  const noiseSelectors = [
-    "script",
-    "style",
-    "noscript",
-    "svg",
-    "iframe",
-    "nav",
-    "header",
-    "footer",
-    "aside",
-    "#ai-detect-floating-btn",
-    "#ai-detect-tooltip-modal",
-  ];
-  noiseSelectors.forEach((sel) => {
-    clone.querySelectorAll(sel).forEach((node) => node.remove());
+  const SKIP_TAGS = new Set([
+    "SCRIPT", "STYLE", "NOSCRIPT", "SVG", "IFRAME",
+    "NAV", "HEADER", "FOOTER", "ASIDE", "BUTTON", "SELECT",
+  ]);
+  const chunks = [];
+  let lastBlock = null;
+
+  const walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+      let cur = node.parentElement;
+      while (cur && cur !== rootEl.parentElement) {
+        if (SKIP_TAGS.has(cur.tagName)) return NodeFilter.FILTER_REJECT;
+        if (cur.id === "ai-detect-floating-btn" || cur.id === "ai-detect-tooltip-modal") {
+          return NodeFilter.FILTER_REJECT;
+        }
+        if (cur.hidden || cur.getAttribute("aria-hidden") === "true") {
+          return NodeFilter.FILTER_REJECT;
+        }
+        try {
+          const st = window.getComputedStyle(cur);
+          if (st.display === "none" || st.visibility === "hidden") return NodeFilter.FILTER_REJECT;
+        } catch (_) {}
+        cur = cur.parentElement;
+      }
+      return NodeFilter.FILTER_ACCEPT;
+    },
   });
 
-  const rawText = (clone.innerText || clone.textContent || "")
-    .replace(/\r\n/g, "\n")
+  let n;
+  while ((n = walker.nextNode())) {
+    const parentBlock = n.parentElement
+      ? n.parentElement.closest("p,div,li,h1,h2,h3,h4,h5,h6,tr,section,article,blockquote,pre")
+      : null;
+    if (lastBlock && parentBlock !== lastBlock) {
+      chunks.push("\n");
+    }
+    chunks.push(n.nodeValue.replace(/\s+/g, " "));
+    lastBlock = parentBlock;
+  }
+
+  const rawText = chunks
+    .join(" ")
+    .replace(/[ \t]*\n[ \t]*/g, "\n")
     .replace(/[ \t]{2,}/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -620,10 +655,15 @@ function renderResults(fullResponse, data, sentences) {
     }
   }
 
-  // 7. Trạng thái đồng bộ SQL Server
+  // 7. Trạng thái đồng bộ SQL Server (kiểm chứng thực tế từ cờ saved_by_user của Backend)
   if (fullResponse.scan_id) {
-    if (currentAuthToken && currentAuthUser) {
-      syncResultText.textContent = `✓ Đã lưu lịch sử #${fullResponse.scan_id} (${currentAuthUser.full_name})`;
+    if (fullResponse.saved_by_user) {
+      const ownerName = fullResponse.saved_user_name || (currentAuthUser && currentAuthUser.full_name) || "Tài khoản";
+      syncResultText.textContent = `✓ Đã lưu lịch sử #${fullResponse.scan_id} (${ownerName})`;
+    } else if (currentAuthToken) {
+      // Token hết hạn -> dọn phiên và báo rõ cho người dùng
+      clearAuthSession();
+      syncResultText.textContent = `⚠️ Phiên đăng nhập hết hạn • Đã quét chế độ khách (#${fullResponse.scan_id})`;
     } else {
       syncResultText.textContent = `✓ Đã phân tích (#${fullResponse.scan_id}) • Đăng nhập để lưu riêng`;
     }

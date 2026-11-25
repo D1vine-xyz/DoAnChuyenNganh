@@ -3,13 +3,13 @@ Backend RESTful API Server bằng FastAPI & Web Application Dashboard
 Đồ án Chuyên ngành Kỹ thuật Phần mềm (Chủ đề 6)
 Đề tài: Phát hiện văn bản do LLM sinh sử dụng Mô hình kết hợp (Ensemble PLMs)
 
-Các tính năng hệ thống:
-1. Nạp Singleton mô hình Ensemble (AITextDetector) trong vòng đời Lifespan.
-2. Cung cấp Web Dashboard SPA hiện đại phục vụ người dùng tại đường dẫn gốc `/`.
-3. Tiếp nhận tải tệp tài liệu đa định dạng: .PDF, .DOCX, .TXT.
-4. Cơ sở dữ liệu SQLite lưu trữ nhật ký thẩm định và thống kê KPI.
-5. Xuất báo cáo chứng thực PDF chuẩn khoa học (ReportLab Engine).
-6. Tương thích 100% với Chrome Extension Manifest v3 qua các endpoints API mở CORS.
+Các tính năng hệ thống (VeriText AI PRO v3.0):
+1. Nạp Singleton mô hình Song ngữ (Ensemble 3 PLMs & PhoBERT v2) trong vòng đời Lifespan.
+2. Cung cấp Web Dashboard SPA hiện đại tại `/`, hỗ trợ Anti-Bypass, Bộ lọc học thuật, XAI và Phân loại 4 cấp độ.
+3. Chấm bài hàng loạt cả lớp (.ZIP / Multi-file) và xuất Bảng điểm Excel (.XLSX) / CSV chuẩn UTF-8 BOM (Teacher RBAC).
+4. Cơ sở dữ liệu Microsoft SQL Server 2022 (`VeriTextAI`) với phân quyền JWT + Bcrypt + Google OAuth 2.0.
+5. Xuất báo cáo chứng thực PDF chuẩn khoa học (ReportLab Engine, font ArialVN).
+6. Tương thích 100% với Chrome Extension Manifest v3 (đồng bộ JWT & quét toàn trang LMS).
 """
 
 import os
@@ -21,6 +21,7 @@ from contextlib import asynccontextmanager
 
 import torch
 from fastapi import FastAPI, HTTPException, status, UploadFile, File, Form, Query, Depends, Header
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -80,13 +81,12 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="AI-Generated Text Detection API (Ensemble PLMs)",
+    title="VeriText AI PRO - Bilingual AI Text Detection API",
     description=(
-        "Hệ thống Phát hiện Văn bản do Mô hình Ngôn ngữ Lớn (LLMs) sinh, "
-        "kết hợp sức mạnh của 3 mô hình tiền huấn luyện: BERT, RoBERTa và Longformer (1024 tokens) "
-        "với thuật toán Weighted Soft Voting tối ưu."
+        "Hệ thống Phát hiện Văn bản AI Song ngữ Anh-Việt (Ensemble BERT + RoBERTa + Longformer & PhoBERT v2), "
+        "tích hợp Anti-Bypass, XAI, Chấm bài lớp học (.ZIP -> Excel), SQL Server RBAC & Google OAuth 2.0."
     ),
-    version="1.2.0",
+    version="3.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -428,7 +428,8 @@ async def detect_text(req: DetectRequest):
         )
         eval_text = filter_raw["filtered_text"] or sanitized_text
 
-        result = detector_instance.predict(
+        result = await run_in_threadpool(
+            detector_instance.predict,
             text=eval_text,
             threshold=eff_threshold,
             detailed=req.detailed,
@@ -447,7 +448,8 @@ async def detect_text(req: DetectRequest):
         )
 
 
-MAX_UPLOAD_SIZE_BYTES = 15 * 1024 * 1024  # Giới hạn 15 MB cho tệp tải lên
+MAX_UPLOAD_SIZE_BYTES = 15 * 1024 * 1024  # Giới hạn 15 MB cho tệp tài liệu lẻ
+MAX_BATCH_ZIP_BYTES = 50 * 1024 * 1024    # Giới hạn 50 MB cho tệp .ZIP cả lớp
 
 
 def _execute_full_analysis_and_save(
@@ -482,21 +484,21 @@ def _execute_full_analysis_and_save(
     )
     eval_text = filter_raw["filtered_text"] or sanitized_text
 
-    # 3. Suy luận AI tổng thể & cấp câu trên văn bản đã làm sạch
+    # 3. Suy luận AI tổng thể & cấp câu trên văn bản đã làm sạch (đồng nhất tuyến ngôn ngữ)
     overall_pred = detector_instance.predict(
         eval_text,
         threshold=eff_threshold,
         detailed=True,
         force_language=language,
     )
+    detected_lang = overall_pred.get("language", "en")
     sentences = detector_instance.analyze_sentences(
         eval_text,
         threshold=eff_threshold,
-        force_language=language,
+        force_language=detected_lang,
     )
 
     # 4. Phân tích bằng chứng ngôn ngữ học (XAI) & phân loại 4 mức can thiệp
-    detected_lang = overall_pred.get("language", "en")
     xai_metrics = tfx.analyze_linguistic_xai(eval_text, language=detected_lang)
     authorship_tier = tfx.classify_authorship_tier(
         overall_ai_prob=overall_pred["ai_probability"],
@@ -519,7 +521,11 @@ def _execute_full_analysis_and_save(
 
     bypass_public = {k: v for k, v in bypass_raw.items() if k != "sanitized_text"}
     filter_public = {k: v for k, v in filter_raw.items() if k != "filtered_text"}
-    risk_level = bp.classify_risk_level(overall_pred["ai_probability"], bypass_public["has_bypass_warning"])
+    risk_level = bp.classify_risk_level(
+        overall_pred["ai_probability"],
+        bypass_public["has_bypass_warning"],
+        threshold=eff_threshold,
+    )
 
     auto_title = title or (f"Tài liệu: {filename}" if filename else sanitized_text[:45] + ("..." if len(sanitized_text) > 45 else ""))
 
@@ -564,6 +570,8 @@ def _execute_full_analysis_and_save(
 
     return {
         "scan_id": scan_id,
+        "saved_by_user": bool(current_user),
+        "saved_user_name": current_user.get("full_name") if current_user else None,
         "overall": overall_pred,
         "risk_level": risk_level,
         "authorship_tier": authorship_tier,
@@ -603,7 +611,8 @@ async def detect_sentences(
         )
 
     try:
-        return _execute_full_analysis_and_save(
+        return await run_in_threadpool(
+            _execute_full_analysis_and_save,
             clean_text=clean_text,
             threshold=req.threshold,
             title=req.title,
@@ -689,7 +698,8 @@ async def detect_uploaded_file(
             detail="Nội dung văn bản trong tệp quá ngắn (yêu cầu ít nhất 5 từ).",
         )
 
-    res = _execute_full_analysis_and_save(
+    res = await run_in_threadpool(
+        _execute_full_analysis_and_save,
         clean_text=extracted_text,
         threshold=threshold,
         filename=file.filename,
@@ -712,23 +722,25 @@ async def detect_batch(req: BatchDetectRequest):
             detail="Mô hình AI chưa sẵn sàng.",
         )
 
-    t0 = time.time()
-    results = []
-    for idx, text in enumerate(req.texts):
-        clean = text.strip()
-        if clean:
-            pred = detector_instance.predict(clean, threshold=req.threshold, detailed=False)
-            results.append({"index": idx, "success": True, "result": pred})
-        else:
-            results.append({"index": idx, "success": False, "error": "Văn bản rỗng."})
+    def _run_batch():
+        t0 = time.time()
+        results = []
+        for idx, text in enumerate(req.texts):
+            clean = text.strip()
+            if clean:
+                pred = detector_instance.predict(clean, threshold=req.threshold, detailed=False)
+                results.append({"index": idx, "success": True, "result": pred})
+            else:
+                results.append({"index": idx, "success": False, "error": "Văn bản rỗng."})
+        total_time_ms = round((time.time() - t0) * 1000, 2)
+        return {
+            "total_items": len(req.texts),
+            "processed_items": len(results),
+            "total_time_ms": total_time_ms,
+            "results": results,
+        }
 
-    total_time_ms = round((time.time() - t0) * 1000, 2)
-    return {
-        "total_items": len(req.texts),
-        "processed_items": len(results),
-        "total_time_ms": total_time_ms,
-        "results": results,
-    }
+    return await run_in_threadpool(_run_batch)
 
 
 # ==============================================================================
@@ -854,10 +866,17 @@ async def classroom_batch_scan(
     t0 = time.time()
     uploaded_items = []
     for f in files:
+        fname = f.filename or "untitled.txt"
         content = await f.read()
-        uploaded_items.append((f.filename or "untitled.txt", content))
+        max_allowed = MAX_BATCH_ZIP_BYTES if fname.lower().endswith(".zip") else MAX_UPLOAD_SIZE_BYTES
+        if len(content) > max_allowed:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"Tệp '{fname}' vượt quá giới hạn dung lượng cho phép ({max_allowed // (1024 * 1024)} MB).",
+            )
+        uploaded_items.append((fname, content))
 
-    valid_docs, skipped_files = bp.extract_files_from_uploads(uploaded_items)
+    valid_docs, skipped_files = await run_in_threadpool(bp.extract_files_from_uploads, uploaded_items)
     if not valid_docs:
         reasons = "; ".join(f"{s['filename']}: {s['reason']}" for s in skipped_files[:5])
         raise HTTPException(
@@ -865,59 +884,61 @@ async def classroom_batch_scan(
             detail=f"Không trích xuất được bài nộp hợp lệ nào. Chi tiết: {reasons or 'Tệp rỗng hoặc sai định dạng.'}",
         )
 
-    batch_id = db.create_classroom_batch(
-        teacher_id=current_user["id"],
-        batch_name=batch_name.strip() or "Đợt chấm bài lớp học",
-    )
+    def _run_classroom_pipeline():
+        batch_id = db.create_classroom_batch(
+            teacher_id=current_user["id"],
+            batch_name=batch_name.strip() or "Đợt chấm bài lớp học",
+        )
 
-    high_risk = 0
-    moderate_risk = 0
-    safe_cnt = 0
-    bypass_cnt = 0
-    prob_sum = 0.0
+        high_risk = 0
+        moderate_risk = 0
+        safe_cnt = 0
+        bypass_cnt = 0
+        prob_sum = 0.0
 
-    for doc in valid_docs:
-        try:
-            res = _execute_full_analysis_and_save(
-                clean_text=doc["text"],
-                threshold=threshold,
-                title=doc["filename"],
-                filename=doc["filename"],
-                strictness_preset=strictness_preset,
-                filter_quotes=filter_quotes,
-                filter_references=filter_references,
-                current_user=current_user,
-                batch_id=batch_id,
-                student_label=doc["student_label"],
-            )
-            r_level = res["risk_level"]
-            if r_level == "high":
-                high_risk += 1
-            elif r_level == "moderate":
-                moderate_risk += 1
-            else:
-                safe_cnt += 1
+        for doc in valid_docs:
+            try:
+                res = _execute_full_analysis_and_save(
+                    clean_text=doc["text"],
+                    threshold=threshold,
+                    title=doc["filename"],
+                    filename=doc["filename"],
+                    strictness_preset=strictness_preset,
+                    filter_quotes=filter_quotes,
+                    filter_references=filter_references,
+                    current_user=current_user,
+                    batch_id=batch_id,
+                    student_label=doc["student_label"],
+                )
+                r_level = res["risk_level"]
+                if r_level == "high":
+                    high_risk += 1
+                elif r_level == "moderate":
+                    moderate_risk += 1
+                else:
+                    safe_cnt += 1
 
-            if res["bypass_report"]["has_bypass_warning"]:
-                bypass_cnt += 1
-            prob_sum += float(res["overall"]["ai_probability"])
-        except Exception as e:
-            skipped_files.append({"filename": doc["filename"], "reason": f"Lỗi phân tích AI: {str(e)}"})
+                if res["bypass_report"]["has_bypass_warning"]:
+                    bypass_cnt += 1
+                prob_sum += float(res["overall"]["ai_probability"])
+            except Exception as e:
+                skipped_files.append({"filename": doc["filename"], "reason": f"Lỗi phân tích AI: {str(e)}"})
 
-    processed_count = high_risk + moderate_risk + safe_cnt
-    avg_prob = (prob_sum / processed_count) if processed_count > 0 else 0.0
+        processed_count = high_risk + moderate_risk + safe_cnt
+        avg_prob = (prob_sum / processed_count) if processed_count > 0 else 0.0
 
-    db.finalize_classroom_batch(
-        batch_id=batch_id,
-        total_files=processed_count,
-        high_risk_count=high_risk,
-        moderate_risk_count=moderate_risk,
-        safe_count=safe_cnt,
-        bypass_count=bypass_cnt,
-        avg_ai_probability=avg_prob,
-    )
+        db.finalize_classroom_batch(
+            batch_id=batch_id,
+            total_files=processed_count,
+            high_risk_count=high_risk,
+            moderate_risk_count=moderate_risk,
+            safe_count=safe_cnt,
+            bypass_count=bypass_cnt,
+            avg_ai_probability=avg_prob,
+        )
+        return db.get_classroom_batch_detail(batch_id)
 
-    batch_detail = db.get_classroom_batch_detail(batch_id)
+    batch_detail = await run_in_threadpool(_run_classroom_pipeline)
     total_time_ms = round((time.time() - t0) * 1000, 2)
 
     return {

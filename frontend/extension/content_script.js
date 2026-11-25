@@ -57,25 +57,50 @@ function extractMainPageText() {
   }
   if (!rootEl) rootEl = document.body;
 
-  const clone = rootEl.cloneNode(true);
-  [
-    "script",
-    "style",
-    "noscript",
-    "svg",
-    "iframe",
-    "nav",
-    "header",
-    "footer",
-    "aside",
-    "#ai-detect-floating-btn",
-    "#ai-detect-tooltip-modal",
-  ].forEach((sel) => {
-    clone.querySelectorAll(sel).forEach((node) => node.remove());
+  const SKIP_TAGS = new Set([
+    "SCRIPT", "STYLE", "NOSCRIPT", "SVG", "IFRAME",
+    "NAV", "HEADER", "FOOTER", "ASIDE", "BUTTON", "SELECT",
+  ]);
+  const chunks = [];
+  let lastBlock = null;
+
+  const walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+      let cur = node.parentElement;
+      while (cur && cur !== rootEl.parentElement) {
+        if (SKIP_TAGS.has(cur.tagName)) return NodeFilter.FILTER_REJECT;
+        if (cur.id === "ai-detect-floating-btn" || cur.id === "ai-detect-tooltip-modal") {
+          return NodeFilter.FILTER_REJECT;
+        }
+        if (cur.hidden || cur.getAttribute("aria-hidden") === "true") {
+          return NodeFilter.FILTER_REJECT;
+        }
+        try {
+          const st = window.getComputedStyle(cur);
+          if (st.display === "none" || st.visibility === "hidden") return NodeFilter.FILTER_REJECT;
+        } catch (_) {}
+        cur = cur.parentElement;
+      }
+      return NodeFilter.FILTER_ACCEPT;
+    },
   });
 
-  const rawText = (clone.innerText || clone.textContent || "")
-    .replace(/\r\n/g, "\n")
+  let n;
+  while ((n = walker.nextNode())) {
+    const parentBlock = n.parentElement
+      ? n.parentElement.closest("p,div,li,h1,h2,h3,h4,h5,h6,tr,section,article,blockquote,pre")
+      : null;
+    if (lastBlock && parentBlock !== lastBlock) {
+      chunks.push("\n");
+    }
+    chunks.push(n.nodeValue.replace(/\s+/g, " "));
+    lastBlock = parentBlock;
+  }
+
+  const rawText = chunks
+    .join(" ")
+    .replace(/[ \t]*\n[ \t]*/g, "\n")
     .replace(/[ \t]{2,}/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -187,9 +212,12 @@ function showErrorModal(message) {
     </div>
   `;
   modal.classList.remove("hidden");
-  document.getElementById("ai-detect-close").addEventListener("click", () => {
-    modal.classList.add("hidden");
-  });
+  const closeBtn = modal.querySelector(".ai-detect-close-btn");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", () => {
+      modal.classList.add("hidden");
+    });
+  }
 }
 
 async function triggerDetection(text, options = {}) {
@@ -215,9 +243,12 @@ async function triggerDetection(text, options = {}) {
   `;
   modal.classList.remove("hidden");
 
-  document.getElementById("ai-detect-close").addEventListener("click", () => {
-    modal.classList.add("hidden");
-  });
+  const loadingCloseBtn = modal.querySelector(".ai-detect-close-btn");
+  if (loadingCloseBtn) {
+    loadingCloseBtn.addEventListener("click", () => {
+      modal.classList.add("hidden");
+    });
+  }
 
   try {
     const settings = await getExtensionSettings();
@@ -262,10 +293,12 @@ function positionModalNearSelection(centerTop = false) {
   if (!centerTop && lastSelectionRange) {
     const rect = lastSelectionRange.getBoundingClientRect();
     modal.style.top = `${window.scrollY + rect.bottom + 8}px`;
-    modal.style.left = `${Math.max(12, Math.min(window.innerWidth - 400, window.scrollX + rect.left))}px`;
+    const minLeft = window.scrollX + 12;
+    const maxLeft = Math.max(minLeft, window.scrollX + window.innerWidth - 400);
+    modal.style.left = `${Math.max(minLeft, Math.min(maxLeft, window.scrollX + rect.left))}px`;
   } else {
     modal.style.top = `${window.scrollY + 24}px`;
-    modal.style.left = `${Math.max(12, window.scrollX + window.innerWidth - 415)}px`;
+    modal.style.left = `${Math.max(window.scrollX + 12, window.scrollX + window.innerWidth - 415)}px`;
   }
 }
 
@@ -319,11 +352,14 @@ function renderModalResults(data, authUser, isSynced) {
     `;
   }
 
-  // Sync status chip
-  const syncHtml =
-    isSynced && authUser
-      ? `<div class="ai-detect-sync-chip synced">✓ Đã đồng bộ SQL Server (#${escapeHtml(data.scan_id || "")}) • ${escapeHtml(authUser.full_name || authUser.email)}</div>`
-      : `<div class="ai-detect-sync-chip guest">ℹ️ Chế độ khách • Đăng nhập ở Popup Extension để lưu lịch sử</div>`;
+  // Sync status chip (đối chiếu cờ saved_by_user thực tế từ Backend)
+  const actuallySynced = Boolean(data.saved_by_user);
+  const ownerDisplay = data.saved_user_name || (authUser && (authUser.full_name || authUser.email)) || "Tài khoản";
+  const syncHtml = actuallySynced
+    ? `<div class="ai-detect-sync-chip synced">✓ Đã đồng bộ SQL Server (#${escapeHtml(data.scan_id || "")}) • ${escapeHtml(ownerDisplay)}</div>`
+    : isSynced
+    ? `<div class="ai-detect-sync-chip guest">⚠️ Phiên đăng nhập hết hạn • Đăng nhập lại ở Popup Extension để đồng bộ</div>`
+    : `<div class="ai-detect-sync-chip guest">ℹ️ Chế độ khách • Đăng nhập ở Popup Extension để lưu lịch sử</div>`;
 
   let sentencesHtml = "";
   if (data.sentences && data.sentences.length > 0) {
@@ -383,7 +419,10 @@ function renderModalResults(data, authUser, isSynced) {
     </div>
   `;
 
-  document.getElementById("ai-detect-close").addEventListener("click", () => {
-    modal.classList.add("hidden");
-  });
+  const closeBtn = modal.querySelector(".ai-detect-close-btn");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", () => {
+      modal.classList.add("hidden");
+    });
+  }
 }

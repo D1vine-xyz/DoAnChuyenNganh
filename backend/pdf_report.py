@@ -226,8 +226,18 @@ def generate_pdf_report(scan_data: Dict[str, Any]) -> bytes:
         alignment=1,
     )
 
+    tier_map_pdf = {
+        "AI_PURE": "AI sinh toàn phần (Pure AI)",
+        "HYBRID_MIXED": "Văn bản lai: Trộn Người + AI (Hybrid)",
+        "AI_ASSISTED": "Nghi vấn AI biên tập / Paraphrase",
+        "HUMAN_PURE": "Tự viết hoàn toàn (Human-Written)",
+    }
+    raw_tier = scan_data.get("authorship_tier") or scan_data.get("details", {}).get("authorship_tier")
+    tier_code = raw_tier.get("code") if isinstance(raw_tier, dict) else str(raw_tier or "")
+    tier_display = tier_map_pdf.get(tier_code, "")
+
     verdict_content = [
-        [Paragraph(f"🛡️ <b>{verdict_title}</b>", verdict_p_style)],
+        [Paragraph(f"<b>{verdict_title}</b>", verdict_p_style)],
         [Spacer(1, 4)],
         [Paragraph(
             f"Xác suất AI sinh: <b>{ai_prob*100:.2f}%</b> &nbsp;&nbsp;|&nbsp;&nbsp; "
@@ -236,6 +246,8 @@ def generate_pdf_report(scan_data: Dict[str, Any]) -> bytes:
             verdict_sub_style
         )],
     ]
+    if tier_display:
+        verdict_content.append([Paragraph(f"Phân loại mức độ can thiệp: <b>{xml_escape(tier_display)}</b>", verdict_sub_style)])
 
     verdict_table = Table(verdict_content, colWidths=[515])
     verdict_table.setStyle(TableStyle([
@@ -258,7 +270,7 @@ def generate_pdf_report(scan_data: Dict[str, Any]) -> bytes:
         flagged = bypass_report.get("flagged_samples") or []
         flagged_str = f"<br/><b>Từ nghi vấn bị can thiệp:</b> {xml_escape(', '.join(flagged[:6]))}" if flagged else ""
         bypass_alert_table = Table(
-            [[Paragraph(f"<b>⚠ CẢNH BÁO TIỂU XẢO QUA MẶT AI (ANTI-BYPASS ALERT)</b><br/>{bypass_summary}{flagged_str}", body_style)]],
+            [[Paragraph(f"<b>[!] CẢNH BÁO TIỂU XẢO QUA MẶT AI (ANTI-BYPASS ALERT)</b><br/>{bypass_summary}{flagged_str}", body_style)]],
             colWidths=[515],
         )
         bypass_alert_table.setStyle(TableStyle([
@@ -275,7 +287,7 @@ def generate_pdf_report(scan_data: Dict[str, Any]) -> bytes:
     # 3c. Bảng Bằng Chứng Giải Thích Ngôn Ngữ Học (Explainable AI - XAI)
     xai = scan_data.get("xai_metrics") or scan_data.get("details", {}).get("xai_metrics")
     if isinstance(xai, dict) and xai.get("burstiness_score") is not None:
-        story.append(Paragraph("🔬 <b>Bằng Chứng Giải Thích Ngôn Ngữ Học (Explainable AI - XAI)</b>", section_heading))
+        story.append(Paragraph("<b>1. Bằng Chứng Giải Thích Ngôn Ngữ Học (Explainable AI - XAI)</b>", section_heading))
         b_score = xai.get("burstiness_score", 0.0)
         p_score = xai.get("perplexity_score", 0.0)
         lex_score = xai.get("lexical_diversity", 0.0)
@@ -327,7 +339,7 @@ def generate_pdf_report(scan_data: Dict[str, Any]) -> bytes:
         story.append(Spacer(1, 4))
 
     # 4. Bảng phân rã điểm số các mô hình thành phần (Ensemble Decomposition)
-    story.append(Paragraph("📊 <b>Đóng Góp Của Mô Hình Đánh Giá (Model Breakdown)</b>", section_heading))
+    story.append(Paragraph("<b>2. Đóng Góp Của Mô Hình Đánh Giá (Model Breakdown)</b>", section_heading))
 
     details = scan_data.get("details", {})
     mb = details.get("model_breakdown", {}).get("individual_models", {})
@@ -409,7 +421,7 @@ def generate_pdf_report(scan_data: Dict[str, Any]) -> bytes:
     # 5. Phân tích chi tiết cấp câu (Sentence-Level AI Hotspots)
     sentences = details.get("sentences", [])
     if sentences:
-        story.append(Paragraph("📑 <b>Phân Tích Chi Tiết Cấp Câu (AI Hotspots)</b>", section_heading))
+        story.append(Paragraph("<b>3. Phân Tích Chi Tiết Cấp Câu (AI Hotspots)</b>", section_heading))
         story.append(Paragraph("Hệ thống bóc tách văn bản thành từng câu độc lập để xác định cụ thể các đoạn văn có sự can thiệp của AI:", body_style))
         story.append(Spacer(1, 6))
 
@@ -451,7 +463,7 @@ def generate_pdf_report(scan_data: Dict[str, Any]) -> bytes:
     full_text = scan_data.get("full_text") or scan_data.get("text_snippet") or ""
     if full_text:
         story.append(Spacer(1, 10))
-        story.append(Paragraph("📄 <b>Trích Đoạn Văn Bản Được Thẩm Định</b>", section_heading))
+        story.append(Paragraph("<b>4. Trích Đoạn Văn Bản Được Thẩm Định</b>", section_heading))
         excerpt = xml_escape(full_text[:700] + ("..." if len(full_text) > 700 else ""))
         quote_p = Paragraph(f"<i>\"{excerpt}\"</i>", body_style)
         quote_table = Table([[quote_p]], colWidths=[515])

@@ -19,6 +19,7 @@ import sys
 import re
 import json
 import time
+import threading
 import argparse
 from typing import Dict, Any, List, Optional, Tuple, Union
 
@@ -114,6 +115,7 @@ class AITextDetector:
             self.device = device
 
         self.use_fp16 = use_fp16 and (self.device.type == "cuda")
+        self._inference_lock = threading.Lock()
 
         if self.device.type == "cpu":
             num_threads = min(os.cpu_count() or 4, 8)
@@ -240,10 +242,11 @@ class AITextDetector:
                 global_mask[:, 0] = 1
                 kwargs["global_attention_mask"] = global_mask
 
-            with torch.inference_mode():
-                with torch.amp.autocast("cuda", enabled=self.use_fp16):
-                    logits = model(**kwargs)
-                probs = torch.sigmoid(logits).float().cpu().numpy().flatten()
+            with self._inference_lock:
+                with torch.inference_mode():
+                    with torch.amp.autocast("cuda", enabled=self.use_fp16):
+                        logits = model(**kwargs)
+                    probs = torch.sigmoid(logits).float().cpu().numpy().flatten()
             all_probs.append(probs)
 
         return np.concatenate(all_probs) if all_probs else np.array([])
@@ -297,14 +300,20 @@ class AITextDetector:
         return "Không chắc chắn / Ngưỡng ranh giới (Uncertain)", "LOW"
 
     @staticmethod
-    def _format_sentence_results(sentences: List[str], probs: np.ndarray) -> List[Dict[str, Any]]:
-        """Chuẩn hóa danh sách phân tích cấp câu và màu cảnh báo."""
+    def _format_sentence_results(
+        sentences: List[str],
+        probs: np.ndarray,
+        threshold: float = 0.5,
+    ) -> List[Dict[str, Any]]:
+        """Chuẩn hóa danh sách phân tích cấp câu và màu cảnh báo đồng bộ theo ngưỡng chấm."""
+        yellow_th = max(0.05, min(0.90, float(threshold)))
+        red_th = min(0.90, max(yellow_th + 0.15, yellow_th + 0.30))
         results = []
         for idx, sentence in enumerate(sentences):
             prob = float(probs[idx])
-            if prob >= 0.80:
+            if prob >= red_th:
                 color, level = "red", "Chắc chắn AI"
-            elif prob >= 0.50:
+            elif prob >= yellow_th:
                 color, level = "yellow", "Nghi vấn AI"
             else:
                 color, level = "green", "Văn phong tự nhiên (Người)"
@@ -516,7 +525,7 @@ class AITextDetector:
         # 1. Nếu là Tiếng Việt và PhoBERT đã nạp
         if lang == "vi" and self.model_phobert is not None:
             probs = self._predict_phobert(eval_sentences)
-            return self._format_sentence_results(eval_sentences, probs)
+            return self._format_sentence_results(eval_sentences, probs, threshold=threshold)
 
         # 2. Nếu là Tiếng Anh: Tối ưu hóa Batch Inference
         p_bert = self._predict_bert(eval_sentences) if self.model_bert else np.full(len(eval_sentences), 0.5)
@@ -530,12 +539,15 @@ class AITextDetector:
                 self.weights[2] * p_longformer
             )
         else:
-            w_sum = self.weights[0] + self.weights[1]
-            w_bert = self.weights[0] / w_sum
-            w_roberta = self.weights[1] / w_sum
+            w_sum = float(self.weights[0] + self.weights[1])
+            if w_sum > 0:
+                w_bert = self.weights[0] / w_sum
+                w_roberta = self.weights[1] / w_sum
+            else:
+                w_bert, w_roberta = 0.5, 0.5
             p_weighted = w_bert * p_bert + w_roberta * p_roberta
 
-        return self._format_sentence_results(eval_sentences, p_weighted)
+        return self._format_sentence_results(eval_sentences, p_weighted, threshold=threshold)
 
     def benchmark_latency(self, num_runs: int = 5) -> Dict[str, Any]:
         """Đo đạc độ trễ suy luận chuẩn khoa học trên cả tiếng Anh và tiếng Việt."""
