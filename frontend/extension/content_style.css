@@ -252,3 +252,119 @@
 .hidden {
   display: none !important;
 }
+
+/* ==============================================================================
+   PHASE 3 — ANTI-BYPASS, 4-TIER AUTHORSHIP, XAI MINI-GRID & SYNC CHIP
+   ============================================================================== */
+.ai-detect-bypass-alert {
+  background-color: #FEF2F2;
+  border: 1px solid #FCA5A5;
+  border-left: 4px solid #DC2626;
+  color: #991B1B;
+  border-radius: 7px;
+  padding: 7px 9px;
+  font-size: 11px;
+  line-height: 1.4;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ai-detect-tier {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background-color: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  color: #111827;
+}
+
+.ai-detect-tier.tier-ai-pure {
+  background-color: #FEF2F2;
+  border-color: #FECACA;
+  color: #991B1B;
+}
+
+.ai-detect-tier.tier-hybrid {
+  background-color: #FFF7ED;
+  border-color: #FED7AA;
+  color: #9A3412;
+}
+
+.ai-detect-tier.tier-assisted {
+  background-color: #FFFBEB;
+  border-color: #FDE68A;
+  color: #92400E;
+}
+
+.ai-detect-tier.tier-human {
+  background-color: #ECFDF5;
+  border-color: #A7F3D0;
+  color: #065F46;
+}
+
+.ai-detect-xai-box {
+  background-color: #F8FAFC;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  padding: 7px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ai-detect-xai-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+
+.ai-detect-xai-cell {
+  background-color: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 5px;
+  padding: 4px 5px;
+  text-align: center;
+}
+
+.ai-detect-xai-cell span {
+  display: block;
+  font-size: 9.5px;
+  color: #6B7280;
+}
+
+.ai-detect-xai-cell b {
+  font-size: 11.5px;
+  color: #111827;
+}
+
+.ai-detect-cliches {
+  font-size: 10.5px;
+  color: #92400E;
+  background-color: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: 5px;
+  padding: 4px 7px;
+  line-height: 1.35;
+}
+
+.ai-detect-sync-chip {
+  font-size: 10.5px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.ai-detect-sync-chip.synced {
+  background-color: #ECFDF5;
+  border: 1px solid #A7F3D0;
+  color: #065F46;
+}
+
+.ai-detect-sync-chip.guest {
+  background-color: #F3F4F6;
+  border: 1px solid #E5E7EB;
+  color: #4B5563;
+  font-weight: 500;
+}

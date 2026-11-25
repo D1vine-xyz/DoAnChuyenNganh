@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "VeriText AI - Ensemble PLMs",
-  "version": "1.0.0",
-  "description": "Phát hiện văn bản do AI/ChatGPT sinh sử dụng mô hình kết hợp Ensemble PLMs (BERT, RoBERTa, Longformer 1024 tokens).",
+  "name": "VeriText AI PRO - Phát hiện Văn bản AI Song ngữ",
+  "version": "3.0.0",
+  "description": "Phát hiện văn bản AI song ngữ Anh-Việt (Ensemble PLMs + PhoBERT v2), chống lách luật Anti-Bypass, XAI, đồng bộ tài khoản SQL Server và quét toàn trang LMS.",
   "permissions": [
     "activeTab",
     "scripting",

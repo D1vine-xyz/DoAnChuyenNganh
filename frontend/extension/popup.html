@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VeriText AI - Phân Tích Văn Bản AI</title>
+  <title>VeriText AI PRO - Phân Tích Văn Bản AI</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
@@ -13,28 +13,97 @@
       <div class="brand">
         <img src="icons/icon32.png" alt="Logo" class="logo">
         <div class="brand-text">
-          <h1>VeriText AI <span class="version-tag">v2.0</span></h1>
-          <span class="subtitle">Phát hiện AI Đa ngôn ngữ (Anh - Việt)</span>
+          <h1>VeriText AI <span class="version-tag">v3.0 PRO</span></h1>
+          <span class="subtitle">Song ngữ Anh-Việt • Anti-Bypass • XAI</span>
         </div>
       </div>
       <div id="api-status" class="status-badge status-checking">
         <span class="status-dot"></span>
-        <span id="status-text">Đang kết nối API...</span>
+        <span id="status-text">Đang kết nối...</span>
       </div>
     </header>
 
+    <!-- Account Sync Bar (JWT + SQL Server) -->
+    <section class="auth-bar" id="auth-bar">
+      <!-- Guest View -->
+      <div id="auth-guest-view" class="auth-bar-row">
+        <div class="auth-status-info">
+          <span class="auth-dot guest"></span>
+          <span>Chế độ khách <small>(Chưa đồng bộ lịch sử)</small></span>
+        </div>
+        <button id="btn-toggle-login" class="btn-auth-pill" type="button">🔐 Đăng nhập</button>
+      </div>
+
+      <!-- Logged-in View -->
+      <div id="auth-user-view" class="auth-bar-row hidden">
+        <div class="auth-user-meta">
+          <img id="auth-avatar" class="auth-avatar hidden" alt="Avatar">
+          <span id="auth-role-icon" class="auth-role-icon">👨‍🏫</span>
+          <div class="auth-user-text">
+            <strong id="auth-user-name">Giảng viên</strong>
+            <span id="auth-user-sub" class="auth-sync-tag">✓ Đồng bộ SQL Server</span>
+          </div>
+        </div>
+        <div class="auth-user-actions">
+          <button id="btn-open-dashboard" class="icon-mini-btn" title="Mở Web Dashboard" type="button">📊</button>
+          <button id="btn-logout" class="btn-logout-mini" type="button">Thoát</button>
+        </div>
+      </div>
+
+      <!-- Inline Login Form Drawer -->
+      <form id="login-drawer" class="login-drawer hidden">
+        <div class="login-drawer-title">
+          <span>Đăng nhập để đồng bộ lịch sử &amp; PDF</span>
+          <button id="btn-close-login" type="button" class="text-link-btn">Đóng</button>
+        </div>
+        <input type="email" id="login-email" placeholder="Email (vd: giangvien@veritext.ai)" required autocomplete="username">
+        <input type="password" id="login-password" placeholder="Mật khẩu" required autocomplete="current-password">
+        <div id="login-error" class="login-error hidden"></div>
+        <div class="login-drawer-actions">
+          <button id="btn-login-submit" type="submit" class="btn-login-submit">Đăng nhập</button>
+          <button id="btn-demo-teacher" type="button" class="btn-demo-fill" title="Điền nhanh tài khoản Giảng viên mẫu">Demo GV</button>
+        </div>
+        <div class="login-drawer-footer">
+          <span>Chưa có tài khoản hoặc dùng Google?</span>
+          <a href="#" id="link-open-web-auth">Mở Web Dashboard ↗</a>
+        </div>
+      </form>
+    </section>
+
     <!-- Main Content -->
     <main class="main-content">
+      <!-- Quick Full-Page LMS Scan Banner -->
+      <button id="btn-scan-page" class="btn-page-scan" type="button">
+        <span>🌐 Quét Toàn Trang Web Hiện Tại (LMS / Classroom / Blog)</span>
+      </button>
+      <div id="page-source-banner" class="page-source-banner hidden">
+        <span id="page-source-text"></span>
+        <button id="btn-clear-source" type="button" class="source-close-btn">&times;</button>
+      </div>
+
       <!-- Input Section -->
       <div class="input-card">
         <div class="input-header">
-          <label for="text-input">Nhập hoặc dán văn bản cần kiểm tra:</label>
+          <label for="text-input">Văn bản cần thẩm định:</label>
           <div class="action-links">
-            <button id="btn-paste" class="text-btn">📋 Dán</button>
-            <button id="btn-clear" class="text-btn">🗑️ Xóa</button>
+            <button id="btn-paste" class="text-btn" type="button">📋 Dán</button>
+            <button id="btn-clear" class="text-btn" type="button">🗑️ Xóa</button>
           </div>
         </div>
-        <textarea id="text-input" placeholder="Dán văn bản cần kiểm tra vào đây (tiếng Anh hoặc tiếng Việt)..."></textarea>
+        <textarea id="text-input" placeholder="Dán văn bản cần kiểm tra hoặc bấm 'Quét Toàn Trang Web Hiện Tại' ở trên..."></textarea>
+
+        <!-- Academic Filter Checkboxes -->
+        <div class="academic-filters">
+          <label class="filter-chip" title="Loại trừ trích dẫn nguyên văn trong ngoặc kép dài (>= 8 từ)">
+            <input type="checkbox" id="chk-filter-quotes">
+            <span>Bỏ trích dẫn "..."</span>
+          </label>
+          <label class="filter-chip" title="Tự động cắt phần Tài liệu tham khảo / References cuối bài">
+            <input type="checkbox" id="chk-filter-references">
+            <span>Bỏ Tài liệu tham khảo</span>
+          </label>
+        </div>
+
         <div class="input-footer">
           <span id="word-count">0 từ | 0 ký tự</span>
           <div class="threshold-control">
@@ -46,8 +115,8 @@
       </div>
 
       <!-- Analyze Button -->
-      <button id="btn-analyze" class="btn-primary">
-        <span class="btn-text">🔍 Phân tích Văn bản (Ensemble)</span>
+      <button id="btn-analyze" class="btn-primary" type="button">
+        <span class="btn-text">🔍 Phân tích Văn bản (Ensemble + XAI)</span>
         <div id="spinner" class="spinner hidden"></div>
       </button>
 
@@ -56,6 +125,12 @@
 
       <!-- Results Section -->
       <div id="results-card" class="results-card hidden">
+        <!-- Anti-Bypass Warning Banner -->
+        <div id="bypass-banner" class="bypass-banner hidden">
+          <div class="bypass-banner-title">🚨 PHÁT HIỆN LÁCH LUẬT (ANTI-BYPASS)</div>
+          <div id="bypass-summary" class="bypass-banner-body"></div>
+        </div>
+
         <div class="result-header">
           <div id="verdict-badge" class="verdict-badge">
             <span id="verdict-icon">🤖</span>
@@ -64,6 +139,9 @@
           <span id="inference-time" class="time-tag">150 ms</span>
         </div>
 
+        <!-- 4-Tier Authorship Badge -->
+        <div id="tier-badge" class="tier-badge hidden"></div>
+
         <!-- Gauge Bar -->
         <div class="gauge-section">
           <div class="gauge-labels">
@@ -71,12 +149,32 @@
             <span id="ai-percentage-text" class="percentage-val">98.5%</span>
           </div>
           <div class="gauge-bar-bg">
-            <div id="gauge-bar-fill" class="gauge-bar-fill" style="width: 98.5%;"></div>
+            <div id="gauge-bar-fill" class="gauge-bar-fill" style="width: 0%;"></div>
           </div>
           <div class="gauge-sub-labels">
             <span id="human-percentage-text">Người viết: 1.5%</span>
             <span id="confidence-text">Độ tin cậy: Rất cao</span>
           </div>
+        </div>
+
+        <!-- Compact XAI Metrics Strip -->
+        <div id="xai-strip" class="xai-strip hidden">
+          <div class="xai-header">🧠 Bằng chứng Ngôn ngữ học (XAI)</div>
+          <div class="xai-grid">
+            <div class="xai-metric">
+              <span class="xai-label">Burstiness</span>
+              <strong id="xai-burstiness" class="xai-val">--</strong>
+            </div>
+            <div class="xai-metric">
+              <span class="xai-label">Từ vựng (MATTR)</span>
+              <strong id="xai-mattr" class="xai-val">--</strong>
+            </div>
+            <div class="xai-metric">
+              <span class="xai-label">Perplexity</span>
+              <strong id="xai-perplexity" class="xai-val">--</strong>
+            </div>
+          </div>
+          <div id="xai-cliches" class="xai-cliches hidden"></div>
         </div>
 
         <!-- Model Breakdown -->
@@ -96,9 +194,15 @@
           </div>
         </div>
 
+        <!-- SQL Server History Sync Status -->
+        <div id="sync-result-bar" class="sync-result-bar hidden">
+          <span id="sync-result-text">✓ Đã lưu vào SQL Server</span>
+          <a href="#" id="link-view-history">Xem Dashboard ↗</a>
+        </div>
+
         <!-- Sentence Breakdown Toggle -->
         <div class="sentences-section">
-          <button id="btn-toggle-sentences" class="btn-secondary">
+          <button id="btn-toggle-sentences" class="btn-secondary" type="button">
             📑 Xem chi tiết từng câu (AI Hotspots)
           </button>
           <div id="sentences-list" class="sentences-list hidden"></div>
@@ -108,7 +212,7 @@
 
     <!-- Footer -->
     <footer class="footer">
-      <span>Đồ án Chuyên ngành (Chủ đề 6) • FastAPI Backend</span>
+      <span>VeriText AI PRO • FastAPI &amp; SQL Server 2022</span>
     </footer>
   </div>
 
