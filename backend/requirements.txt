@@ -13,10 +13,11 @@ numpy>=2.5.0
 tqdm>=4.70.0
 requests>=2.34.0
 
-# Database & Authentication (Microsoft SQL Server + JWT + Bcrypt)
+# Database & Authentication (Microsoft SQL Server + JWT + Bcrypt + Google OAuth 2.0)
 pyodbc>=5.1.0
 PyJWT>=2.9.0
 bcrypt>=4.2.0
+google-auth>=2.25.0
 
 # AI APIs & LLM Generation
 google-generativeai>=0.8.6

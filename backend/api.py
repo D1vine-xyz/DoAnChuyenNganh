@@ -191,6 +191,7 @@ class BatchDetectRequest(BaseModel):
 class RegisterRequest(BaseModel):
     email: str = Field(..., description="Email đăng ký", examples=["sinhvien@veritext.ai"])
     password: str = Field(..., min_length=6, description="Mật khẩu tối thiểu 6 ký tự", examples=["123456"])
+    confirm_password: Optional[str] = Field(default=None, description="Xác nhận lại mật khẩu")
     full_name: str = Field(..., min_length=2, description="Họ và tên đầy đủ", examples=["Nguyễn Văn A"])
     role: str = Field(default="student", description="Vai trò: 'student' (Sinh viên) hoặc 'teacher' (Giảng viên)", examples=["student"])
 
@@ -200,13 +201,56 @@ class LoginRequest(BaseModel):
     password: str = Field(..., description="Mật khẩu", examples=["123456"])
 
 
+class GoogleAuthRequest(BaseModel):
+    credential: str = Field(..., min_length=10, description="Google Identity Services JWT ID Token")
+    role: str = Field(default="student", description="Vai trò mặc định nếu đăng ký lần đầu bằng Google")
+
+
+class UpdateProfileRequest(BaseModel):
+    full_name: str = Field(..., min_length=2, max_length=120, description="Họ và tên mới")
+    role: Optional[str] = Field(default=None, description="Cập nhật vai trò ('student' hoặc 'teacher')")
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: Optional[str] = Field(default=None, description="Mật khẩu hiện tại (bắt buộc với tài khoản thường)")
+    new_password: str = Field(..., min_length=6, description="Mật khẩu mới tối thiểu 6 ký tự")
+
+
 # ==============================================================================
-# 0. AUTHENTICATION & USER MANAGEMENT (SQL SERVER + JWT)
+# 0. AUTHENTICATION & USER MANAGEMENT (SQL SERVER + JWT + GOOGLE OAUTH 2.0)
 # ==============================================================================
+
+def _build_auth_response(user: Dict[str, Any], message: str) -> Dict[str, Any]:
+    token = auth.create_access_token({
+        "id": user["id"],
+        "email": user["email"],
+        "full_name": user["full_name"],
+        "role": user["role"],
+    })
+    return {
+        "success": True,
+        "message": message,
+        "access_token": token,
+        "token_type": "bearer",
+        "user": user,
+    }
+
+
+@app.get("/api/v1/auth/config", tags=["Authentication"])
+async def get_auth_config():
+    """Trả về cấu hình xác thực công khai (bao gồm Google OAuth Client ID nếu đã cấu hình)."""
+    google_cid = auth.get_google_client_id()
+    return {
+        "google_enabled": bool(google_cid),
+        "google_client_id": google_cid,
+    }
+
 
 @app.post("/api/v1/auth/register", tags=["Authentication"])
 async def register_account(req: RegisterRequest):
     """Đăng ký tài khoản người dùng mới (Sinh viên hoặc Giảng viên) vào Microsoft SQL Server."""
+    if req.confirm_password is not None and req.password != req.confirm_password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mật khẩu xác nhận không khớp!")
     try:
         user = db.create_user(
             email=req.email,
@@ -214,19 +258,7 @@ async def register_account(req: RegisterRequest):
             full_name=req.full_name,
             role=req.role,
         )
-        token = auth.create_access_token({
-            "id": user["id"],
-            "email": user["email"],
-            "full_name": user["full_name"],
-            "role": user["role"],
-        })
-        return {
-            "success": True,
-            "message": "Đăng ký tài khoản thành công!",
-            "access_token": token,
-            "token_type": "bearer",
-            "user": user,
-        }
+        return _build_auth_response(user, "Đăng ký tài khoản thành công!")
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
     except Exception as e:
@@ -243,19 +275,29 @@ async def login_account(req: LoginRequest):
             detail="Email hoặc mật khẩu không chính xác!",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    token = auth.create_access_token({
-        "id": user["id"],
-        "email": user["email"],
-        "full_name": user["full_name"],
-        "role": user["role"],
-    })
-    return {
-        "success": True,
-        "message": "Đăng nhập thành công!",
-        "access_token": token,
-        "token_type": "bearer",
-        "user": user,
-    }
+    return _build_auth_response(user, "Đăng nhập thành công!")
+
+
+@app.post("/api/v1/auth/google", tags=["Authentication"])
+async def login_with_google(req: GoogleAuthRequest):
+    """
+    Đăng nhập / Đăng ký 1-Click bằng tài khoản Google (Google Identity Services / OAuth 2.0):
+    Xác thực chữ ký ID Token trực tiếp từ Google -> Đồng bộ tài khoản vào SQL Server VeriTextAI -> Cấp JWT.
+    """
+    try:
+        google_info = auth.verify_google_id_token(req.credential)
+        user = db.upsert_google_user(
+            google_id=google_info["google_id"],
+            email=google_info["email"],
+            full_name=google_info["full_name"],
+            avatar_url=google_info["avatar_url"],
+            role=req.role,
+        )
+        return _build_auth_response(user, "Đăng nhập bằng Google thành công!")
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Lỗi xác thực Google: {str(e)}")
 
 
 @app.get("/api/v1/auth/me", tags=["Authentication"])
@@ -265,6 +307,42 @@ async def get_my_profile(current_user: Dict[str, Any] = Depends(auth.get_current
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Người dùng không tồn tại.")
     return {"user": user}
+
+
+@app.put("/api/v1/auth/profile", tags=["Authentication"])
+async def update_my_profile(
+    req: UpdateProfileRequest,
+    current_user: Dict[str, Any] = Depends(auth.get_current_user),
+):
+    """Cập nhật Họ tên & Vai trò của người dùng đang đăng nhập, đồng thời cấp lại JWT mới."""
+    try:
+        updated = db.update_user_profile(
+            user_id=current_user["id"],
+            full_name=req.full_name,
+            role=req.role,
+        )
+        if not updated:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Người dùng không tồn tại.")
+        return _build_auth_response(updated, "Cập nhật hồ sơ thành công!")
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+
+
+@app.post("/api/v1/auth/change-password", tags=["Authentication"])
+async def change_my_password(
+    req: ChangePasswordRequest,
+    current_user: Dict[str, Any] = Depends(auth.get_current_user),
+):
+    """Đổi mật khẩu an toàn (xác thực mật khẩu cũ qua bcrypt)."""
+    try:
+        db.change_user_password(
+            user_id=current_user["id"],
+            old_password=req.old_password,
+            new_password=req.new_password,
+        )
+        return {"success": True, "message": "Đổi mật khẩu thành công!"}
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
 
 
 # ==============================================================================

@@ -1072,13 +1072,294 @@ function initAuth() {
       const fullName = document.getElementById("reg-fullname").value.trim();
       const email = document.getElementById("reg-email").value.trim();
       const password = document.getElementById("reg-password").value;
+      const confirmPassword = document.getElementById("reg-password-confirm")?.value || "";
       const role = document.querySelector('input[name="reg-role"]:checked')?.value || "student";
-      await handleRegister(fullName, email, password, role);
+      if (password !== confirmPassword) {
+        showAuthAlert("Mật khẩu xác nhận không khớp! Vui lòng nhập lại.");
+        return;
+      }
+      await handleRegister(fullName, email, password, confirmPassword, role);
+    });
+  }
+
+  // Toggle ẩn/hiện mật khẩu cho tất cả các ô password
+  document.querySelectorAll(".btn-toggle-pwd").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const targetId = btn.dataset.target;
+      const input = document.getElementById(targetId);
+      if (!input) return;
+      const isHidden = input.type === "password";
+      input.type = isHidden ? "text" : "password";
+      btn.textContent = isHidden ? "🙈" : "👁️";
+    });
+  });
+
+  // Thanh đo độ mạnh mật khẩu trực tiếp khi đăng ký
+  const regPwdInput = document.getElementById("reg-password");
+  const regPwdBar = document.getElementById("reg-pwd-strength-bar");
+  const regPwdText = document.getElementById("reg-pwd-strength-text");
+  if (regPwdInput && regPwdBar && regPwdText) {
+    regPwdInput.addEventListener("input", () => {
+      const v = regPwdInput.value;
+      let score = 0;
+      if (v.length >= 6) score += 1;
+      if (v.length >= 10) score += 1;
+      if (/[A-Z]/.test(v) && /[a-z]/.test(v)) score += 1;
+      if (/\d/.test(v)) score += 1;
+      if (/[^A-Za-z0-9]/.test(v)) score += 1;
+
+      if (!v) {
+        regPwdBar.style.width = "0%";
+        regPwdText.textContent = "Độ mạnh mật khẩu";
+      } else if (score <= 2) {
+        regPwdBar.style.width = "33%";
+        regPwdBar.style.backgroundColor = "#EF4444";
+        regPwdText.textContent = "Yếu";
+      } else if (score <= 3) {
+        regPwdBar.style.width = "66%";
+        regPwdBar.style.backgroundColor = "#F59E0B";
+        regPwdText.textContent = "Trung bình";
+      } else {
+        regPwdBar.style.width = "100%";
+        regPwdBar.style.backgroundColor = "#10B981";
+        regPwdText.textContent = "Mạnh ✓";
+      }
     });
   }
 
   if (btnLogout) {
     btnLogout.addEventListener("click", handleLogout);
+  }
+
+  // Khởi tạo Google Sign-In (OAuth 2.0 / GIS) & Profile Modal
+  initGoogleSignIn();
+  initProfileModal();
+}
+
+async function initGoogleSignIn() {
+  const gisContainer = document.getElementById("google-gis-button");
+  const fallbackBtn = document.getElementById("btn-google-fallback");
+  const setupHint = document.getElementById("google-setup-hint");
+
+  if (fallbackBtn && setupHint) {
+    fallbackBtn.addEventListener("click", () => {
+      setupHint.classList.toggle("hidden");
+    });
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/auth/config`);
+    if (!res.ok) return;
+    const cfg = await res.json();
+    if (!cfg.google_enabled || !cfg.google_client_id) return;
+
+    const mountGoogleButton = () => {
+      if (!window.google || !window.google.accounts || !window.google.accounts.id) return false;
+      window.google.accounts.id.initialize({
+        client_id: cfg.google_client_id,
+        callback: handleGoogleCredentialResponse,
+      });
+      if (gisContainer) {
+        gisContainer.innerHTML = "";
+        window.google.accounts.id.renderButton(gisContainer, {
+          theme: document.documentElement.getAttribute("data-theme") === "dark" ? "filled_black" : "outline",
+          size: "large",
+          width: 360,
+          text: "continue_with",
+          locale: "vi",
+        });
+        gisContainer.classList.remove("hidden");
+      }
+      if (fallbackBtn) fallbackBtn.classList.add("hidden");
+      if (setupHint) setupHint.classList.add("hidden");
+      return true;
+    };
+
+    if (!mountGoogleButton()) {
+      let tries = 0;
+      const poll = setInterval(() => {
+        tries += 1;
+        if (mountGoogleButton() || tries >= 20) clearInterval(poll);
+      }, 300);
+    }
+  } catch (e) {}
+}
+
+async function handleGoogleCredentialResponse(response) {
+  if (!response || !response.credential) {
+    showAuthAlert("Không nhận được mã xác thực từ Google.");
+    return;
+  }
+  clearAuthAlert();
+  const role = document.querySelector('input[name="reg-role"]:checked')?.value || "student";
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/auth/google`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credential: response.credential, role }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Đăng nhập Google thất bại.");
+
+    localStorage.setItem("veritext_token", data.access_token);
+    localStorage.setItem("veritext_user", JSON.stringify(data.user));
+    currentUser = data.user;
+    updateAuthUI(currentUser);
+    showAuthAlert("Đăng nhập bằng Google thành công!", true);
+    setTimeout(() => {
+      hideAuthModal();
+      loadHistoryAndStats();
+    }, 550);
+  } catch (err) {
+    showAuthAlert(err.message || "Lỗi đăng nhập Google.");
+  }
+}
+
+function initProfileModal() {
+  const btnOpenProfile = document.getElementById("btn-open-profile");
+  const profileModal = document.getElementById("profile-modal");
+  const btnCloseProfile = document.getElementById("btn-close-profile-modal");
+  const tabProfInfo = document.getElementById("tab-btn-prof-info");
+  const tabProfPwd = document.getElementById("tab-btn-prof-pwd");
+  const formProfInfo = document.getElementById("form-profile-info");
+  const formProfPwd = document.getElementById("form-profile-pwd");
+  const profAlert = document.getElementById("profile-alert");
+
+  function showProfAlert(msg, isSuccess = false) {
+    if (!profAlert) return;
+    profAlert.textContent = msg;
+    profAlert.className = "auth-alert " + (isSuccess ? "auth-alert-success" : "auth-alert-error");
+    profAlert.classList.remove("hidden");
+  }
+
+  function clearProfAlert() {
+    if (profAlert) profAlert.classList.add("hidden");
+  }
+
+  function switchProfTab(tab) {
+    clearProfAlert();
+    if (tab === "info") {
+      tabProfInfo?.classList.add("active");
+      tabProfPwd?.classList.remove("active");
+      formProfInfo?.classList.remove("hidden");
+      formProfPwd?.classList.add("hidden");
+    } else {
+      tabProfInfo?.classList.remove("active");
+      tabProfPwd?.classList.add("active");
+      formProfInfo?.classList.add("hidden");
+      formProfPwd?.classList.remove("hidden");
+    }
+  }
+
+  function openProfileModal() {
+    if (!currentUser || !profileModal) return;
+    clearProfAlert();
+    switchProfTab("info");
+
+    const avatarBox = document.getElementById("profile-avatar-box");
+    const nameEl = document.getElementById("profile-summary-name");
+    const emailEl = document.getElementById("profile-summary-email");
+    const badgesEl = document.getElementById("profile-summary-badges");
+    const tsEl = document.getElementById("profile-timestamps");
+    const oldPwdGroup = document.getElementById("group-old-password");
+    const oldPwdInput = document.getElementById("prof-old-pwd");
+
+    if (avatarBox) {
+      if (currentUser.avatar_url) {
+        avatarBox.innerHTML = `<img src="${escapeHtml(currentUser.avatar_url)}" alt="Avatar" referrerpolicy="no-referrer">`;
+      } else {
+        const initials = (currentUser.full_name || currentUser.email || "U").trim().charAt(0).toUpperCase();
+        avatarBox.textContent = initials;
+      }
+    }
+    if (nameEl) nameEl.textContent = currentUser.full_name || currentUser.email;
+    if (emailEl) emailEl.textContent = currentUser.email || "";
+    if (badgesEl) {
+      const roleLabel = currentUser.role === "teacher" ? "👨‍🏫 Giảng viên" : "🎓 Sinh viên";
+      const providerLabel = currentUser.is_google_linked || currentUser.auth_provider === "google" ? "🔵 Google OAuth 2.0" : "🔑 Email / Mật khẩu";
+      badgesEl.innerHTML = `<span class="data-badge badge-human-table">${roleLabel}</span> <span class="data-badge" style="background: var(--bg-card); border: 1px solid var(--border-light);">${providerLabel}</span>`;
+    }
+    if (tsEl) {
+      tsEl.textContent = `Ngày tạo: ${currentUser.created_at || "--"} • Đăng nhập gần nhất: ${currentUser.last_login || "Vừa xong"}`;
+    }
+
+    const inputFullname = document.getElementById("prof-fullname");
+    const selectRole = document.getElementById("prof-role");
+    if (inputFullname) inputFullname.value = currentUser.full_name || "";
+    if (selectRole) selectRole.value = currentUser.role || "student";
+
+    const isPureGoogle = currentUser.auth_provider === "google";
+    if (oldPwdGroup) oldPwdGroup.classList.toggle("hidden", isPureGoogle);
+    if (oldPwdInput) oldPwdInput.required = !isPureGoogle;
+
+    profileModal.classList.remove("hidden");
+  }
+
+  function closeProfileModal() {
+    if (profileModal) profileModal.classList.add("hidden");
+  }
+
+  if (btnOpenProfile) btnOpenProfile.addEventListener("click", openProfileModal);
+  if (btnCloseProfile) btnCloseProfile.addEventListener("click", closeProfileModal);
+  if (profileModal) {
+    profileModal.addEventListener("click", (e) => {
+      if (e.target === profileModal) closeProfileModal();
+    });
+  }
+  if (tabProfInfo) tabProfInfo.addEventListener("click", () => switchProfTab("info"));
+  if (tabProfPwd) tabProfPwd.addEventListener("click", () => switchProfTab("pwd"));
+
+  if (formProfInfo) {
+    formProfInfo.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fullName = document.getElementById("prof-fullname").value.trim();
+      const role = document.getElementById("prof-role").value;
+      clearProfAlert();
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/auth/profile`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+          body: JSON.stringify({ full_name: fullName, role }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Không thể cập nhật hồ sơ.");
+        localStorage.setItem("veritext_token", data.access_token);
+        localStorage.setItem("veritext_user", JSON.stringify(data.user));
+        currentUser = data.user;
+        updateAuthUI(currentUser);
+        showProfAlert("Đã cập nhật hồ sơ thành công!", true);
+        loadHistoryAndStats();
+      } catch (err) {
+        showProfAlert(err.message);
+      }
+    });
+  }
+
+  if (formProfPwd) {
+    formProfPwd.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const oldPwd = document.getElementById("prof-old-pwd")?.value || "";
+      const newPwd = document.getElementById("prof-new-pwd").value;
+      const confirmPwd = document.getElementById("prof-new-pwd-confirm").value;
+      clearProfAlert();
+      if (newPwd !== confirmPwd) {
+        showProfAlert("Mật khẩu mới xác nhận không khớp!");
+        return;
+      }
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/auth/change-password`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+          body: JSON.stringify({ old_password: oldPwd || null, new_password: newPwd }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Đổi mật khẩu thất bại.");
+        formProfPwd.reset();
+        showProfAlert("Đổi mật khẩu thành công!", true);
+      } catch (err) {
+        showProfAlert(err.message);
+      }
+    });
   }
 }
 
@@ -1173,7 +1454,7 @@ async function handleLogin(email, password) {
   }
 }
 
-async function handleRegister(fullName, email, password, role) {
+async function handleRegister(fullName, email, password, confirmPassword, role) {
   const submitBtn = document.getElementById("btn-submit-register");
   if (submitBtn) submitBtn.disabled = true;
   clearAuthAlert();
@@ -1182,7 +1463,13 @@ async function handleRegister(fullName, email, password, role) {
     const res = await fetch(`${API_BASE}/api/v1/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ full_name: fullName, email, password, role }),
+      body: JSON.stringify({
+        full_name: fullName,
+        email,
+        password,
+        confirm_password: confirmPassword,
+        role,
+      }),
     });
 
     const data = await res.json();
@@ -1216,21 +1503,31 @@ function handleLogout() {
 }
 
 function updateAuthUI(user) {
+  const avatarImg = document.getElementById("user-avatar-img");
   if (user) {
     if (btnOpenAuth) btnOpenAuth.classList.add("hidden");
     if (userProfileBox) userProfileBox.classList.remove("hidden");
     const isTeacher = user.role === "teacher";
+    if (avatarImg) {
+      if (user.avatar_url) {
+        avatarImg.src = user.avatar_url;
+        avatarImg.classList.remove("hidden");
+      } else {
+        avatarImg.classList.add("hidden");
+      }
+    }
     if (userRoleBadge) {
       userRoleBadge.textContent = isTeacher ? "👨‍🏫" : "🎓";
       userRoleBadge.title = isTeacher ? "Giảng viên" : "Sinh viên";
     }
     if (userDisplayName) {
       userDisplayName.textContent = user.full_name || user.email;
-      userDisplayName.title = `${user.full_name} (${isTeacher ? "Giảng viên" : "Sinh viên"})`;
+      userDisplayName.title = `${user.full_name} (${isTeacher ? "Giảng viên" : "Sinh viên"}) • Nhấn để xem hồ sơ`;
     }
   } else {
     if (btnOpenAuth) btnOpenAuth.classList.remove("hidden");
     if (userProfileBox) userProfileBox.classList.add("hidden");
+    if (avatarImg) avatarImg.classList.add("hidden");
   }
   syncClassroomAccessUI();
 }

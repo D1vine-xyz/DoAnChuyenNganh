@@ -396,6 +396,98 @@ class TestDetectionAPI(unittest.TestCase):
         )
         self.assertEqual(del_batch.status_code, 200)
 
+    def test_14_complete_auth_profile_password_and_google_oauth(self):
+        """Kiểm tra toàn diện Đăng ký (confirm_password, email validation), Đổi mật khẩu, Cập nhật hồ sơ & Google OAuth."""
+        from unittest.mock import patch
+        import database as db_mod
+
+        # 1. Kiểm tra /api/v1/auth/config
+        cfg = self.client.get("/api/v1/auth/config")
+        self.assertEqual(cfg.status_code, 200)
+        self.assertIn("google_enabled", cfg.json())
+
+        # 2. Đăng ký sai confirm_password -> 400
+        bad_reg = self.client.post("/api/v1/auth/register", json={
+            "email": "test_auth_user@veritext.ai",
+            "password": "Password123!",
+            "confirm_password": "MismatchPassword",
+            "full_name": "Test Auth User",
+            "role": "student",
+        })
+        self.assertEqual(bad_reg.status_code, 400)
+
+        # 3. Đăng ký hợp lệ
+        test_email = "test_auth_complete@veritext.ai"
+        with db_mod.get_connection() as conn:
+            conn.cursor().execute("DELETE FROM users WHERE email IN (?, ?);", (test_email, "google_demo@gmail.com"))
+            conn.commit()
+
+        reg = self.client.post("/api/v1/auth/register", json={
+            "email": test_email,
+            "password": "OldPassword123",
+            "confirm_password": "OldPassword123",
+            "full_name": "Nguyen Test User",
+            "role": "student",
+        })
+        self.assertEqual(reg.status_code, 200)
+        token = reg.json()["access_token"]
+
+        # 4. Cập nhật hồ sơ & đổi vai trò -> trả JWT mới
+        upd = self.client.put(
+            "/api/v1/auth/profile",
+            json={"full_name": "TS. Nguyen Updated", "role": "teacher"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        self.assertEqual(upd.status_code, 200)
+        self.assertEqual(upd.json()["user"]["full_name"], "TS. Nguyen Updated")
+        self.assertEqual(upd.json()["user"]["role"], "teacher")
+        token = upd.json()["access_token"]
+
+        # 5. Đổi mật khẩu -> sai mật khẩu cũ phải báo 400, đúng mật khẩu cũ phải thành công
+        bad_pwd = self.client.post(
+            "/api/v1/auth/change-password",
+            json={"old_password": "WrongOldPassword", "new_password": "NewPassword456!"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        self.assertEqual(bad_pwd.status_code, 400)
+
+        ok_pwd = self.client.post(
+            "/api/v1/auth/change-password",
+            json={"old_password": "OldPassword123", "new_password": "NewPassword456!"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        self.assertEqual(ok_pwd.status_code, 200)
+
+        # Đăng nhập lại bằng mật khẩu mới
+        relogin = self.client.post("/api/v1/auth/login", json={
+            "email": test_email, "password": "NewPassword456!"
+        })
+        self.assertEqual(relogin.status_code, 200)
+
+        # 6. Kiểm tra luồng Google OAuth 2.0 (mock verify_google_id_token)
+        mock_google_payload = {
+            "google_id": "google-sub-123456789",
+            "email": "google_demo@gmail.com",
+            "full_name": "Google Demo User",
+            "avatar_url": "https://lh3.googleusercontent.com/a/demo-avatar",
+        }
+        with patch("auth.verify_google_id_token", return_value=mock_google_payload):
+            g_res = self.client.post("/api/v1/auth/google", json={
+                "credential": "fake.valid.google.jwt.token",
+                "role": "teacher",
+            })
+            self.assertEqual(g_res.status_code, 200)
+            g_user = g_res.json()["user"]
+            self.assertEqual(g_user["email"], "google_demo@gmail.com")
+            self.assertEqual(g_user["auth_provider"], "google")
+            self.assertTrue(g_user["is_google_linked"])
+            self.assertEqual(g_user["avatar_url"], mock_google_payload["avatar_url"])
+
+        # Dọn 2 tài khoản test khỏi SQL Server
+        with db_mod.get_connection() as conn:
+            conn.cursor().execute("DELETE FROM users WHERE email IN (?, ?);", (test_email, "google_demo@gmail.com"))
+            conn.commit()
+
 
 if __name__ == "__main__":
     unittest.main()

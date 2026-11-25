@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script>
     (function () {
       try {
@@ -60,8 +61,11 @@
         </button>
 
         <div id="user-profile-box" class="user-profile-pill hidden">
-          <span id="user-role-badge" class="user-role-badge">🎓</span>
-          <span id="user-display-name" class="user-display-name">Sinh Viên</span>
+          <button type="button" id="btn-open-profile" class="profile-trigger-btn" title="Xem hồ sơ &amp; Đổi mật khẩu">
+            <img id="user-avatar-img" class="user-avatar-img hidden" src="" alt="Avatar" referrerpolicy="no-referrer">
+            <span id="user-role-badge" class="user-role-badge">🎓</span>
+            <span id="user-display-name" class="user-display-name">Sinh Viên</span>
+          </button>
           <button id="btn-logout" class="btn-logout-small" type="button" title="Đăng xuất khỏi hệ thống">Thoát</button>
         </div>
       </div>
@@ -739,11 +743,37 @@
         </div>
         <div class="auth-form-group">
           <label for="login-password">Mật khẩu:</label>
-          <input type="password" id="login-password" class="auth-input" placeholder="••••••••" required autocomplete="current-password">
+          <div class="pwd-input-wrap">
+            <input type="password" id="login-password" class="auth-input" placeholder="••••••••" required autocomplete="current-password">
+            <button type="button" class="btn-toggle-pwd" data-target="login-password" title="Hiện / Ẩn mật khẩu">👁️</button>
+          </div>
         </div>
         <button type="submit" id="btn-submit-login" class="btn-auth-primary">
           <span>🚀 Đăng Nhập Hệ Thống</span>
         </button>
+
+        <!-- Google Sign-In Section -->
+        <div class="auth-divider"><span>hoặc tiếp tục với Google</span></div>
+        <div id="google-signin-container" class="google-signin-container">
+          <div id="google-gis-button" class="google-gis-button hidden"></div>
+          <button type="button" id="btn-google-fallback" class="btn-google-signin">
+            <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+            </svg>
+            <span>Đăng nhập bằng tài khoản Google</span>
+          </button>
+          <div id="google-setup-hint" class="google-setup-hint hidden">
+            <strong>⚙️ Hướng dẫn bật Google Sign-In thật (1 phút):</strong>
+            <ol>
+              <li>Vào <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud Console → Credentials</a> → Tạo <b>OAuth 2.0 Client ID (Web application)</b>.</li>
+              <li>Thêm Authorized JavaScript origin: <code>http://localhost:8000</code></li>
+              <li>Dán vào tệp <code>.env</code>: <code>GOOGLE_CLIENT_ID=...apps.googleusercontent.com</code> rồi chạy lại server!</li>
+            </ol>
+          </div>
+        </div>
 
         <!-- Nút Đăng nhập mẫu cho Demo Vấn đáp -->
         <div class="quick-demo-login-box">
@@ -763,7 +793,7 @@
       <form id="form-register" class="auth-form hidden">
         <div class="auth-form-group">
           <label for="reg-fullname">Họ và tên đầy đủ:</label>
-          <input type="text" id="reg-fullname" class="auth-input" placeholder="Ví dụ: Nguyễn Văn A" required>
+          <input type="text" id="reg-fullname" class="auth-input" placeholder="Ví dụ: Nguyễn Văn A" minlength="2" required>
         </div>
         <div class="auth-form-group">
           <label for="reg-email">Email:</label>
@@ -771,7 +801,21 @@
         </div>
         <div class="auth-form-group">
           <label for="reg-password">Mật khẩu (tối thiểu 6 ký tự):</label>
-          <input type="password" id="reg-password" class="auth-input" placeholder="••••••••" minlength="6" required autocomplete="new-password">
+          <div class="pwd-input-wrap">
+            <input type="password" id="reg-password" class="auth-input" placeholder="••••••••" minlength="6" required autocomplete="new-password">
+            <button type="button" class="btn-toggle-pwd" data-target="reg-password" title="Hiện / Ẩn mật khẩu">👁️</button>
+          </div>
+          <div class="pwd-strength-wrap">
+            <div class="pwd-strength-track"><div id="reg-pwd-strength-bar" class="pwd-strength-bar"></div></div>
+            <span id="reg-pwd-strength-text" class="pwd-strength-text">Độ mạnh mật khẩu</span>
+          </div>
+        </div>
+        <div class="auth-form-group">
+          <label for="reg-password-confirm">Xác nhận lại mật khẩu:</label>
+          <div class="pwd-input-wrap">
+            <input type="password" id="reg-password-confirm" class="auth-input" placeholder="Nhập lại mật khẩu" minlength="6" required autocomplete="new-password">
+            <button type="button" class="btn-toggle-pwd" data-target="reg-password-confirm" title="Hiện / Ẩn mật khẩu">👁️</button>
+          </div>
         </div>
         <div class="auth-form-group">
           <label>Vai trò người dùng (Phân quyền):</label>
@@ -788,6 +832,84 @@
         </div>
         <button type="submit" id="btn-submit-register" class="btn-auth-primary">
           <span>✨ Tạo Tài Khoản Mới</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================================================================== -->
+  <!-- PROFILE MODAL: HỒ SƠ CÁ NHÂN & ĐỔI MẬT KHẨU -->
+  <!-- ==================================================================== -->
+  <div id="profile-modal" class="auth-modal-overlay hidden">
+    <div class="auth-modal-card" style="max-width: 470px;">
+      <div class="auth-modal-header">
+        <div class="auth-brand">
+          <span class="brand-dot"></span>
+          <span class="auth-modal-title">Hồ Sơ &amp; Bảo Mật Tài Khoản</span>
+        </div>
+        <button id="btn-close-profile-modal" class="auth-close-btn" type="button" aria-label="Đóng">&times;</button>
+      </div>
+
+      <div class="profile-summary-card">
+        <div id="profile-avatar-box" class="profile-avatar-lg">👤</div>
+        <div class="profile-summary-info">
+          <strong id="profile-summary-name">Người dùng</strong>
+          <span id="profile-summary-email">email@veritext.ai</span>
+          <div id="profile-summary-badges" class="profile-summary-badges"></div>
+        </div>
+      </div>
+
+      <div class="auth-tabs">
+        <button id="tab-btn-prof-info" class="auth-tab-btn active" type="button">👤 Thông Tin</button>
+        <button id="tab-btn-prof-pwd" class="auth-tab-btn" type="button">🔐 Đổi Mật Khẩu</button>
+      </div>
+
+      <div id="profile-alert" class="auth-alert hidden"></div>
+
+      <!-- Form Cập nhật Hồ sơ -->
+      <form id="form-profile-info" class="auth-form">
+        <div class="auth-form-group">
+          <label for="prof-fullname">Họ và tên hiển thị:</label>
+          <input type="text" id="prof-fullname" class="auth-input" minlength="2" required>
+        </div>
+        <div class="auth-form-group">
+          <label for="prof-role">Vai trò sử dụng (Phân quyền RBAC):</label>
+          <select id="prof-role" class="auth-input">
+            <option value="student">🎓 Sinh viên (Quét cá nhân &amp; xem lịch sử riêng)</option>
+            <option value="teacher">👨‍🏫 Giảng viên (Chấm cả lớp .ZIP, Xuất Excel &amp; xem toàn bộ)</option>
+          </select>
+        </div>
+        <div id="profile-timestamps" class="profile-timestamps"></div>
+        <button type="submit" id="btn-save-profile" class="btn-auth-primary">
+          <span>💾 Lưu Thay Đổi Hồ Sơ</span>
+        </button>
+      </form>
+
+      <!-- Form Đổi mật khẩu -->
+      <form id="form-profile-pwd" class="auth-form hidden">
+        <div class="auth-form-group" id="group-old-password">
+          <label for="prof-old-pwd">Mật khẩu hiện tại:</label>
+          <div class="pwd-input-wrap">
+            <input type="password" id="prof-old-pwd" class="auth-input" placeholder="Nhập mật khẩu đang dùng">
+            <button type="button" class="btn-toggle-pwd" data-target="prof-old-pwd" title="Hiện / Ẩn mật khẩu">👁️</button>
+          </div>
+        </div>
+        <div class="auth-form-group">
+          <label for="prof-new-pwd">Mật khẩu mới (tối thiểu 6 ký tự):</label>
+          <div class="pwd-input-wrap">
+            <input type="password" id="prof-new-pwd" class="auth-input" minlength="6" required placeholder="••••••••">
+            <button type="button" class="btn-toggle-pwd" data-target="prof-new-pwd" title="Hiện / Ẩn mật khẩu">👁️</button>
+          </div>
+        </div>
+        <div class="auth-form-group">
+          <label for="prof-new-pwd-confirm">Xác nhận mật khẩu mới:</label>
+          <div class="pwd-input-wrap">
+            <input type="password" id="prof-new-pwd-confirm" class="auth-input" minlength="6" required placeholder="Nhập lại mật khẩu mới">
+            <button type="button" class="btn-toggle-pwd" data-target="prof-new-pwd-confirm" title="Hiện / Ẩn mật khẩu">👁️</button>
+          </div>
+        </div>
+        <button type="submit" id="btn-change-pwd" class="btn-auth-primary">
+          <span>🔐 Cập Nhật Mật Khẩu</span>
         </button>
       </form>
     </div>

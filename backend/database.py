@@ -8,6 +8,8 @@ Hỗ trợ:
 """
 
 import os
+import re
+import secrets
 import sys
 import json
 from datetime import datetime
@@ -15,6 +17,8 @@ from typing import Dict, Any, List, Optional
 from contextlib import contextmanager
 import pyodbc
 import bcrypt
+
+EMAIL_REGEX = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
 
 # Đảm bảo in tiếng Việt UTF-8 chuẩn trên Windows Console
 if hasattr(sys.stdout, "reconfigure"):
@@ -76,11 +80,29 @@ def init_db(force: bool = False):
                     password_hash NVARCHAR(255) NOT NULL,
                     full_name NVARCHAR(255) NOT NULL,
                     role NVARCHAR(50) NOT NULL DEFAULT 'student',
+                    auth_provider NVARCHAR(30) NOT NULL DEFAULT 'local',
+                    google_id NVARCHAR(255) NULL,
+                    avatar_url NVARCHAR(500) NULL,
                     is_active BIT NOT NULL DEFAULT 1,
+                    last_login DATETIME2 NULL,
                     created_at DATETIME2 DEFAULT GETDATE()
                 );
             END;
         """)
+
+        # Bổ sung các cột Google OAuth & Hồ sơ nếu bảng users đã tạo từ trước
+        for col_name, col_def in [
+            ("auth_provider", "NVARCHAR(30) NOT NULL DEFAULT 'local'"),
+            ("google_id", "NVARCHAR(255) NULL"),
+            ("avatar_url", "NVARCHAR(500) NULL"),
+            ("last_login", "DATETIME2 NULL"),
+        ]:
+            cursor.execute(f"""
+                IF COL_LENGTH('users', '{col_name}') IS NULL
+                BEGIN
+                    ALTER TABLE users ADD {col_name} {col_def};
+                END;
+            """)
 
         # 2. Bảng Lịch sử thẩm định (detection_history)
         cursor.execute("""
@@ -222,10 +244,22 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return False
 
 
-def create_user(email: str, password: str, full_name: str, role: str = "student") -> Dict[str, Any]:
+def create_user(
+    email: str,
+    password: str,
+    full_name: str,
+    role: str = "student",
+    auth_provider: str = "local",
+    google_id: Optional[str] = None,
+    avatar_url: Optional[str] = None,
+) -> Dict[str, Any]:
     """Đăng ký tài khoản người dùng mới (Sinh viên hoặc Giảng viên)."""
     email_clean = email.strip().lower()
+    if not EMAIL_REGEX.match(email_clean):
+        raise ValueError("Định dạng email không hợp lệ! Vui lòng kiểm tra lại.")
     full_name_clean = full_name.strip()
+    if len(full_name_clean) < 2:
+        raise ValueError("Họ và tên phải có ít nhất 2 ký tự.")
     role_clean = "teacher" if role.lower() in ["teacher", "giangvien", "giảng viên"] else "student"
     pwd_hash = hash_password(password)
 
@@ -236,10 +270,10 @@ def create_user(email: str, password: str, full_name: str, role: str = "student"
             raise ValueError(f"Email '{email_clean}' đã được đăng ký trong hệ thống!")
 
         cursor.execute("""
-            INSERT INTO users (email, password_hash, full_name, role)
-            OUTPUT INSERTED.id, INSERTED.created_at
-            VALUES (?, ?, ?, ?);
-        """, (email_clean, pwd_hash, full_name_clean, role_clean))
+            INSERT INTO users (email, password_hash, full_name, role, auth_provider, google_id, avatar_url, last_login)
+            OUTPUT INSERTED.id, INSERTED.created_at, INSERTED.last_login
+            VALUES (?, ?, ?, ?, ?, ?, ?, GETDATE());
+        """, (email_clean, pwd_hash, full_name_clean, role_clean, auth_provider, google_id, avatar_url))
         row = cursor.fetchone()
         conn.commit()
 
@@ -248,17 +282,22 @@ def create_user(email: str, password: str, full_name: str, role: str = "student"
             "email": email_clean,
             "full_name": full_name_clean,
             "role": role_clean,
+            "auth_provider": auth_provider,
+            "is_google_linked": bool(google_id),
+            "avatar_url": avatar_url or "",
             "created_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "",
+            "last_login": row[2].strftime("%Y-%m-%d %H:%M:%S") if row[2] else "",
         }
 
 
 def authenticate_user(email: str, password: str) -> Optional[Dict[str, Any]]:
-    """Xác thực đăng nhập người dùng."""
+    """Xác thực đăng nhập người dùng bằng email & mật khẩu (bcrypt)."""
     email_clean = email.strip().lower()
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, email, password_hash, full_name, role, is_active, created_at
+            SELECT id, email, password_hash, full_name, role, is_active, created_at,
+                   auth_provider, google_id, avatar_url
             FROM users
             WHERE email = ?;
         """, (email_clean,))
@@ -266,19 +305,86 @@ def authenticate_user(email: str, password: str) -> Optional[Dict[str, Any]]:
         if not row:
             return None
 
-        user_id, user_email, pwd_hash, full_name, role, is_active, created_at = row
+        user_id, user_email, pwd_hash, full_name, role, is_active, created_at, provider, google_id, avatar_url = row
         if not is_active:
             return None
 
         if verify_password(password, pwd_hash):
+            cursor.execute("UPDATE users SET last_login = GETDATE() WHERE id = ?;", (user_id,))
+            conn.commit()
             return {
                 "id": user_id,
                 "email": user_email,
                 "full_name": full_name,
                 "role": role,
+                "auth_provider": provider or "local",
+                "is_google_linked": bool(google_id),
+                "avatar_url": avatar_url or "",
                 "created_at": created_at.strftime("%Y-%m-%d %H:%M:%S") if created_at else "",
+                "last_login": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             }
         return None
+
+
+def upsert_google_user(
+    google_id: str,
+    email: str,
+    full_name: str,
+    avatar_url: str = "",
+    role: str = "student",
+) -> Dict[str, Any]:
+    """
+    Đăng nhập hoặc tự động đăng ký tài khoản bằng Google OAuth 2.0 (ID Token):
+    - Nếu email/google_id đã tồn tại: liên kết google_id, cập nhật avatar & last_login, giữ nguyên vai trò hiện tại.
+    - Nếu là người dùng Google mới: tạo tài khoản mới trong SQL Server với auth_provider='google'.
+    """
+    email_clean = email.strip().lower()
+    name_clean = (full_name or email_clean.split("@")[0]).strip()
+    role_clean = "teacher" if role.lower() in ["teacher", "giangvien", "giảng viên"] else "student"
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, email, full_name, role, is_active, created_at, auth_provider, google_id, avatar_url
+            FROM users
+            WHERE google_id = ? OR email = ?;
+        """, (google_id, email_clean))
+        row = cursor.fetchone()
+
+        if row:
+            uid, u_email, u_name, u_role, is_active, created_at, u_provider, u_gid, u_avatar = row
+            if not is_active:
+                raise ValueError("Tài khoản này đã bị vô hiệu hóa.")
+            new_avatar = avatar_url or u_avatar or ""
+            cursor.execute("""
+                UPDATE users
+                SET google_id = ?, avatar_url = ?, last_login = GETDATE()
+                WHERE id = ?;
+            """, (google_id, new_avatar, uid))
+            conn.commit()
+            return {
+                "id": uid,
+                "email": u_email,
+                "full_name": u_name or name_clean,
+                "role": u_role,
+                "auth_provider": u_provider or "google",
+                "is_google_linked": True,
+                "avatar_url": new_avatar,
+                "created_at": created_at.strftime("%Y-%m-%d %H:%M:%S") if created_at else "",
+                "last_login": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }
+
+    # Tạo tài khoản mới cho người dùng đăng nhập Google lần đầu
+    random_pwd = secrets.token_urlsafe(24)
+    return create_user(
+        email=email_clean,
+        password=random_pwd,
+        full_name=name_clean,
+        role=role_clean,
+        auth_provider="google",
+        google_id=google_id,
+        avatar_url=avatar_url,
+    )
 
 
 def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
@@ -286,7 +392,8 @@ def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, email, full_name, role, is_active, created_at
+            SELECT id, email, full_name, role, is_active, created_at,
+                   auth_provider, google_id, avatar_url, last_login
             FROM users WHERE id = ?;
         """, (user_id,))
         row = cursor.fetchone()
@@ -299,7 +406,51 @@ def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
             "role": row[3],
             "is_active": bool(row[4]),
             "created_at": row[5].strftime("%Y-%m-%d %H:%M:%S") if row[5] else "",
+            "auth_provider": row[6] or "local",
+            "is_google_linked": bool(row[7]),
+            "avatar_url": row[8] or "",
+            "last_login": row[9].strftime("%Y-%m-%d %H:%M:%S") if row[9] else "",
         }
+
+
+def update_user_profile(user_id: int, full_name: str, role: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Cập nhật họ tên và vai trò tài khoản trong SQL Server."""
+    clean_name = full_name.strip()
+    if len(clean_name) < 2:
+        raise ValueError("Họ và tên phải có ít nhất 2 ký tự.")
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        if role is not None:
+            role_clean = "teacher" if role.lower() in ["teacher", "giangvien", "giảng viên"] else "student"
+            cursor.execute("UPDATE users SET full_name = ?, role = ? WHERE id = ?;", (clean_name, role_clean, user_id))
+        else:
+            cursor.execute("UPDATE users SET full_name = ? WHERE id = ?;", (clean_name, user_id))
+        conn.commit()
+
+    return get_user_by_id(user_id)
+
+
+def change_user_password(user_id: int, old_password: Optional[str], new_password: str) -> None:
+    """Đổi mật khẩu tài khoản (yêu cầu mật khẩu cũ với tài khoản local; hỗ trợ đặt mật khẩu cho tài khoản Google)."""
+    if not new_password or len(new_password) < 6:
+        raise ValueError("Mật khẩu mới phải có ít nhất 6 ký tự.")
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT password_hash, auth_provider FROM users WHERE id = ?;", (user_id,))
+        row = cursor.fetchone()
+        if not row:
+            raise ValueError("Tài khoản không tồn tại.")
+
+        pwd_hash, provider = row
+        if (provider or "local") == "local":
+            if not old_password or not verify_password(old_password, pwd_hash):
+                raise ValueError("Mật khẩu hiện tại không chính xác!")
+
+        new_hash = hash_password(new_password)
+        cursor.execute("UPDATE users SET password_hash = ? WHERE id = ?;", (new_hash, user_id))
+        conn.commit()
 
 
 # ==============================================================================

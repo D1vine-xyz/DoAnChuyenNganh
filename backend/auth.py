@@ -10,10 +10,61 @@ from typing import Optional, Dict, Any, List
 import jwt
 from fastapi import HTTPException, status, Header, Depends, Query
 
+try:
+    from dotenv import load_dotenv
+    _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    load_dotenv(os.path.join(_BASE_DIR, "..", ".env"))
+    load_dotenv(os.path.join(_BASE_DIR, ".env"))
+except Exception:
+    pass
+
 # Khóa bí mật ký JWT (ưu tiên biến môi trường, fallback key mặc định cho môi trường local)
 JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "veritext-ai-super-secret-jwt-key-2026-academic-thesis")
 JWT_ALGORITHM = "HS256"
 JWT_ACCESS_TOKEN_EXPIRE_DAYS = 7  # Token có hiệu lực 7 ngày
+
+
+def get_google_client_id() -> str:
+    """Đọc GOOGLE_CLIENT_ID từ biến môi trường / file .env (bỏ qua giá trị placeholder)."""
+    cid = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+    if not cid or "your_google_client_id" in cid.lower():
+        return ""
+    return cid
+
+
+def verify_google_id_token(credential: str) -> Dict[str, Any]:
+    """
+    Xác thực chữ ký số Google ID Token (Google Identity Services / OAuth 2.0)
+    bằng thư viện chính chủ `google-auth`.
+    """
+    client_id = get_google_client_id()
+    if not client_id:
+        raise ValueError(
+            "Chưa cấu hình GOOGLE_CLIENT_ID trong tệp .env. "
+            "Vui lòng dán Google OAuth Client ID vào .env và khởi động lại server."
+        )
+
+    from google.oauth2 import id_token as google_id_token
+    from google.auth.transport import requests as google_requests
+
+    try:
+        idinfo = google_id_token.verify_oauth2_token(
+            credential,
+            google_requests.Request(),
+            client_id,
+        )
+    except Exception as e:
+        raise ValueError(f"Google ID Token không hợp lệ hoặc đã hết hạn: {str(e)}")
+
+    if not idinfo.get("email") or not idinfo.get("email_verified", False):
+        raise ValueError("Tài khoản Google chưa xác minh địa chỉ email.")
+
+    return {
+        "google_id": str(idinfo["sub"]),
+        "email": str(idinfo["email"]).strip().lower(),
+        "full_name": str(idinfo.get("name") or idinfo["email"].split("@")[0]).strip(),
+        "avatar_url": str(idinfo.get("picture") or ""),
+    }
 
 
 def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
