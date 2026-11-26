@@ -81,7 +81,7 @@ class TestDetectionAPI(unittest.TestCase):
         self.assertIn("model_breakdown", data)
 
     def test_04_detect_sentences_and_db_save(self):
-        """Kiểm tra phân tích cấp câu POST /api/v1/detect/sentences và lưu vào SQLite"""
+        """Kiểm tra phân tích cấp câu POST /api/v1/detect/sentences và lưu vào SQL Server"""
         paragraph = (
             "Yesterday afternoon, I went to the park and enjoyed walking my dog. "
             "Meanwhile, large language models are transforming modern digital content creation with high fluency. "
@@ -551,6 +551,81 @@ class TestDetectionAPI(unittest.TestCase):
             for sub in batch["submissions"]:
                 self.client.delete(f"/api/v1/history/{sub['scan_id']}", headers={"Authorization": f"Bearer {t_token}"})
             self.client.delete(f"/api/v1/classroom/batches/{batch['id']}", headers={"Authorization": f"Bearer {t_token}"})
+
+    def test_16_sliding_window_long_essay_qr_verify_and_history_filters(self):
+        """Kiểm tra Sliding-Window bài dài (>256 tokens), chống chấm oan tiêu đề ngắn, xác thực HMAC QR & bộ lọc lịch sử."""
+        long_hybrid_vi = (
+            "1. Mở đầu\n"
+            "Hôm qua tôi đi bộ dọc bờ hồ lúc trời vừa hửng nắng sớm, nghe tiếng rao bánh khúc quen thuộc ở góc phố nhỏ "
+            "và nhớ lại những buổi chiều tụ tập ăn chè cùng đám bạn thời sinh viên. Hồi đó cả nhóm hay rủ nhau đạp xe "
+            "vòng quanh khu tập thể cũ, vừa ăn xôi xéo vừa bàn chuyện thi cử, chẳng mấy khi nghĩ ngợi sâu xa về công nghệ. "
+            "Bà cụ bán nước chè đầu ngõ vẫn nhớ tên từng đứa, cứ thấy mặt là mỉm cười rót ngay cốc trà đá mát lạnh. "
+            "Những mảnh ký ức bình dị ấy khiến bài ghi chép tay hôm nay mang đậm cảm xúc đời thường rất tự nhiên. "
+            "Khi mùa thu ghé qua, lá bàng rơi rụng đầy khoảng sân trường cũ, đám học trò lại í ới gọi nhau chụp vài tấm ảnh kỷ niệm. "
+            "Tôi vẫn giữ thói quen ghi chép mọi chuyện vặt vãnh vào cuốn sổ tay bìa sờn cũ để mỗi lúc rảnh rỗi lật ra đọc lại. "
+            "Cảm giác viết từng dòng chữ bằng mực xanh lên trang giấy thơm mùi gỗ luôn đem tới sự thư thái kỳ lạ mà không màn hình nào thay thế nổi.\n\n"
+            "2. Phân tích AI\n"
+            "Trí tuệ nhân tạo ngày nay đang đóng vai trò then chốt trong sự phát triển vượt bậc của nền công nghệ số toàn cầu. "
+            "Không thể phủ nhận rằng các mô hình ngôn ngữ lớn hiện đại có khả năng tiếp nhận, tổng hợp và tái cấu trúc "
+            "lượng thông tin khổng lồ với độ mạch lạc và tính nhất quán cú pháp đáng kinh ngạc. "
+            "Bên cạnh đó, sự phổ biến rộng rãi của các công cụ sinh văn bản tự động cũng đặt ra hàng loạt thách thức cấp bách "
+            "đối với tính trung thực học thuật, quyền sở hữu trí tuệ và công tác kiểm định chất lượng đào tạo tại các trường đại học. "
+            "Do đó, việc nghiên cứu và triển khai các giải pháp phát hiện nội dung do máy sinh dựa trên kiến trúc Transformer kết hợp "
+            "là một hướng đi chiến lược vô cùng cần thiết trong kỷ nguyên chuyển đổi số hiện đại. "
+            "Tóm lại, việc kết hợp phân tích thống kê ngôn ngữ học với các mô hình học sâu sẽ đảm bảo tính minh bạch và công bằng."
+        )
+
+        res = self.client.post("/api/v1/detect/web", json={
+            "text": long_hybrid_vi,
+            "threshold": 0.5,
+            "title": "KiemThu_SlidingWindow_QR_Verify",
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+
+        # 1. Sliding-Window phải chia >= 2 đoạn bao phủ 100% văn bản > 256 tokens
+        stats = data["overall"]["text_stats"]
+        self.assertGreaterEqual(stats["chunk_count"], 2)
+        self.assertIn("Sliding-Window", stats["context_coverage"])
+
+        # 2. Tiêu đề ngắn (<= 4 từ: "1. Mở đầu") phải được bảo vệ ở trạng thái xanh trung tính
+        first_sent = data["sentences"][0]
+        self.assertLessEqual(first_sent["word_count"], 4)
+        self.assertEqual(first_sent["highlight_color"], "green")
+        self.assertIn("Tiêu đề", first_sent["assessment"])
+
+        # 3. Audit Code HMAC-SHA256 hợp lệ & PDF QR export thành công
+        scan_id = data["scan_id"]
+        audit_code = data.get("audit_code", "")
+        self.assertRegex(audit_code, r"^VT-\d{6}-[A-F0-9]{8}$")
+
+        pdf_res = self.client.get(f"/api/v1/report/pdf/{scan_id}")
+        self.assertEqual(pdf_res.status_code, 200)
+        self.assertEqual(pdf_res.headers.get("content-type"), "application/pdf")
+        self.assertGreater(len(pdf_res.content), 2000)
+
+        # 4. Cổng xác thực chống giả mạo GET /api/v1/verify/{audit_code}
+        ok_verify = self.client.get(f"/api/v1/verify/{audit_code}").json()
+        self.assertTrue(ok_verify["valid"])
+        self.assertEqual(ok_verify["certificate"]["id"], scan_id)
+
+        last_ch = "0" if audit_code[-1] != "0" else "1"
+        tampered_code = audit_code[:-1] + last_ch
+        bad_verify = self.client.get(f"/api/v1/verify/{tampered_code}").json()
+        self.assertFalse(bad_verify["valid"])
+
+        # 5. Bộ lọc lịch sử đa tiêu chí (language, verdict, q)
+        verdict = data["overall"]["label"]
+        flt_res = self.client.get(
+            "/api/v1/history",
+            params={"language": "vi", "verdict": verdict, "q": "KiemThu_SlidingWindow_QR_Verify"},
+        )
+        self.assertEqual(flt_res.status_code, 200)
+        matched_ids = [it["id"] for it in flt_res.json().get("history", [])]
+        self.assertIn(scan_id, matched_ids)
+
+        # Dọn bản ghi test khỏi SQL Server
+        self.client.delete(f"/api/v1/history/{scan_id}")
 
 
 if __name__ == "__main__":

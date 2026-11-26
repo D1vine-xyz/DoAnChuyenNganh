@@ -47,6 +47,9 @@
       </nav>
 
       <div class="nav-right">
+        <button id="btn-open-verify" class="btn-action-pill btn-verify-nav" type="button" title="Tra cứu &amp; Xác thực mã chống giả mạo trên Biên bản PDF">
+          <span>🛡️ Xác Thực PDF</span>
+        </button>
         <button id="btn-theme-toggle" class="theme-toggle-btn" type="button" aria-label="Chuyển chế độ Sáng / Tối" title="Chuyển chế độ Sáng / Tối">
           <span id="theme-toggle-icon">🌙</span>
         </button>
@@ -333,26 +336,36 @@
           </div>
         </div>
 
-        <!-- Sentence Hotspots -->
+        <!-- Sentence Hotspots & Turnitin-Style Annotated Document View -->
         <div class="sentences-inspect-box">
           <div class="sentences-box-header">
-            <div class="sentences-box-title">Bóc tách chi tiết từng câu (Sentence AI Hotspots):</div>
+            <div class="hotspot-view-tabs">
+              <button type="button" id="btn-view-annotated" class="hotspot-tab-btn active">📄 Mạch văn gốc tô màu</button>
+              <button type="button" id="btn-view-list" class="hotspot-tab-btn">📑 Danh sách từng câu</button>
+            </div>
             <div class="sentences-legend">
-              <div class="legend-tag"><span class="dot-red"></span> AI (≥80%)</div>
-              <div class="legend-tag"><span class="dot-yellow"></span> Nghi vấn (50-80%)</div>
-              <div class="legend-tag"><span class="dot-green"></span> Người viết (&lt;50%)</div>
+              <div class="legend-tag"><span class="dot-red"></span> AI cao</div>
+              <div class="legend-tag"><span class="dot-yellow"></span> Nghi vấn</div>
+              <div class="legend-tag"><span class="dot-green"></span> Tự nhiên</div>
             </div>
           </div>
-          <div id="sentences-container" class="sentences-list-scroll">
-            <!-- Dynamically populated -->
+          <div id="annotated-doc-container" class="annotated-doc-box">
+            <!-- Turnitin-style inline highlighted essay -->
+          </div>
+          <div id="sentences-container" class="sentences-list-scroll hidden">
+            <!-- Dynamically populated sentence list -->
           </div>
         </div>
 
-        <!-- Footer Actions with PDF Export -->
+        <!-- Footer Actions with Cryptographic Audit Code & PDF Export -->
         <div id="result-actions" class="result-footer-actions">
+          <button id="btn-copy-audit-code" class="audit-code-pill hidden" type="button" title="Nhấp để kiểm chứng chống giả mạo hoặc sao chép mã">
+            <span>🔐 Mã chứng thực:</span>
+            <strong id="result-audit-code">VT-000000-00000000</strong>
+          </button>
           <button id="btn-export-pdf" class="btn-export-pdf" type="button">
             <span>📥</span>
-            <span>Xuất Báo Cáo Giám Định (PDF)</span>
+            <span>Xuất Báo Cáo Giám Định (PDF + QR)</span>
           </button>
         </div>
 
@@ -559,6 +572,23 @@
           <div class="history-card-header">
             <h3>Nhật Ký Các Lần Thẩm Định (Microsoft SQL Server 2022 - VeriTextAI)</h3>
             <button id="btn-refresh-history" class="btn-action-pill" type="button">🔄 Làm mới</button>
+          </div>
+          <div class="history-filter-toolbar">
+            <input type="text" id="hist-search-input" class="auth-input hist-search-input" placeholder="🔍 Tìm theo tên tài liệu, sinh viên hoặc mã #ID...">
+            <select id="hist-filter-lang" class="auth-input hist-select">
+              <option value="">🌐 Mọi ngôn ngữ</option>
+              <option value="vi">🇻🇳 Tiếng Việt</option>
+              <option value="en">🇬🇧 Tiếng Anh</option>
+            </select>
+            <select id="hist-filter-verdict" class="auth-input hist-select">
+              <option value="">📊 Mọi kết luận</option>
+              <option value="AI-generated">🤖 Do AI sinh</option>
+              <option value="Human-written">👤 Do Người viết</option>
+            </select>
+            <label class="filter-checkbox-label hist-bypass-chk">
+              <input type="checkbox" id="hist-filter-bypass">
+              <span>⚠️ Chỉ bài dính Bypass</span>
+            </label>
           </div>
           <div class="table-wrapper">
             <table class="data-table">
@@ -912,6 +942,31 @@
           <span>🔐 Cập Nhật Mật Khẩu</span>
         </button>
       </form>
+    </div>
+  </div>
+
+  <!-- ==================================================================== -->
+  <!-- VERIFY CERTIFICATE MODAL: TRA CỨU CHỐNG GIẢ MẠO BIÊN BẢN PDF (QR/HASH) -->
+  <!-- ==================================================================== -->
+  <div id="verify-modal" class="auth-modal-overlay hidden">
+    <div class="auth-modal-card" style="max-width: 500px;">
+      <div class="auth-modal-header">
+        <div class="auth-brand">
+          <span class="brand-dot"></span>
+          <span class="auth-modal-title">🛡️ Xác Thực Biên Bản Kiểm Định (Chống Giả Mạo)</span>
+        </div>
+        <button id="btn-close-verify-modal" class="auth-close-btn" type="button" aria-label="Đóng">&times;</button>
+      </div>
+      <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5;">
+        Nhập <b>Mã chứng thực chữ ký số HMAC-SHA256</b> in trên Biên bản PDF hoặc Bảng điểm Excel (định dạng <code>VT-000123-A8F912BC</code>) để đối chiếu trực tiếp với bản ghi gốc bất biến trong SQL Server.
+      </p>
+      <form id="form-verify-cert" class="verify-form-row">
+        <input type="text" id="verify-code-input" class="auth-input" placeholder="Ví dụ: VT-000025-8F41C92B" required>
+        <button type="submit" id="btn-submit-verify" class="btn-auth-primary" style="width: auto; white-space: nowrap; padding: 10px 16px;">
+          <span>🔎 Kiểm Chứng</span>
+        </button>
+      </form>
+      <div id="verify-result-box" class="verify-result-box hidden"></div>
     </div>
   </div>
 

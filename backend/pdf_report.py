@@ -25,6 +25,9 @@ from reportlab.platypus import (
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.graphics.shapes import Drawing
+from reportlab.graphics.barcode import qr
+import auth
 
 # Đăng ký phông chữ Arial hỗ trợ tiếng Việt trên Windows
 FONT_REGULAR = "Helvetica"
@@ -150,48 +153,95 @@ def generate_pdf_report(scan_data: Dict[str, Any]) -> bytes:
     story.append(Paragraph("Hệ thống Song ngữ: PhoBERT base v2 (Tiếng Việt) &amp; Ensemble PLMs (Tiếng Anh)", subtitle_style))
     story.append(Spacer(1, 12))
 
-    # 2. Thông tin thẩm định (Metadata Table)
+    # 2. Thông tin thẩm định & Mã QR Chống Giả Mạo (Metadata + Cryptographic QR Verification)
     scan_id = scan_data.get("id", "N/A")
     timestamp_str = scan_data.get("timestamp") or scan_data.get("created_at") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     doc_title = scan_data.get("title") or scan_data.get("filename") or "Văn bản phân tích trực tiếp"
     author_name = scan_data.get("author_name") or "Khách vãng lai"
     lang_code = scan_data.get("language", "en")
     is_vi = lang_code == "vi"
-    word_count = scan_data.get("word_count", 0)
-    char_count = scan_data.get("char_count", 0)
+    word_count = int(scan_data.get("word_count", 0))
+    char_count = int(scan_data.get("char_count", 0))
     proc_time = scan_data.get("inference_time_ms", 0.0)
-    method_label = "PhoBERT base v2 + PyVi (Tiếng Việt)" if is_vi else "Weighted Ensemble (3 PLMs - Tiếng Anh)"
+    ai_prob_meta = float(scan_data.get("ai_probability", 0.0))
+    method_label = "PhoBERT v2 Sliding-Window (VI)" if is_vi else "Weighted Ensemble 3 PLMs (EN)"
 
-    meta_table_data = [
+    audit_code = scan_data.get("audit_code")
+    if not audit_code and isinstance(scan_id, int):
+        audit_code = auth.compute_audit_code(scan_id=scan_id, ai_probability=ai_prob_meta, word_count=word_count)
+    elif not audit_code:
+        audit_code = f"AUDIT-{scan_id}"
+
+    base_verify_url = scan_data.get("verify_base_url") or "http://localhost:8000"
+    verify_url = f"{base_verify_url.rstrip('/')}/?verify={audit_code}"
+
+    # Tạo mã QR vector sắc nét nhúng trực tiếp vào biên bản PDF
+    qr_widget = qr.QrCodeWidget(verify_url)
+    qr_bounds = qr_widget.getBounds()
+    qr_w = max(qr_bounds[2] - qr_bounds[0], 1.0)
+    qr_h = max(qr_bounds[3] - qr_bounds[1], 1.0)
+    qr_size = 64.0
+    qr_drawing = Drawing(qr_size, qr_size, transform=[qr_size / qr_w, 0, 0, qr_size / qr_h, 0, 0])
+    qr_drawing.add(qr_widget)
+
+    meta_inner_data = [
         [
-            Paragraph("<b>Mã thẩm định:</b>", body_style),
-            Paragraph(f"AUDIT-{scan_id:06d}" if isinstance(scan_id, int) else xml_escape(str(scan_id)), body_bold),
-            Paragraph("<b>Thời gian thực hiện:</b>", body_style),
+            Paragraph("<b>Mã xác thực:</b>", body_style),
+            Paragraph(xml_escape(str(audit_code)), body_bold),
+            Paragraph("<b>Thời gian:</b>", body_style),
             Paragraph(xml_escape(str(timestamp_str)), body_style),
         ],
         [
             Paragraph("<b>Tên tài liệu:</b>", body_style),
-            Paragraph(xml_escape(str(doc_title)[:45]), body_bold),
-            Paragraph("<b>Độ dài văn bản:</b>", body_style),
+            Paragraph(xml_escape(str(doc_title)[:40]), body_bold),
+            Paragraph("<b>Độ dài:</b>", body_style),
             Paragraph(f"{word_count:,} từ ({char_count:,} ký tự)", body_style),
         ],
         [
             Paragraph("<b>Phương pháp:</b>", body_style),
             Paragraph(method_label, body_style),
-            Paragraph("<b>Người thực hiện:</b>", body_style),
-            Paragraph(f"{xml_escape(str(author_name)[:32])} ({proc_time} ms)", body_style),
+            Paragraph("<b>Người quét:</b>", body_style),
+            Paragraph(f"{xml_escape(str(author_name)[:26])} ({proc_time} ms)", body_style),
         ],
     ]
+    meta_inner_table = Table(meta_inner_data, colWidths=[78, 145, 72, 136])
+    meta_inner_table.setStyle(TableStyle([
+        ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#E2E8F0")),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+    ]))
 
-    meta_table = Table(meta_table_data, colWidths=[100, 160, 110, 145])
+    qr_caption = ParagraphStyle(
+        "QrCaption",
+        fontName=FONT_REGULAR,
+        fontSize=6.8,
+        leading=8.5,
+        textColor=colors.HexColor("#475569"),
+        alignment=1,
+    )
+    qr_cell_table = Table(
+        [[qr_drawing], [Paragraph("Quét QR xác thực<br/>chống giả mạo PDF", qr_caption)]],
+        colWidths=[80],
+    )
+    qr_cell_table.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 1),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+    ]))
+
+    meta_table = Table([[meta_inner_table, qr_cell_table]], colWidths=[431, 84])
     meta_table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
         ("BOX", (0, 0), (-1, -1), 0.8, colors.HexColor("#CBD5E1")),
-        ("INNERGRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#E2E8F0")),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-        ("LEFTPADDING", (0, 0), (-1, -1), 8),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("LINEBEFORE", (1, 0), (1, 0), 0.5, colors.HexColor("#CBD5E1")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("LEFTPADDING", (0, 0), (-1, -1), 2),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 2),
     ]))
     story.append(meta_table)
     story.append(Spacer(1, 14))

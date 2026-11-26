@@ -22,6 +22,7 @@ from datetime import datetime
 from typing import Dict, Any, List, Tuple
 
 from file_parser import extract_text_from_file
+import auth
 
 SUPPORTED_DOC_EXTENSIONS = (".txt", ".docx", ".doc", ".pdf")
 MAX_BATCH_FILES = 100
@@ -214,7 +215,11 @@ def generate_batch_csv_bytes(batch_detail: Dict[str, Any]) -> bytes:
             s.get("perplexity_score") if s.get("perplexity_score") is not None else "",
             verdict_txt,
             s.get("inference_time_ms", 0.0),
-            f"AUDIT-{int(s.get('scan_id', 0)):06d}",
+            auth.compute_audit_code(
+                scan_id=int(s.get("scan_id", 0)),
+                ai_probability=float(s.get("ai_probability", 0.0)),
+                word_count=int(s.get("word_count", 0)),
+            ),
         ])
 
     return ("\ufeff" + output.getvalue()).encode("utf-8")
@@ -318,7 +323,11 @@ def generate_batch_excel_bytes(batch_detail: Dict[str, Any]) -> bytes:
             s.get("perplexity_score") if s.get("perplexity_score") is not None else "-",
             s.get("verdict", ""),
             round(float(s.get("inference_time_ms", 0.0)), 1),
-            f"AUDIT-{int(s.get('scan_id', 0)):06d}",
+            auth.compute_audit_code(
+                scan_id=int(s.get("scan_id", 0)),
+                ai_probability=float(s.get("ai_probability", 0.0)),
+                word_count=int(s.get("word_count", 0)),
+            ),
         ]
 
         ws.row_dimensions[row_idx].height = 20

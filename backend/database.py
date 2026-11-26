@@ -543,12 +543,21 @@ def save_scan(
         return inserted_id
 
 
-def get_history(limit: int = 50, offset: int = 0, user_id: Optional[int] = None, role: Optional[str] = None) -> List[Dict[str, Any]]:
+def get_history(
+    limit: int = 50,
+    offset: int = 0,
+    user_id: Optional[int] = None,
+    role: Optional[str] = None,
+    search_query: Optional[str] = None,
+    language: Optional[str] = None,
+    verdict: Optional[str] = None,
+    bypass_only: bool = False,
+) -> List[Dict[str, Any]]:
     """
-    Truy xuất danh sách lịch sử thẩm định theo phân quyền:
+    Truy xuất danh sách lịch sử thẩm định theo phân quyền RBAC kết hợp tìm kiếm & lọc đa tiêu chí:
     - Sinh viên: Chỉ xem lịch sử cá nhân (user_id = ?).
     - Giảng viên / Quản trị viên: Xem toàn bộ lịch sử của sinh viên và lớp học.
-    - Khách chưa đăng nhập: Xem các bài quét công khai gần nhất.
+    - Khách chưa đăng nhập: Chỉ xem các bài quét ẩn danh (user_id IS NULL).
     """
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -561,27 +570,49 @@ def get_history(limit: int = 50, offset: int = 0, user_id: Optional[int] = None,
                 FROM detection_history h
                 LEFT JOIN users u ON h.user_id = u.id
         """
+        conditions: List[str] = []
+        params: List[Any] = []
+
         if role in ("teacher", "admin"):
-            query = select_cols + """
-                ORDER BY h.id DESC
-                OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
-            """
-            cursor.execute(query, (offset, limit))
+            pass
         elif role == "student" and user_id is not None:
-            query = select_cols + """
-                WHERE h.user_id = ?
-                ORDER BY h.id DESC
-                OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
-            """
-            cursor.execute(query, (user_id, offset, limit))
+            conditions.append("h.user_id = ?")
+            params.append(user_id)
         else:
-            # Khách chưa đăng nhập chỉ xem các lượt quét ẩn danh (user_id IS NULL), bảo vệ dữ liệu riêng của GV/SV
-            query = select_cols + """
-                WHERE h.user_id IS NULL
+            conditions.append("h.user_id IS NULL")
+
+        if search_query and search_query.strip():
+            q_raw = search_query.strip()
+            like_pat = f"%{q_raw}%"
+            if q_raw.lstrip("#").isdigit():
+                conditions.append("(h.id = ? OR h.title LIKE ? OR u.full_name LIKE ?)")
+                params.extend([int(q_raw.lstrip("#")), like_pat, like_pat])
+            else:
+                conditions.append("(h.title LIKE ? OR u.full_name LIKE ? OR h.student_label LIKE ?)")
+                params.extend([like_pat, like_pat, like_pat])
+
+        if language in ("vi", "en"):
+            conditions.append("h.language = ?")
+            params.append(language)
+
+        if verdict in ("AI-generated", "Human-written"):
+            conditions.append("h.label = ?")
+            params.append(verdict)
+
+        if bypass_only:
+            conditions.append("h.has_bypass_warning = 1")
+
+        where_sql = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+        query = (
+            select_cols
+            + where_sql
+            + """
                 ORDER BY h.id DESC
                 OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
             """
-            cursor.execute(query, (offset, limit))
+        )
+        params.extend([offset, limit])
+        cursor.execute(query, tuple(params))
 
         rows = cursor.fetchall()
         result = []
@@ -697,6 +728,41 @@ def get_scan_by_id(scan_id: int, user_id: Optional[int] = None, role: Optional[s
                 "xai_metrics": xai_metrics,
                 "bypass_report": bypass_report,
             }
+        }
+
+
+def get_scan_public_verification(scan_id: int) -> Optional[Dict[str, Any]]:
+    """
+    Lấy thông tin tóm tắt chứng chỉ kiểm định phục vụ cổng Tra Cứu Xác Thực Mã QR / Hash.
+    Tuyệt đối KHÔNG trả về nội dung bài viết gốc (full_text) để bảo mật quyền riêng tư học thuật.
+    """
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT h.id, h.title, h.language, h.label, h.ai_probability, h.human_probability,
+                   h.confidence, h.word_count, h.char_count, h.has_bypass_warning,
+                   h.authorship_tier, h.created_at, COALESCE(u.full_name, N'Khách vãng lai') as author_name
+            FROM detection_history h
+            LEFT JOIN users u ON h.user_id = u.id
+            WHERE h.id = ?;
+        """, (scan_id,))
+        row = cursor.fetchone()
+        if not row:
+            return None
+        return {
+            "id": int(row[0]),
+            "title": row[1] or "Tài liệu thẩm định",
+            "language": row[2] or "en",
+            "verdict": row[3],
+            "ai_probability": float(row[4] or 0.0),
+            "human_probability": float(row[5] or 0.0),
+            "confidence": row[6] or "",
+            "word_count": int(row[7] or 0),
+            "char_count": int(row[8] or 0),
+            "has_bypass_warning": bool(row[9]),
+            "authorship_tier": row[10] or "",
+            "timestamp": row[11].strftime("%Y-%m-%d %H:%M:%S") if row[11] else "",
+            "author_name": row[12] or "Khách vãng lai",
         }
 
 

@@ -7,6 +7,7 @@ const API_BASE = window.location.protocol === "file:" ? "http://localhost:8000" 
 
 // Global State
 let currentScanId = null;
+let currentAuditCode = null;
 let currentUploadedFile = null;
 let currentUser = null;
 
@@ -132,15 +133,33 @@ const nameModel3 = document.getElementById("name-model-3");
 const weightModel3 = document.getElementById("weight-model-3");
 const barRoberta = document.getElementById("bar-roberta");
 const probRoberta = document.getElementById("prob-roberta");
+const annotatedDocContainer = document.getElementById("annotated-doc-container");
 const sentencesContainer = document.getElementById("sentences-container");
+const btnViewAnnotated = document.getElementById("btn-view-annotated");
+const btnViewList = document.getElementById("btn-view-list");
+const btnCopyAuditCode = document.getElementById("btn-copy-audit-code");
+const resultAuditCodeEl = document.getElementById("result-audit-code");
 
-// DOM Elements - History
+// DOM Elements - History & Filters
 const kpiTotalScans = document.getElementById("kpi-total-scans");
 const kpiAiRate = document.getElementById("kpi-ai-rate");
 const kpiTotalWords = document.getElementById("kpi-total-words");
 const kpiAvgLatency = document.getElementById("kpi-avg-latency");
 const historyTableBody = document.getElementById("history-table-body");
 const btnRefreshHistory = document.getElementById("btn-refresh-history");
+const histSearchInput = document.getElementById("hist-search-input");
+const histFilterLang = document.getElementById("hist-filter-lang");
+const histFilterVerdict = document.getElementById("hist-filter-verdict");
+const histFilterBypass = document.getElementById("hist-filter-bypass");
+
+// DOM Elements - Verify Certificate Modal
+const btnOpenVerify = document.getElementById("btn-open-verify");
+const verifyModal = document.getElementById("verify-modal");
+const btnCloseVerifyModal = document.getElementById("btn-close-verify-modal");
+const formVerifyCert = document.getElementById("form-verify-cert");
+const verifyCodeInput = document.getElementById("verify-code-input");
+const btnSubmitVerify = document.getElementById("btn-submit-verify");
+const verifyResultBox = document.getElementById("verify-result-box");
 
 
 // ==============================================================================
@@ -264,6 +283,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   initClassroomBatchUI();
+  initHotspotViewTabs();
+  initHistoryFilters();
+  initVerifyCertificateModal();
 });
 
 async function checkServerHealth() {
@@ -410,12 +432,15 @@ btnPaste.addEventListener("click", async () => {
 btnClear.addEventListener("click", () => {
   textInput.value = "";
   updateTextCounts();
+  currentScanId = null;
+  currentAuditCode = null;
   currentUploadedFile = null;
   fileInput.value = "";
   fileInfoBar.classList.add("hidden");
   textInput.placeholder = "Nhập văn bản vào đây hoặc tải lên tệp để kiểm tra Nội dung AI.";
   resultContent.classList.add("hidden");
   resultActions.classList.add("hidden");
+  if (btnCopyAuditCode) btnCopyAuditCode.classList.add("hidden");
 });
 
 btnSampleAi.addEventListener("click", () => {
@@ -640,6 +665,17 @@ function renderResults(data) {
   // 2b. Anti-Bypass Alert, Academic Filter Notice, 4-Tier Authorship & XAI Evidence
   renderForensicsAndXai(data);
 
+  // 2c. Cryptographic Anti-Forgery Audit Code Pill
+  currentAuditCode = data.audit_code || null;
+  if (btnCopyAuditCode && resultAuditCodeEl) {
+    if (currentAuditCode) {
+      resultAuditCodeEl.textContent = currentAuditCode;
+      btnCopyAuditCode.classList.remove("hidden");
+    } else {
+      btnCopyAuditCode.classList.add("hidden");
+    }
+  }
+
   // 3. Model Breakdown
   if (modelsBoxTitle) {
     modelsBoxTitle.textContent = isVi
@@ -648,20 +684,41 @@ function renderResults(data) {
   }
 
   if (isVi) {
-    if (nameModel1) nameModel1.textContent = "PhoBERT v2";
-    if (weightModel1) weightModel1.textContent = "Chuyên biệt (100%)";
-    probLongformer.textContent = `${aiPct}%`;
-    barLongformer.style.width = `${aiPct}%`;
+    const chunkInfo = overall.model_breakdown && overall.model_breakdown.chunk_analysis;
+    if (chunkInfo && chunkInfo.chunk_count > 1) {
+      const meanPct = (chunkInfo.mean_probability * 100).toFixed(1);
+      const peakPct = (chunkInfo.peak_probability * 100).toFixed(1);
 
-    if (nameModel2) nameModel2.textContent = "PyVi Segmenter";
-    if (weightModel2) weightModel2.textContent = "Tách từ ghép";
-    probBert.textContent = "Hoàn tất";
-    barBert.style.width = "100%";
+      if (nameModel1) nameModel1.textContent = "PhoBERT v2 (Hợp nhất)";
+      if (weightModel1) weightModel1.textContent = `Sliding-Window (${chunkInfo.chunk_count} đoạn)`;
+      probLongformer.textContent = `${aiPct}%`;
+      barLongformer.style.width = `${aiPct}%`;
 
-    if (nameModel3) nameModel3.textContent = "Language Router";
-    if (weightModel3) weightModel3.textContent = "Định tuyến tự động";
-    probRoberta.textContent = "Tiếng Việt 🇻🇳";
-    barRoberta.style.width = "100%";
+      if (nameModel2) nameModel2.textContent = "Trung bình các đoạn";
+      if (weightModel2) weightModel2.textContent = "Trọng số độ dài (65%)";
+      probBert.textContent = `${meanPct}%`;
+      barBert.style.width = `${meanPct}%`;
+
+      if (nameModel3) nameModel3.textContent = "Đỉnh cục bộ (Hotspot)";
+      if (weightModel3) weightModel3.textContent = "Bắt trộn AI (35%)";
+      probRoberta.textContent = `${peakPct}%`;
+      barRoberta.style.width = `${peakPct}%`;
+    } else {
+      if (nameModel1) nameModel1.textContent = "PhoBERT v2";
+      if (weightModel1) weightModel1.textContent = "Chuyên biệt (100%)";
+      probLongformer.textContent = `${aiPct}%`;
+      barLongformer.style.width = `${aiPct}%`;
+
+      if (nameModel2) nameModel2.textContent = "PyVi Segmenter";
+      if (weightModel2) weightModel2.textContent = "Tách từ ghép";
+      probBert.textContent = "Hoàn tất";
+      barBert.style.width = "100%";
+
+      if (nameModel3) nameModel3.textContent = "Language Router";
+      if (weightModel3) weightModel3.textContent = "Định tuyến tự động";
+      probRoberta.textContent = "Tiếng Việt 🇻🇳";
+      barRoberta.style.width = "100%";
+    }
   } else if (overall.model_breakdown && overall.model_breakdown.individual_models) {
     if (nameModel1) nameModel1.textContent = "Longformer";
     if (weightModel1) weightModel1.textContent = "Trụ cột (48.7%)";
@@ -685,7 +742,8 @@ function renderResults(data) {
     barRoberta.style.width = `${pRob}%`;
   }
 
-  // 4. Sentences Hotspots
+  // 4. Turnitin-Style Annotated Essay & Sentence List Hotspots
+  renderAnnotatedDocument(data.sentences || []);
   renderSentences(data.sentences || []);
 
   // Smooth scroll into view
@@ -806,6 +864,67 @@ function renderForensicsAndXai(data) {
   }
 }
 
+function initHotspotViewTabs() {
+  if (btnViewAnnotated && btnViewList) {
+    btnViewAnnotated.addEventListener("click", () => {
+      btnViewAnnotated.classList.add("active");
+      btnViewList.classList.remove("active");
+      annotatedDocContainer?.classList.remove("hidden");
+      sentencesContainer?.classList.add("hidden");
+    });
+
+    btnViewList.addEventListener("click", () => {
+      btnViewList.classList.add("active");
+      btnViewAnnotated.classList.remove("active");
+      annotatedDocContainer?.classList.add("hidden");
+      sentencesContainer?.classList.remove("hidden");
+    });
+  }
+
+  if (btnCopyAuditCode) {
+    btnCopyAuditCode.addEventListener("click", () => {
+      if (!currentAuditCode) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(currentAuditCode).catch(() => {});
+      }
+      window.openVerifyWithCode(currentAuditCode);
+    });
+  }
+}
+
+function renderAnnotatedDocument(sentences) {
+  if (!annotatedDocContainer) return;
+  annotatedDocContainer.innerHTML = "";
+
+  if (!sentences || sentences.length === 0) {
+    const rawPreview = (textInput && textInput.value.trim()) || "";
+    if (rawPreview) {
+      const p = document.createElement("p");
+      p.style.margin = "0";
+      p.textContent = rawPreview;
+      annotatedDocContainer.appendChild(p);
+    } else {
+      annotatedDocContainer.innerHTML = "<span style='color: var(--text-muted); font-family: var(--font-sans); font-size: 13px;'>Không có dữ liệu tách câu chi tiết cho bản ghi này.</span>";
+    }
+    return;
+  }
+
+  sentences.forEach((s, idx) => {
+    const span = document.createElement("span");
+    const color = ["red", "yellow", "green"].includes(s.highlight_color) ? s.highlight_color : "green";
+    span.className = `hl-sent ${color}`;
+    span.textContent = s.sentence;
+    const sIdx = s.sentence_index || (idx + 1);
+    const wCnt = s.word_count ? ` (${s.word_count} từ)` : "";
+    span.title = `Câu #${sIdx}${wCnt}: ${s.ai_percentage} AI — ${s.assessment || ""}`;
+    annotatedDocContainer.appendChild(span);
+
+    if (idx < sentences.length - 1) {
+      annotatedDocContainer.appendChild(document.createTextNode(" "));
+    }
+  });
+}
+
 function renderSentences(sentences) {
   sentencesContainer.innerHTML = "";
   if (!sentences || sentences.length === 0) {
@@ -863,8 +982,35 @@ btnExportPdf.addEventListener("click", () => {
 
 
 // ==============================================================================
-// 5. QUẢN LÝ LỊCH SỬ QUÉT & KPIS (TAB 2)
+// 5. QUẢN LÝ LỊCH SỬ QUÉT, TÌM KIẾM ĐA TIÊU CHÍ & KPIS (TAB 2)
 // ==============================================================================
+
+let historyFilterTimer = null;
+
+function initHistoryFilters() {
+  if (histSearchInput) {
+    histSearchInput.addEventListener("input", () => {
+      clearTimeout(historyFilterTimer);
+      historyFilterTimer = setTimeout(() => {
+        loadHistoryAndStats();
+      }, 280);
+    });
+  }
+  [histFilterLang, histFilterVerdict, histFilterBypass].forEach((el) => {
+    if (el) {
+      el.addEventListener("change", () => loadHistoryAndStats());
+    }
+  });
+}
+
+function hasActiveHistoryFilter() {
+  return Boolean(
+    (histSearchInput && histSearchInput.value.trim()) ||
+    (histFilterLang && histFilterLang.value) ||
+    (histFilterVerdict && histFilterVerdict.value) ||
+    (histFilterBypass && histFilterBypass.checked)
+  );
+}
 
 async function loadHistoryAndStats() {
   try {
@@ -880,8 +1026,19 @@ async function loadHistoryAndStats() {
       kpiAvgLatency.textContent = `${stats.avg_inference_time_ms} ms`;
     }
 
-    // 2. Bảng dữ liệu
-    const histRes = await fetch(`${API_BASE}/api/v1/history?limit=30`, {
+    // 2. Bảng dữ liệu có lọc đa tiêu chí từ SQL Server
+    const params = new URLSearchParams({ limit: "50" });
+    const qVal = histSearchInput ? histSearchInput.value.trim() : "";
+    const langVal = histFilterLang ? histFilterLang.value : "";
+    const verdictVal = histFilterVerdict ? histFilterVerdict.value : "";
+    const bypassVal = histFilterBypass ? histFilterBypass.checked : false;
+
+    if (qVal) params.set("q", qVal);
+    if (langVal) params.set("language", langVal);
+    if (verdictVal) params.set("verdict", verdictVal);
+    if (bypassVal) params.set("bypass_only", "true");
+
+    const histRes = await fetch(`${API_BASE}/api/v1/history?${params.toString()}`, {
       headers: getAuthHeaders(),
     });
     if (histRes.ok) {
@@ -898,10 +1055,13 @@ btnRefreshHistory.addEventListener("click", loadHistoryAndStats);
 function renderHistoryTable(items, user) {
   historyTableBody.innerHTML = "";
   if (!items || items.length === 0) {
+    const isFiltered = hasActiveHistoryFilter();
     const isStudent = user && user.role === "student";
-    const msg = isStudent
-      ? "Bạn chưa có lượt thẩm định nào. Hãy nhập văn bản ở tab 'Thẩm Định Văn Bản' để kiểm tra!"
-      : "Chưa có lượt thẩm định nào được lưu. Hãy thực hiện kiểm tra ở Tab Thẩm Định!";
+    const msg = isFiltered
+      ? "Không tìm thấy lượt thẩm định nào khớp với bộ lọc hiện tại."
+      : (isStudent
+        ? "Bạn chưa có lượt thẩm định nào. Hãy nhập văn bản ở tab 'Thẩm Định Văn Bản' để kiểm tra!"
+        : "Chưa có lượt thẩm định nào được lưu. Hãy thực hiện kiểm tra ở Tab Thẩm Định!");
     historyTableBody.innerHTML = `
       <tr>
         <td colspan="8" class="text-center" style="padding: 30px; color: var(--text-muted);">
@@ -920,20 +1080,23 @@ function renderHistoryTable(items, user) {
 
     const langBadge = item.language === "vi" ? "🇻🇳 VI" : "🇬🇧 EN";
     const bypassTag = item.has_bypass_warning ? `<span class="badge-bypass-table" title="Phát hiện ký tự ẩn / Cyrillic giả mạo">⚠️ Bypass</span>` : "";
+    const auditTag = item.audit_code
+      ? `<span class="audit-mini-tag" title="Nhấp để kiểm chứng chống giả mạo mã ${escapeHtml(item.audit_code)}" onclick="openVerifyWithCode('${escapeHtml(item.audit_code)}')">🔐 ${escapeHtml(item.audit_code)}</span>`
+      : "";
 
     tr.innerHTML = `
       <td><b>#${item.id}</b></td>
-      <td style="color: var(--text-secondary); font-size: 12px;">${item.timestamp}</td>
+      <td style="color: var(--text-sub); font-size: 12px;">${item.timestamp}</td>
       <td>
         <b>${escapeHtml(item.title || item.filename || "Văn bản")}</b>${bypassTag}
-        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
-          ${langBadge} • 👤 Người nộp: <b>${escapeHtml(item.author_name || "Khách")}</b>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">
+          ${langBadge} • 👤 Người nộp: <b>${escapeHtml(item.author_name || "Khách")}</b> ${auditTag}
         </div>
       </td>
       <td>${item.word_count} từ</td>
       <td><span class="data-badge ${badgeClass}">${badgeText}</span></td>
       <td><b style="font-family: var(--font-mono);">${(item.ai_probability * 100).toFixed(1)}%</b></td>
-      <td style="color: var(--text-secondary);">${item.inference_time_ms} ms</td>
+      <td style="color: var(--text-sub);">${item.inference_time_ms} ms</td>
       <td style="text-align: right;">
         <button class="table-btn" onclick="downloadPdf(${item.id})">📥 PDF</button>
         <button class="table-btn" onclick="viewHistoryItem(${item.id})">👁️ Xem</button>
@@ -961,10 +1124,13 @@ window.viewHistoryItem = async function(id) {
 
       const resolvedLabel = data.label || data.verdict;
       const isVi = data.language === "vi";
+      const savedCoverage = (data.details && data.details.text_stats && data.details.text_stats.context_coverage)
+        || (isVi ? "256 Tokens (PhoBERT)" : "1024 Tokens");
 
-      // Render lại kết quả trên tab inspect (bao gồm XAI & Anti-Bypass nếu có)
+      // Render lại kết quả trên tab inspect (bao gồm Audit Code, XAI & Anti-Bypass nếu có)
       renderResults({
         scan_id: id,
+        audit_code: data.audit_code || null,
         overall: {
           label: resolvedLabel,
           language: data.language || "en",
@@ -976,7 +1142,7 @@ window.viewHistoryItem = async function(id) {
           text_stats: {
             word_count: data.word_count,
             char_count: data.char_count,
-            context_coverage: isVi ? "256 Tokens (PhoBERT)" : "1024 Tokens",
+            context_coverage: savedCoverage,
           },
         },
         authorship_tier: data.authorship_tier || (data.details ? data.details.authorship_tier : null),
@@ -1946,3 +2112,117 @@ window.downloadBatchExport = async function(batchId, fmt = "xlsx") {
     alert("Lỗi xuất bảng điểm: " + err.message);
   }
 };
+
+
+// ==============================================================================
+// 8. CỔNG XÁC THỰC CHỐNG GIẢ MẠO BIÊN BẢN PDF (HMAC-SHA256 + QR CODE)
+// ==============================================================================
+
+function initVerifyCertificateModal() {
+  if (!verifyModal) return;
+
+  const closeVerify = () => {
+    verifyModal.classList.add("hidden");
+  };
+
+  if (btnOpenVerify) {
+    btnOpenVerify.addEventListener("click", () => {
+      verifyModal.classList.remove("hidden");
+      if (verifyCodeInput && currentAuditCode && !verifyCodeInput.value.trim()) {
+        verifyCodeInput.value = currentAuditCode;
+      }
+      verifyCodeInput?.focus();
+    });
+  }
+
+  if (btnCloseVerifyModal) {
+    btnCloseVerifyModal.addEventListener("click", closeVerify);
+  }
+
+  verifyModal.addEventListener("click", (e) => {
+    if (e.target === verifyModal) closeVerify();
+  });
+
+  if (formVerifyCert) {
+    formVerifyCert.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const rawCode = verifyCodeInput ? verifyCodeInput.value.trim() : "";
+      if (!rawCode) return;
+      await verifyAuditCode(rawCode);
+    });
+  }
+
+  // Hỗ trợ tự động mở & xác thực khi người dùng quét mã QR trên biên bản PDF (?verify=VT-...)
+  try {
+    const verifyParam = new URLSearchParams(window.location.search).get("verify");
+    if (verifyParam && verifyParam.trim()) {
+      window.openVerifyWithCode(verifyParam.trim());
+    }
+  } catch (e) {}
+}
+
+window.openVerifyWithCode = function(code) {
+  if (!verifyModal) return;
+  verifyModal.classList.remove("hidden");
+  if (verifyCodeInput) {
+    verifyCodeInput.value = (code || "").trim().toUpperCase();
+  }
+  if (code && code.trim()) {
+    verifyAuditCode(code.trim());
+  }
+};
+
+async function verifyAuditCode(rawCode) {
+  if (!verifyResultBox) return;
+  const cleanCode = rawCode.trim().toUpperCase();
+  if (btnSubmitVerify) btnSubmitVerify.disabled = true;
+  verifyResultBox.className = "verify-result-box";
+  verifyResultBox.innerHTML = "<span>⏳ Đang đối chiếu chữ ký mật mã HMAC-SHA256 với SQL Server VeriTextAI...</span>";
+  verifyResultBox.classList.remove("hidden");
+
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/verify/${encodeURIComponent(cleanCode)}`);
+    const data = await res.json();
+
+    if (res.ok && data.valid && data.certificate) {
+      const c = data.certificate;
+      const aiPct = ((Number(c.ai_probability) || 0) * 100).toFixed(2);
+      const isAi = c.verdict === "AI-generated" || Number(c.ai_probability) >= 0.5;
+      const verdictStr = isAi ? "🤖 VĂN BẢN DO AI SINH" : "👤 DO CON NGƯỜI VIẾT";
+      const langStr = c.language === "vi" ? "🇻🇳 Tiếng Việt (PhoBERT v2)" : "🇬🇧 Tiếng Anh (Ensemble PLMs)";
+      const tierStr = TIER_SHORT_LABELS[c.authorship_tier] || c.authorship_tier || "--";
+      const bypassStr = c.has_bypass_warning ? "🚨 Có phát hiện tiểu xảo" : "✅ Sạch (Không phát hiện)";
+
+      verifyResultBox.className = "verify-result-box verify-valid";
+      verifyResultBox.innerHTML = `
+        <div style="font-weight: 700; font-size: 13.5px; margin-bottom: 4px;">
+          ✅ BIÊN BẢN KIỂM ĐỊNH THẬT — CHỮ KÝ SỐ HỢP LỆ 100%
+        </div>
+        <div style="font-size: 12px; opacity: 0.92;">${escapeHtml(data.message || "")}</div>
+        <div class="verify-cert-grid">
+          <div><span>Mã chứng thực</span><strong style="font-family: var(--font-mono);">${escapeHtml(data.audit_code)}</strong></div>
+          <div><span>Thời điểm lưu trữ</span><strong>${escapeHtml(c.timestamp || "--")}</strong></div>
+          <div><span>Kết luận gốc</span><strong>${verdictStr} (${aiPct}% AI)</strong></div>
+          <div><span>Phân loại 4 mức</span><strong>${escapeHtml(tierStr)}</strong></div>
+          <div><span>Ngôn ngữ &amp; Độ dài</span><strong>${langStr} • ${Number(c.word_count || 0).toLocaleString()} từ</strong></div>
+          <div><span>Kiểm tra Anti-Bypass</span><strong>${bypassStr}</strong></div>
+          <div><span>Tài liệu / Tiêu đề</span><strong>${escapeHtml(c.title || c.filename || "Văn bản trực tiếp")}</strong></div>
+          <div><span>Tài khoản thẩm định</span><strong>${escapeHtml(c.author_name || "Khách vãng lai")}</strong></div>
+        </div>
+      `;
+    } else {
+      verifyResultBox.className = "verify-result-box verify-invalid";
+      verifyResultBox.innerHTML = `
+        <div style="font-weight: 700; font-size: 13.5px; margin-bottom: 4px;">
+          🚨 KHÔNG HỢP LỆ / CẢNH BÁO NGHI VẤN CHỈNH SỬA GIẢ MẠO
+        </div>
+        <div>${escapeHtml(data.message || "Không thể xác thực mã kiểm định này.")}</div>
+      `;
+    }
+  } catch (err) {
+    verifyResultBox.className = "verify-result-box verify-invalid";
+    verifyResultBox.innerHTML = `<strong>⚠️ Lỗi kết nối máy chủ:</strong> ${escapeHtml(err.message || "Không thể kiểm tra.")}`;
+  } finally {
+    if (btnSubmitVerify) btnSubmitVerify.disabled = false;
+  }
+}

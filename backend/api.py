@@ -567,9 +567,16 @@ def _execute_full_analysis_and_save(
     )
 
     overall_pred["preset_used"] = preset_label
+    eval_word_count = len(eval_text.split())
+    audit_code = auth.compute_audit_code(
+        scan_id=scan_id,
+        ai_probability=overall_pred["ai_probability"],
+        word_count=eval_word_count,
+    )
 
     return {
         "scan_id": scan_id,
+        "audit_code": audit_code,
         "saved_by_user": bool(current_user),
         "saved_user_name": current_user.get("full_name") if current_user else None,
         "overall": overall_pred,
@@ -751,12 +758,31 @@ async def detect_batch(req: BatchDetectRequest):
 async def get_scan_history(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    q: Optional[str] = Query(None, description="Từ khóa tìm kiếm tên tài liệu, người nộp hoặc mã ID"),
+    language: Optional[str] = Query(None, description="Lọc ngôn ngữ: 'vi' hoặc 'en'"),
+    verdict: Optional[str] = Query(None, description="Lọc nhãn: 'AI-generated' hoặc 'Human-written'"),
+    bypass_only: bool = Query(False, description="Chỉ lấy các bài phát hiện tiểu xảo Anti-Bypass"),
     current_user: Optional[Dict[str, Any]] = Depends(auth.get_current_user_optional),
 ):
-    """Lấy danh sách các lần thẩm định trước đó từ CSDL Microsoft SQL Server theo phân quyền."""
+    """Lấy danh sách các lần thẩm định từ CSDL Microsoft SQL Server theo RBAC kèm tìm kiếm & lọc."""
     user_id = current_user["id"] if current_user else None
     role = current_user["role"] if current_user else None
-    items = db.get_history(limit=limit, offset=offset, user_id=user_id, role=role)
+    items = db.get_history(
+        limit=limit,
+        offset=offset,
+        user_id=user_id,
+        role=role,
+        search_query=q,
+        language=language,
+        verdict=verdict,
+        bypass_only=bypass_only,
+    )
+    for it in items:
+        it["audit_code"] = auth.compute_audit_code(
+            scan_id=it["id"],
+            ai_probability=it["ai_probability"],
+            word_count=it["word_count"],
+        )
     return {"total": len(items), "history": items, "current_user": current_user}
 
 
@@ -771,6 +797,11 @@ async def get_scan_detail(
     item = db.get_scan_by_id(scan_id, user_id=user_id, role=role)
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy lượt quét này hoặc bạn không có quyền xem.")
+    item["audit_code"] = auth.compute_audit_code(
+        scan_id=item["id"],
+        ai_probability=item["ai_probability"],
+        word_count=item["word_count"],
+    )
     return item
 
 
@@ -814,6 +845,11 @@ async def export_pdf_report(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy dữ liệu lượt quét hoặc bạn không có quyền truy cập.")
 
     try:
+        scan_data["audit_code"] = auth.compute_audit_code(
+            scan_id=scan_data["id"],
+            ai_probability=scan_data["ai_probability"],
+            word_count=scan_data["word_count"],
+        )
         pdf_bytes = generate_pdf_report(scan_data)
         filename = f"AI_Audit_Report_{scan_id:06d}.pdf"
         return Response(
@@ -829,6 +865,47 @@ async def export_pdf_report(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi khởi tạo tệp PDF: {str(e)}",
         )
+
+
+@app.get("/api/v1/verify/{audit_code}", tags=["Audit Report"])
+async def verify_audit_certificate(audit_code: str):
+    """
+    Cổng Xác Thực Chống Làm Giả Biên Bản Kiểm Định PDF (HMAC-SHA256 + QR Code):
+    Kiểm tra chữ ký mật mã của mã chứng thực (dạng VT-000123-A8F912BC) đối chiếu trực tiếp
+    với bản ghi gốc bất biến trong CSDL Microsoft SQL Server VeriTextAI.
+    """
+    clean_code = (audit_code or "").strip().upper()
+    m = auth.AUDIT_CODE_REGEX.match(clean_code)
+    if not m:
+        return {
+            "valid": False,
+            "audit_code": clean_code,
+            "message": "Định dạng mã chứng thực không hợp lệ (Chuẩn: VT-XXXXXX-8KÝTỰHEX).",
+        }
+
+    scan_id = int(m.group(1))
+    record = db.get_scan_public_verification(scan_id)
+    if not record:
+        return {
+            "valid": False,
+            "audit_code": clean_code,
+            "message": "Không tìm thấy hồ sơ gốc trong hệ thống SQL Server VeriTextAI!",
+        }
+
+    is_authentic = auth.parse_and_verify_audit_code(clean_code, record)
+    if not is_authentic:
+        return {
+            "valid": False,
+            "audit_code": clean_code,
+            "message": "CẢNH BÁO GIẢ MẠO: Chữ ký số không khớp! Biên bản PDF có dấu hiệu bị chỉnh sửa kết quả.",
+        }
+
+    return {
+        "valid": True,
+        "audit_code": clean_code,
+        "message": "Biên bản kiểm định hợp lệ — Khớp 100% với dữ liệu gốc trên SQL Server VeriTextAI.",
+        "certificate": record,
+    }
 
 
 # ==============================================================================

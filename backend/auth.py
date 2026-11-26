@@ -4,6 +4,9 @@ Module Xác thực & Quản lý Phiên Người Dùng (JWT Authentication & RBAC
 """
 
 import os
+import re
+import hmac
+import hashlib
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
@@ -166,3 +169,39 @@ def require_role(allowed_roles: List[str]):
             )
         return current_user
     return role_checker
+
+
+AUDIT_CODE_REGEX = re.compile(r"^VT-(\d{1,10})-([0-9A-Fa-f]{8})$")
+
+
+def compute_audit_code(scan_id: int, ai_probability: float, word_count: int) -> str:
+    """
+    Sinh Mã Chứng Thực Chống Giả Mạo (HMAC-SHA256 rút gọn) từ dữ liệu gốc bất biến trong SQL Server.
+    Nếu kẻ gian sửa điểm % AI hoặc số từ trên file PDF rồi giữ nguyên mã VT-..., đối chiếu sẽ phát hiện ngay.
+    """
+    canonical = f"VERITEXT|{int(scan_id)}|{round(float(ai_probability), 4):.4f}|{int(word_count)}"
+    digest = hmac.new(
+        JWT_SECRET_KEY.encode("utf-8"),
+        canonical.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()[:8].upper()
+    return f"VT-{int(scan_id):06d}-{digest}"
+
+
+def parse_and_verify_audit_code(audit_code: str, scan_record: Optional[Dict[str, Any]]) -> bool:
+    """Kiểm tra chữ ký HMAC-SHA256 của mã chứng thực đối với bản ghi gốc trong SQL Server."""
+    if not audit_code or not scan_record:
+        return False
+    code_clean = audit_code.strip().upper()
+    m = AUDIT_CODE_REGEX.match(code_clean)
+    if not m:
+        return False
+    parsed_id = int(m.group(1))
+    if parsed_id != int(scan_record.get("id", -1)):
+        return False
+    expected = compute_audit_code(
+        scan_id=parsed_id,
+        ai_probability=float(scan_record.get("ai_probability", 0.0)),
+        word_count=int(scan_record.get("word_count", 0)),
+    )
+    return hmac.compare_digest(code_clean, expected)

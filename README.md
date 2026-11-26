@@ -36,10 +36,11 @@ DoAn/
 │   ├── models.py                      # Định nghĩa kiến trúc PyTorch cho BERT, RoBERTa, Longformer, PhoBERT
 │   ├── test_forensics.py              # Unit tests cho Anti-Bypass, Bộ lọc học thuật, XAI & 4 cấp độ
 │   ├── test_batch.py                  # Unit tests cho giải nén .ZIP an toàn, .DOCX bảng & xuất Excel/CSV
-│   ├── test_api.py                    # Suite 15 integration tests toàn diện (AI, RBAC, Batch, Auth, Google, Ext)
+│   ├── test_api.py                    # Suite 16 integration tests toàn diện (AI, Sliding-Window, QR Verify, RBAC)
+│   ├── generate_vietnamese_figures.py # Xuất 3 biểu đồ khoa học 300 DPI cho PhoBERT 8K & Độ nhạy độ dài
 │   ├── view_db.py                     # Tiện ích xem nhanh dữ liệu trực tiếp trong SQL Server VeriTextAI
 │   ├── requirements.txt               # Danh mục thư viện Python backend (PyTorch, FastAPI, OpenPyXL, Google-Auth)
-│   ├── data/                          # Thư mục dữ liệu: GossipCop, LIAR, TOEFL, và vietnamese_*.csv (5K)
+│   ├── data/                          # Thư mục dữ liệu: GossipCop, LIAR, TOEFL, và vietnamese_pre2022_*.csv (8K)
 │   ├── output/                        # Checkpoints (*_best.pt), tokenizers, kết quả đánh giá
 │   ├── kaggle_jobs/                   # Cấu hình huấn luyện mô hình từ xa trên Kaggle GPU T4
 │   └── scripts/                       # Các kịch bản phụ trợ & kết nối NotebookLM MCP
@@ -48,7 +49,7 @@ DoAn/
 │   ├── CHỦ ĐỀ 6.docx                  # Phiếu giao đề tài chính thức của giảng viên
 │   ├── KE_HOACH_NANG_CAP_CHUYEN_NGANH.md # Lộ trình nâng cấp 4 giai đoạn VeriText AI PRO
 │   ├── demo_samples/                  # Bộ bài nộp mẫu `Lop_K16_TieuLuan_Demo.zip` (demo 30s trước hội đồng)
-│   └── reports/                       # Biểu đồ khoa học phân tích ROC-AUC, Confusion Matrix
+│   └── reports/figures/               # Bộ 9 biểu đồ khoa học 300 DPI (ROC-AUC, Confusion Matrix, 8K VI & Length)
 │   └── ...                            # Các tài liệu nghiên cứu và danh mục tài liệu tham khảo
 │
 ├── start_server.bat                   # 🚀 Script 1-click khởi chạy toàn bộ hệ thống từ thư mục gốc
@@ -222,14 +223,17 @@ kaggle kernels output quannguyenxx/do-an-train-bert -p ./output
 
 ## 🎨 Trực quan hóa Kết quả Thực nghiệm - Hoàn thành Ngày 12
 
-Bộ 6 đồ thị khoa học độ phân giải cao (**300 DPI**) được lưu trữ tại [`reports/figures/`](file:///c:/DoAn/reports/figures) phục vụ chèn trực tiếp vào báo cáo Luận văn và Slide bảo vệ:
+Bộ 9 đồ thị khoa học độ phân giải cao (**300 DPI**) được lưu trữ tại [`docs/reports/figures/`](file:///c:/DoAn/docs/reports/figures) phục vụ chèn trực tiếp vào báo cáo Luận văn và Slide bảo vệ:
 
-1. **Đường cong ROC tổng hợp**: `reports/figures/roc_curves_comparison.png` (So sánh trọn vẹn ROC & AUC của cả 6 mô hình trên tập Test nội miền).
-2. **Ma trận nhầm lẫn chi tiết (Weighted Soft Voting)**: `reports/figures/confusion_matrix_weighted_ensemble.png` (Hiển thị số lượng và tỷ lệ % True Positive, True Negative, False Positive chỉ 0.94%).
-3. **Lưới ma trận nhầm lẫn 2x3**: `reports/figures/confusion_matrices_all_models.png` (So sánh đối kháng 6 ma trận nhầm lẫn cạnh nhau).
-4. **Biểu đồ cột hiệu năng 4 thang đo**: `reports/figures/metrics_comparison_bar.png` (Grouped Bar Chart trực quan hóa Accuracy, Precision, Recall, F1).
-5. **Phân bổ trọng số Ensemble tối ưu**: `reports/figures/ensemble_weights_distribution.png` (Pie Chart & Bar Chart thể hiện đóng góp 48.65% Longformer, 33.96% BERT, 17.38% RoBERTa).
-6. **Biểu đồ suy giảm hiệu năng ngoại miền**: `reports/figures/toefl_domain_shift_comparison.png` (So sánh In-Domain GossipCop vs Out-of-Domain TOEFL).
+1. **Đường cong ROC tổng hợp**: `docs/reports/figures/roc_curves_comparison.png` (So sánh trọn vẹn ROC & AUC của cả 6 mô hình trên tập Test nội miền).
+2. **Ma trận nhầm lẫn chi tiết (Weighted Soft Voting)**: `docs/reports/figures/confusion_matrix_weighted_ensemble.png` (Hiển thị số lượng và tỷ lệ % True Positive, True Negative, False Positive chỉ 0.94%).
+3. **Lưới ma trận nhầm lẫn 2x3**: `docs/reports/figures/confusion_matrices_all_models.png` (So sánh đối kháng 6 ma trận nhầm lẫn cạnh nhau).
+4. **Biểu đồ cột hiệu năng 4 thang đo**: `docs/reports/figures/metrics_comparison_bar.png` (Grouped Bar Chart trực quan hóa Accuracy, Precision, Recall, F1).
+5. **Phân bổ trọng số Ensemble tối ưu**: `docs/reports/figures/ensemble_weights_distribution.png` (Pie Chart & Bar Chart thể hiện đóng góp 48.65% Longformer, 33.96% BERT, 17.38% RoBERTa).
+6. **Biểu đồ suy giảm hiệu năng ngoại miền**: `docs/reports/figures/toefl_domain_shift_comparison.png` (So sánh In-Domain GossipCop vs Out-of-Domain TOEFL).
+7. **Đối sánh 12 thể loại Tiếng Việt (5K Cũ vs 8K Pre-2022)**: `docs/reports/figures/vietnamese_5k_vs_8k_genre_comparison.png` (Chứng minh cú nhảy vọt `+22.9%` đa thể loại trên 1.200 mẫu Test Pre-2022).
+8. **Ma trận nhầm lẫn & ROC-AUC PhoBERT 8K**: `docs/reports/figures/vietnamese_8k_confusion_and_roc.png` (`Accuracy 99.08%`, `ROC-AUC 0.9991`).
+9. **Phân tích độ nhạy theo độ dài văn bản (Short / Medium / Long)**: `docs/reports/figures/length_sensitivity_analysis.png` (Đánh giá song ngữ Việt - Anh đáp ứng Research Gap #1 của Chủ đề 6).
 
 ---
 
@@ -346,11 +350,12 @@ uvicorn api:app --host 0.0.0.0 --port 8000 --reload
 | **`GET`** | `/api/v1/classroom/batches/{id}` | Chi tiết bảng xếp hạng rủi ro sinh viên của một đợt chấm — *Teacher RBAC* |
 | **`GET`** | `/api/v1/classroom/batches/{id}/export` | **Xuất Bảng Điểm Excel (`.XLSX` tô màu) / `.CSV` (UTF-8 BOM)** — *Teacher RBAC* |
 | **`DELETE`**| `/api/v1/classroom/batches/{id}` | Xóa một đợt chấm bài lớp học — *Teacher RBAC* |
-| **`GET`** | `/api/v1/history` | Truy xuất danh sách nhật ký thẩm định từ SQL Server theo phân quyền RBAC |
+| **`GET`** | `/api/v1/history` | Truy xuất nhật ký thẩm định từ SQL Server kèm bộ lọc (`q`, `language`, `verdict`, `bypass_only`) & RBAC |
 | **`GET`** | `/api/v1/history/{id}` | Lấy chi tiết một lượt thẩm định theo ID (cô lập nghiêm ngặt theo RBAC) |
 | **`DELETE`**| `/api/v1/history/{id}` | Xóa một bản ghi lịch sử khỏi SQL Server |
 | **`GET`** | `/api/v1/stats` | Thống kê KPI tổng quan theo vai trò người dùng |
-| **`GET`** | `/api/v1/report/pdf/{id}` | **Xuất Báo Cáo Kiểm Định PDF** (kèm Anti-Bypass, XAI & Phân loại 4 cấp độ) |
+| **`GET`** | `/api/v1/report/pdf/{id}` | **Xuất Báo Cáo Kiểm Định PDF** (kèm QR Code, mã HMAC-SHA256, XAI & Anti-Bypass) |
+| **`GET`** | `/api/v1/verify/{audit_code}` | **Cổng Xác Thực Chống Giả Mạo Biên Bản** (đối chiếu HMAC-SHA256 & SQL Server VeriTextAI) |
 
 ### 🧪 Kiểm Thử Tích Hợp & Unit Tests (Automated Testing):
 Toàn bộ hệ thống được bao phủ bởi 3 bộ kiểm thử tự động ([`test_forensics.py`](file:///c:/DoAn/backend/test_forensics.py), [`test_batch.py`](file:///c:/DoAn/backend/test_batch.py), [`test_api.py`](file:///c:/DoAn/backend/test_api.py)):

@@ -300,18 +300,132 @@ class AITextDetector:
         return "Không chắc chắn / Ngưỡng ranh giới (Uncertain)", "LOW"
 
     @staticmethod
+    def _split_sentences(text: str) -> List[str]:
+        """Tách câu theo ngắt dòng và dấu kết thúc câu, giữ nguyên tiền tố đánh số đầu dòng (vd: '1. Mở đầu')."""
+        raw_sentences: List[str] = []
+        for line in re.split(r"\n+", text.strip()):
+            line = line.strip()
+            if not line:
+                continue
+            m_prefix = re.match(r"^(\d{1,2}\.)\s+(.*)$", line)
+            if m_prefix:
+                prefix, rest = m_prefix.group(1), m_prefix.group(2)
+                parts = [p.strip() for p in re.split(r"(?<=[.!?…])\s+", rest) if p.strip()]
+                if parts:
+                    parts[0] = f"{prefix} {parts[0]}"
+            else:
+                parts = [p.strip() for p in re.split(r"(?<=[.!?…])\s+", line) if p.strip()]
+            raw_sentences.extend(parts)
+        return raw_sentences
+
+    @classmethod
+    def _split_into_sliding_chunks(
+        cls,
+        text: str,
+        chunk_words: int = 175,
+        overlap_words: int = 30,
+        max_chunks: int = 24,
+    ) -> Tuple[List[str], List[int]]:
+        """
+        Chia văn bản dài thành các đoạn cửa sổ trượt chồng lấp theo ranh giới câu tự nhiên.
+        Giải quyết triệt để giới hạn cắt ngọn 256 tokens (PhoBERT) và 1024 tokens (Longformer)
+        đối với bài tiểu luận / khóa luận dài nhiều trang.
+        """
+        raw_sents = cls._split_sentences(text)
+        if not raw_sents:
+            return [text.strip()], [max(1, len(text.split()))]
+
+        # Tách nhỏ nếu có câu đơn lẻ quá dài không chấm câu
+        norm_sents: List[str] = []
+        for s in raw_sents:
+            sw = s.split()
+            if len(sw) <= chunk_words:
+                norm_sents.append(s)
+            else:
+                step = max(40, chunk_words - overlap_words)
+                for i in range(0, len(sw), step):
+                    part = " ".join(sw[i:i + chunk_words]).strip()
+                    if part:
+                        norm_sents.append(part)
+
+        chunks: List[str] = []
+        weights: List[int] = []
+        cur_sents: List[str] = []
+        cur_words = 0
+
+        for s in norm_sents:
+            sw_len = len(s.split())
+            if cur_words + sw_len > chunk_words and cur_sents:
+                chunk_str = " ".join(cur_sents).strip()
+                chunks.append(chunk_str)
+                weights.append(max(1, cur_words))
+                if len(chunks) >= max_chunks:
+                    break
+                # Giữ lại phần chồng lấp (overlap) ở cuối đoạn trước
+                overlap_buf: List[str] = []
+                ov_cnt = 0
+                for prev_s in reversed(cur_sents):
+                    pw = len(prev_s.split())
+                    if ov_cnt + pw > overlap_words and overlap_buf:
+                        break
+                    overlap_buf.insert(0, prev_s)
+                    ov_cnt += pw
+                    if ov_cnt >= overlap_words:
+                        break
+                cur_sents = overlap_buf + [s]
+                cur_words = ov_cnt + sw_len
+            else:
+                cur_sents.append(s)
+                cur_words += sw_len
+
+        if cur_sents and len(chunks) < max_chunks:
+            chunk_str = " ".join(cur_sents).strip()
+            if not chunks or chunk_str != chunks[-1]:
+                chunks.append(chunk_str)
+                weights.append(max(1, cur_words))
+
+        return chunks, weights
+
+    @staticmethod
+    def _aggregate_chunk_probs(probs: np.ndarray, weights: List[int]) -> Tuple[float, float, float]:
+        """
+        Hợp nhất xác suất đa đoạn (Weighted Mean + Hotspot Peak Detection):
+        Nếu bài dài có từ 2 đoạn trở lên và xuất hiện đoạn nghi AI rất cao (>= 0.80),
+        kết hợp 65% trung bình trọng số độ dài + 35% đỉnh cục bộ để chống chiêu trộn Mở bài Người + Thân bài AI.
+        """
+        if len(probs) == 0:
+            return 0.5, 0.5, 0.5
+        if len(probs) == 1:
+            p0 = float(probs[0])
+            return p0, p0, p0
+        w_arr = np.array(weights[:len(probs)], dtype=np.float64)
+        w_arr = w_arr / max(float(w_arr.sum()), 1.0)
+        p_mean = float(np.sum(probs * w_arr))
+        p_peak = float(np.max(probs))
+        if p_peak >= 0.80 and p_mean >= 0.22:
+            p_final = 0.65 * p_mean + 0.35 * p_peak
+        else:
+            p_final = p_mean
+        return float(p_final), p_mean, p_peak
+
+    @staticmethod
     def _format_sentence_results(
         sentences: List[str],
         probs: np.ndarray,
         threshold: float = 0.5,
     ) -> List[Dict[str, Any]]:
-        """Chuẩn hóa danh sách phân tích cấp câu và màu cảnh báo đồng bộ theo ngưỡng chấm."""
+        """Chuẩn hóa danh sách phân tích cấp câu, đồng bộ ngưỡng và chống chấm oan tiêu đề ngắn."""
         yellow_th = max(0.05, min(0.90, float(threshold)))
         red_th = min(0.90, max(yellow_th + 0.15, yellow_th + 0.30))
         results = []
         for idx, sentence in enumerate(sentences):
+            w_cnt = len(sentence.split())
             prob = float(probs[idx])
-            if prob >= red_th:
+            # Bảo vệ các dòng tiêu đề mục cực ngắn (<= 4 từ, vd: "1. Giới thiệu", "Kết luận:") khỏi nhiễu PLM
+            if w_cnt <= 4:
+                prob = min(prob, yellow_th * 0.65)
+                color, level = "green", "Tiêu đề / Câu ngắn (Trung tính)"
+            elif prob >= red_th:
                 color, level = "red", "Chắc chắn AI"
             elif prob >= yellow_th:
                 color, level = "yellow", "Nghi vấn AI"
@@ -321,7 +435,7 @@ class AITextDetector:
             results.append({
                 "sentence_index": idx + 1,
                 "sentence": sentence,
-                "word_count": len(sentence.split()),
+                "word_count": w_cnt,
                 "ai_probability": round(prob, 4),
                 "ai_percentage": f"{prob * 100:.1f}%",
                 "highlight_color": color,
@@ -356,13 +470,28 @@ class AITextDetector:
         batch_text = [text]
 
         # ======================================================================
-        # NHÁNH TIẾNG VIỆT (PHOBERT)
+        # NHÁNH TIẾNG VIỆT (PHOBERT + SLIDING-WINDOW MULTI-CHUNK AGGREGATION)
         # ======================================================================
         if lang == "vi" and self.model_phobert is not None:
             seg_text = self._segment_vietnamese(batch_text)[0]
             token_count = len(self.tokenizer_phobert.encode(seg_text, add_special_tokens=False, truncation=False))
 
-            p_phobert = float(self._predict_phobert(batch_text, pre_segmented=[seg_text])[0])
+            if token_count <= 250:
+                chunk_probs = self._predict_phobert(batch_text, pre_segmented=[seg_text])
+                chunk_cnt = 1
+                p_phobert = float(chunk_probs[0])
+                p_mean, p_peak = p_phobert, p_phobert
+                coverage_str = "Full Context (256 tokens)"
+            else:
+                chunks, chunk_weights = self._split_into_sliding_chunks(
+                    text, chunk_words=175, overlap_words=30, max_chunks=24
+                )
+                seg_chunks = self._segment_vietnamese(chunks)
+                chunk_probs = self._predict_phobert(chunks, pre_segmented=seg_chunks)
+                chunk_cnt = len(chunks)
+                p_phobert, p_mean, p_peak = self._aggregate_chunk_probs(chunk_probs, chunk_weights)
+                coverage_str = f"Sliding-Window ({chunk_cnt} đoạn • 100% văn bản)"
+
             final_ai_prob = p_phobert
             is_ai = final_ai_prob >= threshold
 
@@ -383,12 +512,13 @@ class AITextDetector:
                 "threshold_used": threshold,
                 "language": "vi",
                 "language_label": "Tiếng Việt 🇻🇳",
-                "detected_model": "PhoBERT (vinai/phobert-base-v2)",
+                "detected_model": "PhoBERT v2 (Sliding-Window Hybrid)" if chunk_cnt > 1 else "PhoBERT (vinai/phobert-base-v2)",
                 "text_stats": {
                     "word_count": word_count,
                     "char_count": char_count,
                     "token_count": token_count,
-                    "context_coverage": "Full Context (256)" if token_count <= 256 else "Truncated (First 256 tokens)",
+                    "chunk_count": chunk_cnt,
+                    "context_coverage": coverage_str,
                 },
                 "inference_time_ms": round(inference_time_ms, 2),
             }
@@ -396,33 +526,56 @@ class AITextDetector:
             if detailed:
                 result["model_breakdown"] = {
                     "ensemble_weighted": {"probability": round(p_phobert, 4), "is_champion": True},
-                    "ensemble_simple": {"probability": round(p_phobert, 4)},
-                    "ensemble_stacking": {"probability": round(p_phobert, 4)},
+                    "ensemble_simple": {"probability": round(p_mean, 4)},
+                    "ensemble_stacking": {"probability": round(p_peak, 4)},
+                    "chunk_analysis": {
+                        "chunk_count": chunk_cnt,
+                        "mean_probability": round(p_mean, 4),
+                        "peak_probability": round(p_peak, 4),
+                    },
                     "individual_models": {
                         "phobert": {
                             "probability": round(p_phobert, 4),
+                            "mean_chunk_probability": round(p_mean, 4),
+                            "peak_chunk_probability": round(p_peak, 4),
+                            "chunk_count": chunk_cnt,
                             "weight": 1.0,
                             "weight_pct": "100%",
-                            "model_name": "PhoBERT base v2",
+                            "model_name": "PhoBERT base v2 (8K Pre-2022)",
                         },
-                        # Giữ các key bert, roberta, longformer tương thích CSDL và UI cũ
-                        "bert": {"probability": round(p_phobert, 4), "weight": 0.0, "weight_pct": "N/A (Tiếng Việt)"},
-                        "roberta": {"probability": round(p_phobert, 4), "weight": 0.0, "weight_pct": "N/A (Tiếng Việt)"},
-                        "longformer": {"probability": round(p_phobert, 4), "weight": 0.0, "weight_pct": "N/A (Tiếng Việt)"},
+                        "bert": {"probability": round(p_mean, 4), "weight": 0.65 if chunk_cnt > 1 else 1.0, "weight_pct": "Mean Chunks"},
+                        "roberta": {"probability": round(p_peak, 4), "weight": 0.35 if chunk_cnt > 1 else 0.0, "weight_pct": "Peak Hotspot"},
+                        "longformer": {"probability": round(p_phobert, 4), "weight": 1.0, "weight_pct": "100% (PhoBERT)"},
                     },
                 }
 
             return result
 
         # ======================================================================
-        # NHÁNH TIẾNG ANH (ENSEMBLE PLMs)
+        # NHÁNH TIẾNG ANH (ENSEMBLE PLMs + SLIDING-WINDOW FOR >1024 TOKENS)
         # ======================================================================
         token_count = len(self.tokenizer_roberta.encode(text, add_special_tokens=False, truncation=False))
 
-        # 1. Suy luận từ các mô hình thành phần
-        p_bert = float(self._predict_bert(batch_text)[0]) if self.model_bert else 0.5
-        p_roberta = float(self._predict_roberta(batch_text)[0]) if self.model_roberta else 0.5
-        p_longformer = float(self._predict_longformer(batch_text)[0]) if self.model_longformer else 0.5
+        if token_count <= 1000:
+            en_chunks = batch_text
+            en_weights = [max(1, word_count)]
+            chunk_cnt = 1
+            coverage_str = "Full Context (1024)"
+        else:
+            en_chunks, en_weights = self._split_into_sliding_chunks(
+                text, chunk_words=680, overlap_words=80, max_chunks=12
+            )
+            chunk_cnt = len(en_chunks)
+            coverage_str = f"Sliding-Window ({chunk_cnt} chunks • Full Essay)"
+
+        # 1. Suy luận batch từ 3 mô hình thành phần trên toàn bộ các đoạn
+        arr_bert = self._predict_bert(en_chunks) if self.model_bert else np.full(chunk_cnt, 0.5)
+        arr_roberta = self._predict_roberta(en_chunks) if self.model_roberta else np.full(chunk_cnt, 0.5)
+        arr_longformer = self._predict_longformer(en_chunks) if self.model_longformer else np.full(chunk_cnt, 0.5)
+
+        p_bert, _, _ = self._aggregate_chunk_probs(arr_bert, en_weights)
+        p_roberta, _, _ = self._aggregate_chunk_probs(arr_roberta, en_weights)
+        p_longformer, _, _ = self._aggregate_chunk_probs(arr_longformer, en_weights)
 
         # 2. Tính toán điểm số Ensemble
         p_weighted = float(
@@ -463,7 +616,8 @@ class AITextDetector:
                 "word_count": word_count,
                 "char_count": char_count,
                 "token_count": token_count,
-                "context_coverage": "Full Context (1024)" if token_count <= 1024 else "Truncated (First 1024 tokens)",
+                "chunk_count": chunk_cnt,
+                "context_coverage": coverage_str,
             },
             "inference_time_ms": round(inference_time_ms, 2),
         }
@@ -505,7 +659,7 @@ class AITextDetector:
         self,
         text: str,
         threshold: float = 0.5,
-        max_sentences: int = 40,
+        max_sentences: int = 60,
         force_language: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
@@ -513,8 +667,8 @@ class AITextDetector:
         Phục vụ tính năng Highlight màu (AI Hotspots) cho Chrome Extension và Web UI.
         Hỗ trợ cả Tiếng Việt (PhoBERT) và Tiếng Anh (Ensemble PLMs).
         """
-        raw_sentences = re.split(r'(?<=[.!?…\n])\s+', text.strip())
-        sentences = [s.strip() for s in raw_sentences if len(s.strip().split()) >= 2]
+        raw_sentences = self._split_sentences(text)
+        sentences = [s for s in raw_sentences if len(s.split()) >= 2]
 
         if not sentences:
             sentences = [text.strip()]

@@ -93,7 +93,7 @@ class TestBatchProcessor(unittest.TestCase):
         self.assertTrue(csv_bytes.startswith(b"\xef\xbb\xbf"))  # UTF-8 BOM
         csv_text = csv_bytes.decode("utf-8-sig")
         self.assertIn("22110001 Nguyen Van A", csv_text)
-        self.assertIn("AUDIT-000101", csv_text)
+        self.assertRegex(csv_text, r"VT-000101-[A-F0-9]{8}")
 
     def test_03_docx_tables_utf8_bom_and_demo_zip(self):
         """Kiểm tra đọc bảng trong .DOCX, xử lý .TXT UTF-8 BOM, phân rủi ro theo ngưỡng và giải nén file Demo ZIP thật."""
