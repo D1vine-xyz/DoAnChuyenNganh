@@ -81,7 +81,7 @@ def fit_temperature_for_logits(logits: np.ndarray, labels: np.ndarray) -> Dict[s
     p_before = 1.0 / (1.0 + np.exp(-np.clip(logits_f, -30.0, 30.0)))
     ece_before = compute_ece(p_before, labels_f)
 
-    opt = minimize_scalar(_nll, bounds=(0.5, 4.5), method="bounded")
+    opt = minimize_scalar(_nll, bounds=(1.0, 4.5), method="bounded")
     best_t = float(opt.x)
     nll_after = _nll(best_t)
     p_after = 1.0 / (1.0 + np.exp(-np.clip(logits_f / best_t, -30.0, 30.0)))

@@ -137,7 +137,7 @@ def fit_temperature_scaling(model, dataloader, device, use_fp16: bool = False) -
     probs_before = 1.0 / (1.0 + np.exp(-np.clip(logits_arr, -30.0, 30.0)))
     ece_before = compute_ece(probs_before, labels_arr)
 
-    opt = minimize_scalar(_nll, bounds=(0.5, 4.5), method="bounded")
+    opt = minimize_scalar(_nll, bounds=(1.0, 4.5), method="bounded")
     best_temp = float(opt.x)
     nll_after = _nll(best_temp)
     probs_after = 1.0 / (1.0 + np.exp(-np.clip(logits_arr / best_temp, -30.0, 30.0)))
