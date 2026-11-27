@@ -167,74 +167,82 @@ const verifyResultBox = document.getElementById("verify-result-box");
 // ==============================================================================
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Theme Toggle Sync with Silky Circular View Transition
+  // Theme Toggle Sync with Butter-Smooth Bidirectional Circular View Transition
   const btnThemeToggle = document.getElementById("btn-theme-toggle");
-  const themeToggleIcon = document.getElementById("theme-toggle-icon");
+  let isThemeAnimating = false;
 
-  function updateThemeIcon(theme) {
-    if (themeToggleIcon) {
-      themeToggleIcon.textContent = theme === "dark" ? "☀️" : "🌙";
-    }
+  function syncThemeButtonA11y(theme) {
+    if (!btnThemeToggle) return;
+    const isDark = theme === "dark";
+    btnThemeToggle.setAttribute("aria-pressed", String(isDark));
+    btnThemeToggle.title = isDark ? "Chuyển sang Chế độ Sáng" : "Chuyển sang Chế độ Tối";
   }
 
   const initialTheme = document.documentElement.getAttribute("data-theme") || "light";
-  updateThemeIcon(initialTheme);
+  syncThemeButtonA11y(initialTheme);
 
   if (btnThemeToggle) {
-    btnThemeToggle.addEventListener("click", (e) => {
-      const activeTheme = document.documentElement.getAttribute("data-theme") || "light";
-      const nextTheme = activeTheme === "dark" ? "light" : "dark";
+    btnThemeToggle.addEventListener("click", () => {
+      if (isThemeAnimating) return;
 
-      // 1. Icon flip spring animation
-      if (themeToggleIcon) {
-        themeToggleIcon.style.transform = "rotate(180deg) scale(0.2)";
-        setTimeout(() => {
-          updateThemeIcon(nextTheme);
-          themeToggleIcon.style.transform = "rotate(360deg) scale(1)";
-        }, 140);
-        setTimeout(() => {
-          themeToggleIcon.style.transform = "";
-        }, 320);
-      }
+      const root = document.documentElement;
+      const activeTheme = root.getAttribute("data-theme") || "light";
+      const nextTheme = activeTheme === "dark" ? "light" : "dark";
+      const toDark = nextTheme === "dark";
 
       const applyTheme = () => {
-        document.documentElement.setAttribute("data-theme", nextTheme);
+        root.setAttribute("data-theme", nextTheme);
+        syncThemeButtonA11y(nextTheme);
         try {
           localStorage.setItem("veritext_theme", nextTheme);
         } catch (err) {}
       };
 
-      // 2. Silky Circular Ripple Transition (View Transitions API)
-      if (document.startViewTransition) {
+      const prefersReducedMotion =
+        window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      // GPU-composited Bidirectional Circular Reveal (không xung đột CSS transition)
+      if (document.startViewTransition && !prefersReducedMotion) {
+        isThemeAnimating = true;
         const rect = btnThemeToggle.getBoundingClientRect();
-        const x = e.clientX || rect.left + rect.width / 2;
-        const y = e.clientY || rect.top + rect.height / 2;
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
         const endRadius = Math.hypot(
           Math.max(x, window.innerWidth - x),
           Math.max(y, window.innerHeight - y)
         );
 
+        const dirClass = toDark ? "theme-to-dark" : "theme-to-light";
+        root.classList.add("theme-transitioning", dirClass);
+
         const transition = document.startViewTransition(() => {
           applyTheme();
         });
 
-        transition.ready.then(() => {
-          document.documentElement.animate(
-            {
-              clipPath: [
-                `circle(0px at ${x}px ${y}px)`,
-                `circle(${endRadius}px at ${x}px ${y}px)`,
-              ],
-            },
-            {
-              duration: 460,
-              easing: "cubic-bezier(0.4, 0, 0.2, 1)",
-              pseudoElement: "::view-transition-new(root)",
-            }
-          );
-        }).catch(() => {});
+        transition.ready
+          .then(() => {
+            const clipExpand = [
+              `circle(0px at ${x}px ${y}px)`,
+              `circle(${endRadius}px at ${x}px ${y}px)`,
+            ];
+            root.animate(
+              {
+                clipPath: toDark ? clipExpand : [...clipExpand].reverse(),
+              },
+              {
+                duration: 560,
+                easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+                pseudoElement: toDark ? "::view-transition-new(root)" : "::view-transition-old(root)",
+              }
+            );
+          })
+          .catch(() => {});
+
+        transition.finished.finally(() => {
+          root.classList.remove("theme-transitioning", "theme-to-dark", "theme-to-light");
+          isThemeAnimating = false;
+        });
       } else {
-        // Fallback for browsers without View Transition API
         applyTheme();
       }
     });

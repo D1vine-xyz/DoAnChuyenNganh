@@ -118,20 +118,38 @@ body,
 }
 
 /* ==============================================================================
-   VIEW TRANSITIONS API (CIRCULAR RIPPLE THEME TOGGLE)
+   VIEW TRANSITIONS API (SILKY BIDIRECTIONAL GPU CIRCULAR THEME REVEAL)
    ============================================================================== */
+
+/* Đóng băng transition thường trong lúc chụp snapshot View Transition để tránh nháy 2 nhịp */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition: none !important;
+}
+
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;
   mix-blend-mode: normal;
+  will-change: clip-path;
 }
 
-::view-transition-old(root) {
+/* Sáng -> Tối: Lớp tối mới nằm trên và lan tròn mượt ra toàn màn hình */
+html.theme-to-dark::view-transition-old(root) {
   z-index: 1;
 }
-
-::view-transition-new(root) {
+html.theme-to-dark::view-transition-new(root) {
   z-index: 9999;
+}
+
+/* Tối -> Sáng: Lớp tối cũ nằm trên và thu gọn mượt ngược về tâm nút để lộ nền sáng */
+html.theme-to-light::view-transition-old(root) {
+  z-index: 9999;
+}
+html.theme-to-light::view-transition-new(root) {
+  z-index: 1;
 }
 
 body {
@@ -178,45 +196,65 @@ body {
 }
 
 .nav-container {
-  max-width: 1200px;
+  max-width: 1360px;
   margin: 0 auto;
-  padding: 12px 24px;
+  padding: 10px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 14px;
 }
 
 .nav-brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   text-decoration: none;
   cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
-.brand-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background-color: var(--text-main);
-  display: inline-block;
+.brand-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  object-fit: cover;
+  background-color: #FFFFFF;
+  border: 1px solid var(--border-light);
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.nav-brand:hover .brand-logo {
+  transform: scale(1.06);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
+}
+
+.brand-logo-sm {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  object-fit: cover;
+  background-color: #FFFFFF;
+  border: 1px solid var(--border-light);
+  flex-shrink: 0;
 }
 
 .brand-title {
-  font-size: 19px;
+  font-size: 18.5px;
   font-weight: 800;
   color: var(--text-main);
   letter-spacing: -0.5px;
+  white-space: nowrap;
 }
 
-.brand-badge {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 6px;
-  background-color: var(--btn-primary-bg);
-  color: var(--btn-primary-text);
-  border-radius: 4px;
-  text-transform: uppercase;
+.brand-title-ai {
+  background: linear-gradient(135deg, #2563EB 0%, #10B981 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .nav-tabs {
@@ -227,6 +265,7 @@ body {
   padding: 3px;
   border-radius: 30px;
   gap: 2px;
+  flex-shrink: 0;
 }
 
 .nav-tab {
@@ -236,10 +275,11 @@ body {
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 500;
-  padding: 7px 18px;
+  padding: 7px 14px;
   border-radius: 20px;
   cursor: pointer;
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .nav-tab:hover {
@@ -255,10 +295,12 @@ body {
 .nav-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
-/* Theme Toggle Button */
+/* Theme Toggle Button (Smooth SVG Sun <-> Moon Morph) */
 .theme-toggle-btn {
   background-color: var(--bg-card);
   border: 1px solid var(--border-light);
@@ -270,21 +312,60 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 16px;
-  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .theme-toggle-btn:hover {
   background-color: var(--bg-hover);
   border-color: #9CA3AF;
-  transform: rotate(15deg) scale(1.05);
+  transform: scale(1.07);
 }
 
-#theme-toggle-icon {
-  display: inline-block;
-  line-height: 1;
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+.theme-toggle-btn:active {
+  transform: scale(0.92);
+}
+
+.theme-icon-wrap {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-svg {
+  position: absolute;
+  inset: 0;
+  width: 18px;
+  height: 18px;
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.28s ease;
+}
+
+/* Light mode: hiện Mặt Trăng, ẩn Mặt Trời */
+.theme-svg-moon {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+}
+
+.theme-svg-sun {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.45);
+}
+
+/* Dark mode: hiện Mặt Trời ấm, ẩn Mặt Trăng */
+[data-theme="dark"] .theme-svg-moon {
+  opacity: 0;
+  transform: rotate(90deg) scale(0.45);
+}
+
+[data-theme="dark"] .theme-svg-sun {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+  color: #FBBF24;
 }
 
 .status-pill {
@@ -322,13 +403,26 @@ body {
 }
 
 .hero-title {
-  font-family: var(--font-serif);
-  font-size: 46px;
-  font-weight: 500;
+  font-family: var(--font-sans);
+  font-size: 44px;
+  font-weight: 800;
   color: var(--text-main);
-  letter-spacing: -0.8px;
+  letter-spacing: -1.4px;
   margin-bottom: 12px;
   line-height: 1.15;
+}
+
+.hero-title-accent {
+  background: linear-gradient(135deg, #2563EB 0%, #10B981 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@media (max-width: 1180px) {
+  .status-pill {
+    display: none;
+  }
 }
 
 .hero-subtitle {
