@@ -10,6 +10,46 @@ let currentScanId = null;
 let currentAuditCode = null;
 let currentUploadedFile = null;
 let currentUser = null;
+let lastRenderedResult = null;
+let progressStepTimers = [];
+
+// ==============================================================================
+// 0. HỆ THỐNG THÔNG BÁO TOAST CHUẨN SAAS (THAY THẾ HOÀN TOÀN ALERT TRÌNH DUYỆT)
+// ==============================================================================
+
+const TOAST_ICONS = {
+  success: `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
+  error: `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+  warning: `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+  info: `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
+};
+
+function showToast(message, type = "info", duration = 3800) {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+
+  const toast = document.createElement("div");
+  const safeType = TOAST_ICONS[type] ? type : "info";
+  toast.className = `toast-item toast-${safeType}`;
+  toast.innerHTML = `
+    ${TOAST_ICONS[safeType]}
+    <div class="toast-msg">${escapeHtml(String(message || ""))}</div>
+    <button type="button" class="toast-close" aria-label="Đóng">&times;</button>
+  `;
+
+  const removeToast = () => {
+    if (!toast.parentNode) return;
+    toast.classList.add("toast-leaving");
+    setTimeout(() => toast.remove(), 200);
+  };
+
+  toast.querySelector(".toast-close")?.addEventListener("click", removeToast);
+  container.appendChild(toast);
+
+  if (duration > 0) {
+    setTimeout(removeToast, duration);
+  }
+}
 
 function getAuthHeaders() {
   const token = localStorage.getItem("veritext_token");
@@ -139,6 +179,20 @@ const btnViewAnnotated = document.getElementById("btn-view-annotated");
 const btnViewList = document.getElementById("btn-view-list");
 const btnCopyAuditCode = document.getElementById("btn-copy-audit-code");
 const resultAuditCodeEl = document.getElementById("result-audit-code");
+const btnCopySummary = document.getElementById("btn-copy-summary");
+const verdictRingProgress = document.getElementById("verdict-ring-progress");
+const sentenceDistWrap = document.getElementById("sentence-dist-wrap");
+const distSegRed = document.getElementById("dist-seg-red");
+const distSegYellow = document.getElementById("dist-seg-yellow");
+const distSegGreen = document.getElementById("dist-seg-green");
+const distSummaryText = document.getElementById("dist-summary-text");
+const sentenceTooltip = document.getElementById("sentence-tooltip");
+const btnSampleMenu = document.getElementById("btn-sample-menu");
+const sampleDropdownMenu = document.getElementById("sample-dropdown-menu");
+const analysisProgressBar = document.getElementById("analysis-progress-bar");
+const progStep1 = document.getElementById("prog-step-1");
+const progStep2 = document.getElementById("prog-step-2");
+const progStep3 = document.getElementById("prog-step-3");
 
 // DOM Elements - History & Filters
 const kpiTotalScans = document.getElementById("kpi-total-scans");
@@ -294,15 +348,57 @@ document.addEventListener("DOMContentLoaded", () => {
   initHotspotViewTabs();
   initHistoryFilters();
   initVerifyCertificateModal();
+  initSampleDropdownAndShortcuts();
 
-  // Đóng nhanh các hộp thoại Modal bằng phím Escape
+  // Đóng nhanh các hộp thoại Modal & Dropdown bằng phím Escape
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     authModal?.classList.add("hidden");
     document.getElementById("profile-modal")?.classList.add("hidden");
     verifyModal?.classList.add("hidden");
+    closeSampleDropdown();
   });
 });
+
+function closeSampleDropdown() {
+  if (sampleDropdownMenu) sampleDropdownMenu.classList.add("hidden");
+  if (btnSampleMenu) {
+    btnSampleMenu.setAttribute("aria-expanded", "false");
+    btnSampleMenu.closest(".sample-dropdown-wrap")?.classList.remove("open");
+  }
+}
+
+function initSampleDropdownAndShortcuts() {
+  if (btnSampleMenu && sampleDropdownMenu) {
+    btnSampleMenu.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const willOpen = sampleDropdownMenu.classList.contains("hidden");
+      if (willOpen) {
+        sampleDropdownMenu.classList.remove("hidden");
+        btnSampleMenu.setAttribute("aria-expanded", "true");
+        btnSampleMenu.closest(".sample-dropdown-wrap")?.classList.add("open");
+      } else {
+        closeSampleDropdown();
+      }
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!sampleDropdownMenu.contains(e.target) && !btnSampleMenu.contains(e.target)) {
+        closeSampleDropdown();
+      }
+    });
+  }
+
+  // Phím tắt Ctrl + Enter (hoặc Cmd + Enter trên macOS) để quét nhanh ngay trong ô nhập
+  if (textInput) {
+    textInput.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        if (!btnSubmit.disabled) btnSubmit.click();
+      }
+    });
+  }
+}
 
 async function checkServerHealth() {
   try {
@@ -402,7 +498,7 @@ fileInput.addEventListener("change", () => {
 function handleFileSelected(file) {
   const ext = file.name.split(".").pop().toLowerCase();
   if (!["txt", "docx", "doc", "pdf"].includes(ext)) {
-    alert("Chỉ hỗ trợ tệp tin định dạng: .PDF, .DOCX, .DOC, hoặc .TXT");
+    showToast("Chỉ hỗ trợ tệp tin định dạng: .PDF, .DOCX, .DOC, hoặc .TXT", "warning");
     return;
   }
   currentUploadedFile = file;
@@ -445,8 +541,9 @@ btnPaste.addEventListener("click", async () => {
     clearSelectedUploadFile();
     textInput.value = text;
     updateTextCounts();
+    showToast("Đã dán văn bản từ Clipboard.", "info", 2000);
   } catch (err) {
-    alert("Không thể đọc Clipboard. Vui lòng nhấn Ctrl + V để dán trực tiếp.");
+    showToast("Không thể đọc Clipboard. Vui lòng nhấn Ctrl + V để dán trực tiếp.", "warning");
   }
 });
 
@@ -455,74 +552,78 @@ btnClear.addEventListener("click", () => {
   updateTextCounts();
   currentScanId = null;
   currentAuditCode = null;
+  lastRenderedResult = null;
   clearSelectedUploadFile();
   resultContent.classList.add("hidden");
   resultActions.classList.add("hidden");
   if (btnCopyAuditCode) btnCopyAuditCode.classList.add("hidden");
 });
 
-btnSampleAi.addEventListener("click", () => {
+function applySampleText(sampleContent, sampleLabel) {
   clearSelectedUploadFile();
-  textInput.value = (
+  closeSampleDropdown();
+  textInput.value = sampleContent;
+  updateTextCounts();
+  showToast(`Đã nạp ${sampleLabel} — nhấn Ctrl + Enter để kiểm tra!`, "info", 2500);
+}
+
+btnSampleAi.addEventListener("click", () => {
+  applySampleText(
     "Artificial intelligence models have demonstrated exceptional capabilities across various natural language processing domains. "
     + "These sophisticated architectures leverage deep contextual self-attention layers to produce coherent, syntactically fluent discourse. "
     + "However, the widespread dissemination of synthetic content introduces non-trivial risks regarding academic dishonesty and journalistic trust. "
-    + "Therefore, developing resilient multi-model ensemble detection frameworks is of paramount importance to safeguard digital information fidelity."
+    + "Therefore, developing resilient multi-model ensemble detection frameworks is of paramount importance to safeguard digital information fidelity.",
+    "Mẫu AI Tiếng Anh"
   );
-  updateTextCounts();
 });
 
 btnSampleHuman.addEventListener("click", () => {
-  clearSelectedUploadFile();
-  textInput.value = (
+  applySampleText(
     "Last Sunday morning, my roommate and I decided to take a spontaneous road trip out to the coast. "
     + "We packed a couple of sandwiches, some cold drinks, and hit the highway before the morning traffic started piling up. "
     + "The weather was completely overcast with a cool breeze coming off the ocean, but the seafood shack by the pier was fantastic. "
-    + "It was honestly one of the most relaxing weekends we have had all semester."
+    + "It was honestly one of the most relaxing weekends we have had all semester.",
+    "Mẫu Người Tiếng Anh"
   );
-  updateTextCounts();
 });
 
 if (btnSampleAiVi) {
   btnSampleAiVi.addEventListener("click", () => {
-    clearSelectedUploadFile();
-    textInput.value = (
+    applySampleText(
       "Trí tuệ nhân tạo (AI) ngày nay đang đóng vai trò then chốt trong sự phát triển của nền công nghệ toàn cầu. "
       + "Các mô hình xử lý ngôn ngữ tự nhiên hiện đại có khả năng tiếp nhận và xử lý lượng thông tin khổng lồ một cách ấn tượng. "
       + "Tuy nhiên, sự xuất hiện ngày càng phổ biến của các nội dung do máy sinh đòi hỏi các giải pháp kiểm định nghiêm ngặt và đáng tin cậy. "
-      + "Chính vì vậy, việc ứng dụng các mô hình học sâu như PhoBERT vào bài toán phát hiện văn bản AI là một hướng đi vô cùng cấp thiết."
+      + "Chính vì vậy, việc ứng dụng các mô hình học sâu như PhoBERT vào bài toán phát hiện văn bản AI là một hướng đi vô cùng cấp thiết.",
+      "Mẫu AI Tiếng Việt"
     );
-    updateTextCounts();
   });
 }
 
 if (btnSampleHumanVi) {
   btnSampleHumanVi.addEventListener("click", () => {
-    clearSelectedUploadFile();
-    textInput.value = (
+    applySampleText(
       "Chè cam tào phớ giải nhiệt mùa hè là một món giải khát rất dễ làm, vừa giúp thanh lọc cơ thể lại không bị béo ngậy. "
       + "Cam tươi gọt sạch vỏ, bóc lấy phần tép và giữ lại một chút vỏ thái chỉ để tạo mùi thơm dịu nhẹ. "
       + "Nước cam hòa cùng đường phèn đun sôi liu riu trên bếp, thêm chút bột năng khuấy đều đến khi sánh mịn thì tắt bếp. "
-      + "Múc từng lát tào phớ mềm mượt ra bát, chan nước cam lên trên và thưởng thức cùng vài viên đá mát lạnh."
+      + "Múc từng lát tào phớ mềm mượt ra bát, chan nước cam lên trên và thưởng thức cùng vài viên đá mát lạnh.",
+      "Mẫu Người Tiếng Việt"
     );
-    updateTextCounts();
   });
 }
 
 if (btnSampleBypass) {
   btnSampleBypass.addEventListener("click", () => {
-    clearSelectedUploadFile();
     // Mẫu AI bị cài ký tự tàng hình Zero-Width (\u200b) + chữ Cyrillic giả Latin (\u0430, \u0435, \u043e) + mục Tài liệu tham khảo
-    textInput.value = (
+    applySampleText(
       "Trí\u200b tuệ\u200b nhân\u200b t\u0430o (AI) đóng v\u0430i trò then chốt tr\u043eng bối c\u0430nh chuyển đổi số hiện n\u0430y. "
       + "Không thể phủ nhận rằng các mô hình ngôn ngữ lớn m\u0430ng lại nhiều lợi ích vượt trội ch\u043e giáo dục đại học. "
       + "Bên cạnh đó, việc ứng dụng công\u200b nghệ\u200b này cũng đặt r\u0430 nhiều thách thức đối với tính trung thực học thuật. "
       + "Tóm lại, xây dựng hệ thống kiểm định minh bạch là một hướng đi vô cùng cấp thiết.\n\n"
       + "Tài liệu tham khảo:\n"
       + "[1] Vaswani et al. (2017). Attention Is All You Need. NeurIPS.\n"
-      + "[2] Nguyen & Nguyen (2020). PhoBERT: Pre-trained language models for Vietnamese."
+      + "[2] Nguyen & Nguyen (2020). PhoBERT: Pre-trained language models for Vietnamese.",
+      "Mẫu Lách Luật Anti-Bypass"
     );
-    updateTextCounts();
   });
 }
 
@@ -579,9 +680,9 @@ btnSubmit.addEventListener("click", async () => {
     } catch (err) {
       console.error("Lỗi upload:", err);
       if (err.message.includes("Failed to fetch") || err.message.includes("NetworkError")) {
-        alert("Không thể kết nối đến máy chủ FastAPI (http://localhost:8000).\nVui lòng chạy 'start_server.bat' để khởi động server trước khi quét!");
+        showToast("Không thể kết nối máy chủ FastAPI (http://localhost:8000). Vui lòng chạy 'start_server.bat'!", "error", 5000);
       } else {
-        alert("Lỗi thẩm định tệp: " + err.message);
+        showToast("Lỗi thẩm định tệp: " + err.message, "error", 4800);
       }
     } finally {
       setLoading(false);
@@ -592,7 +693,7 @@ btnSubmit.addEventListener("click", async () => {
   // Trường hợp 2: Nhập văn bản trực tiếp
   const rawText = textInput.value.trim();
   if (rawText.length < 10) {
-    alert("Vui lòng nhập hoặc dán ít nhất 10 ký tự (tiếng Anh hoặc tiếng Việt) để hệ thống phân tích.");
+    showToast("Vui lòng nhập hoặc dán ít nhất 10 ký tự (Anh hoặc Việt) để hệ thống phân tích.", "warning");
     return;
   }
 
@@ -620,7 +721,7 @@ btnSubmit.addEventListener("click", async () => {
     currentScanId = data.scan_id;
     renderResults(data);
   } catch (err) {
-    alert("Lỗi thẩm định văn bản: " + err.message);
+    showToast("Lỗi thẩm định văn bản: " + err.message, "error", 4800);
   } finally {
     setLoading(false);
   }
@@ -629,12 +730,41 @@ btnSubmit.addEventListener("click", async () => {
 function setLoading(isLoading) {
   btnSubmit.disabled = isLoading;
   const btnText = btnSubmit.querySelector(".btn-text");
+  const kbdHint = btnSubmit.querySelector(".kbd-hint");
+
+  progressStepTimers.forEach((t) => clearTimeout(t));
+  progressStepTimers = [];
+
   if (isLoading) {
-    btnText.textContent = "Đang phân tích văn bản AI...";
+    btnText.textContent = "Đang phân tích...";
+    if (kbdHint) kbdHint.classList.add("hidden");
     spinner.classList.remove("hidden");
+
+    if (analysisProgressBar) {
+      analysisProgressBar.classList.remove("hidden");
+      [progStep1, progStep2, progStep3].forEach((el) => el?.classList.remove("active", "done"));
+      progStep1?.classList.add("active");
+
+      progressStepTimers.push(setTimeout(() => {
+        progStep1?.classList.remove("active");
+        progStep1?.classList.add("done");
+        progStep2?.classList.add("active");
+      }, 260));
+
+      progressStepTimers.push(setTimeout(() => {
+        progStep2?.classList.remove("active");
+        progStep2?.classList.add("done");
+        progStep3?.classList.add("active");
+      }, 1050));
+    }
   } else {
     btnText.textContent = "Kiểm tra nội dung AI";
+    if (kbdHint) kbdHint.classList.remove("hidden");
     spinner.classList.add("hidden");
+    if (analysisProgressBar) {
+      analysisProgressBar.classList.add("hidden");
+      [progStep1, progStep2, progStep3].forEach((el) => el?.classList.remove("active", "done"));
+    }
   }
 }
 
@@ -644,13 +774,15 @@ function setLoading(isLoading) {
 // ==============================================================================
 
 function renderResults(data) {
+  lastRenderedResult = data;
   if (resultPlaceholder) resultPlaceholder.classList.add("hidden");
   resultContent.classList.remove("hidden");
   resultActions.classList.remove("hidden");
 
   const overall = data.overall || data;
-  const isAI = overall.label ? overall.label === "AI-generated" : overall.ai_probability >= 0.5;
-  const aiPct = (overall.ai_probability * 100).toFixed(1);
+  const aiProb = Math.max(0, Math.min(1, Number(overall.ai_probability) || 0));
+  const isAI = overall.label ? overall.label === "AI-generated" : aiProb >= 0.5;
+  const aiPct = (aiProb * 100).toFixed(1);
   const humanPct = (overall.human_probability * 100).toFixed(1);
 
   // 1. Language Badge & Verdict Banner
@@ -676,6 +808,18 @@ function renderResults(data) {
     ? (isVi ? "Phát hiện dấu hiệu văn phong và phân bố token đặc trưng của ChatGPT / LLMs tiếng Việt" : "Phát hiện dấu hiệu cú pháp và thống kê đặc trưng của Mô hình Ngôn ngữ Lớn (LLM)")
     : (isVi ? "Văn phong tự nhiên, mức độ biến thiên từ vựng phong phú, không phát hiện dấu hiệu máy sinh" : "Văn phong tự nhiên, mức độ biến thiên từ vựng cao, không phát hiện dấu vết máy sinh");
   verdictPercent.textContent = `${aiPct}%`;
+
+  // Animated Circular SVG Ring Gauge (r=36 -> circumference = 226.195)
+  if (verdictRingProgress) {
+    const CIRC = 2 * Math.PI * 36;
+    const ringColor = aiProb >= 0.70 ? "#EF4444" : aiProb >= 0.40 ? "#F59E0B" : "#10B981";
+    verdictRingProgress.style.stroke = ringColor;
+    verdictRingProgress.style.strokeDasharray = `${CIRC}`;
+    verdictRingProgress.style.strokeDashoffset = `${CIRC}`;
+    requestAnimationFrame(() => {
+      verdictRingProgress.style.strokeDashoffset = `${CIRC * (1 - aiProb)}`;
+    });
+  }
 
   // 2. Metrics Box
   metricHumanProb.textContent = `${humanPct}%`;
@@ -910,14 +1054,116 @@ function initHotspotViewTabs() {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(currentAuditCode).catch(() => {});
       }
+      showToast(`Đã sao chép mã chứng thực ${currentAuditCode}`, "success", 2600);
       window.openVerifyWithCode(currentAuditCode);
+    });
+  }
+
+  if (btnCopySummary) {
+    btnCopySummary.addEventListener("click", async () => {
+      if (!lastRenderedResult) {
+        showToast("Chưa có kết quả thẩm định để sao chép.", "warning");
+        return;
+      }
+      const d = lastRenderedResult;
+      const ov = d.overall || d;
+      const aiPct = ((Number(ov.ai_probability) || 0) * 100).toFixed(1);
+      const isAi = ov.label === "AI-generated" || Number(ov.ai_probability) >= 0.5;
+      const langTxt = ov.language === "vi" ? "Tiếng Việt (PhoBERT v2)" : "Tiếng Anh (Ensemble 3 PLMs)";
+      const tierTxt = typeof d.authorship_tier === "object" && d.authorship_tier?.label_vi
+        ? d.authorship_tier.label_vi
+        : (d.authorship_tier || "--");
+      const bypassTxt = d.bypass_report?.has_bypass_warning
+        ? `CÓ CẢNH BÁO (${d.bypass_report.summary || "Phát hiện ký tự bất thường"})`
+        : "Không phát hiện";
+      const xaiLine = d.xai_metrics?.burstiness_score !== undefined
+        ? `• XAI Ngôn ngữ học: Burstiness ${d.xai_metrics.burstiness_score}/100 | Perplexity ${d.xai_metrics.perplexity_score}/100 | MATTR ${d.xai_metrics.lexical_diversity}%`
+        : "";
+      const summaryLines = [
+        "[KẾT QUẢ THẨM ĐỊNH VĂN BẢN — VERITEXT AI]",
+        `• Kết luận: ${isAi ? "Văn bản do AI sinh (AI-Generated)" : "Văn bản do Con người viết (Human-Written)"} (${aiPct}% AI)`,
+        `• Phân loại 4 mức: ${tierTxt}`,
+        `• Tuyến mô hình: ${langTxt} | Độ tin cậy: ${ov.confidence || "--"}`,
+        xaiLine,
+        `• Kiểm tra Anti-Bypass: ${bypassTxt}`,
+        d.audit_code ? `• Mã chứng thực chống giả mạo: ${d.audit_code}` : "",
+      ].filter(Boolean).join("\n");
+
+      try {
+        await navigator.clipboard.writeText(summaryLines);
+        showToast("Đã sao chép tóm tắt nhận xét vào Clipboard!", "success", 2800);
+      } catch (e) {
+        showToast("Trình duyệt không cho phép truy cập Clipboard tự động.", "warning");
+      }
     });
   }
 }
 
+function showSentenceTooltip(spanEl, event) {
+  if (!sentenceTooltip) return;
+  const idx = spanEl.dataset.sIdx || "1";
+  const words = spanEl.dataset.sWords || "";
+  const pct = spanEl.dataset.sPct || "0%";
+  const desc = spanEl.dataset.sDesc || "";
+  const color = spanEl.dataset.sColor || "green";
+
+  sentenceTooltip.innerHTML = `
+    <div class="sentence-tooltip-head">
+      <span class="sentence-tooltip-idx">Câu #${escapeHtml(idx)}${words ? ` (${escapeHtml(words)} từ)` : ""}</span>
+      <span class="sentence-tooltip-pct tooltip-pct-${escapeHtml(color)}">${escapeHtml(pct)} AI</span>
+    </div>
+    <div class="sentence-tooltip-desc">${escapeHtml(desc)}</div>
+  `;
+  sentenceTooltip.classList.remove("hidden");
+
+  const pad = 12;
+  const tipRect = sentenceTooltip.getBoundingClientRect();
+  let left = event.clientX - tipRect.width / 2;
+  let top = event.clientY - tipRect.height - 14;
+  if (top < pad) top = event.clientY + 18;
+  left = Math.max(pad, Math.min(window.innerWidth - tipRect.width - pad, left));
+
+  sentenceTooltip.style.left = `${left}px`;
+  sentenceTooltip.style.top = `${top}px`;
+}
+
+function hideSentenceTooltip() {
+  if (sentenceTooltip) sentenceTooltip.classList.add("hidden");
+}
+
+function renderSentenceDistribution(sentences) {
+  if (!sentenceDistWrap) return;
+  if (!sentences || sentences.length === 0) {
+    sentenceDistWrap.classList.add("hidden");
+    return;
+  }
+
+  const total = sentences.length;
+  const red = sentences.filter((s) => s.highlight_color === "red").length;
+  const yellow = sentences.filter((s) => s.highlight_color === "yellow").length;
+  const green = total - red - yellow;
+
+  const redPct = (red / total) * 100;
+  const yellowPct = (yellow / total) * 100;
+  const greenPct = (green / total) * 100;
+
+  if (distSegRed) distSegRed.style.width = `${redPct.toFixed(1)}%`;
+  if (distSegYellow) distSegYellow.style.width = `${yellowPct.toFixed(1)}%`;
+  if (distSegGreen) distSegGreen.style.width = `${greenPct.toFixed(1)}%`;
+  if (distSummaryText) {
+    distSummaryText.innerHTML = `
+      <span>Phân bố <b>${total} câu</b>: <b>${red}</b> AI cao (${redPct.toFixed(0)}%) • <b>${yellow}</b> nghi vấn (${yellowPct.toFixed(0)}%) • <b>${green}</b> tự nhiên (${greenPct.toFixed(0)}%)</span>
+      <span style="color: var(--text-muted); font-size: 11.5px;">Rê chuột vào từng câu để xem điểm chi tiết</span>
+    `;
+  }
+  sentenceDistWrap.classList.remove("hidden");
+}
+
 function renderAnnotatedDocument(sentences) {
+  renderSentenceDistribution(sentences);
   if (!annotatedDocContainer) return;
   annotatedDocContainer.innerHTML = "";
+  hideSentenceTooltip();
 
   if (!sentences || sentences.length === 0) {
     const rawPreview = (textInput && textInput.value.trim()) || "";
@@ -937,9 +1183,16 @@ function renderAnnotatedDocument(sentences) {
     const color = ["red", "yellow", "green"].includes(s.highlight_color) ? s.highlight_color : "green";
     span.className = `hl-sent ${color}`;
     span.textContent = s.sentence;
-    const sIdx = s.sentence_index || (idx + 1);
-    const wCnt = s.word_count ? ` (${s.word_count} từ)` : "";
-    span.title = `Câu #${sIdx}${wCnt}: ${s.ai_percentage} AI — ${s.assessment || ""}`;
+    span.dataset.sIdx = String(s.sentence_index || (idx + 1));
+    span.dataset.sWords = s.word_count ? String(s.word_count) : "";
+    span.dataset.sPct = String(s.ai_percentage || "0%");
+    span.dataset.sDesc = String(s.assessment || "");
+    span.dataset.sColor = color;
+
+    span.addEventListener("mouseenter", (e) => showSentenceTooltip(span, e));
+    span.addEventListener("mousemove", (e) => showSentenceTooltip(span, e));
+    span.addEventListener("mouseleave", hideSentenceTooltip);
+
     annotatedDocContainer.appendChild(span);
 
     if (idx < sentences.length - 1) {
@@ -999,14 +1252,14 @@ async function openAuthenticatedPdf(scanId) {
     }
     setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
   } catch (err) {
-    alert("Lỗi xuất báo cáo PDF: " + err.message);
+    showToast("Lỗi xuất báo cáo PDF: " + err.message, "error");
   }
 }
 
 // Export PDF Button
 btnExportPdf.addEventListener("click", () => {
   if (!currentScanId) {
-    alert("Chưa có lượt quét nào để xuất báo cáo PDF.");
+    showToast("Chưa có lượt quét nào để xuất báo cáo PDF.", "warning");
     return;
   }
   openAuthenticatedPdf(currentScanId);
@@ -1194,10 +1447,10 @@ window.viewHistoryItem = async function(id) {
       document.querySelector('[data-tab="tab-inspect"]').click();
     } else {
       const err = await res.json().catch(() => ({}));
-      alert(err.detail || "Không thể tải chi tiết lượt quét này.");
+      showToast(err.detail || "Không thể tải chi tiết lượt quét này.", "error");
     }
   } catch (err) {
-    alert("Không thể tải chi tiết: " + err.message);
+    showToast("Không thể tải chi tiết: " + err.message, "error");
   }
 };
 
@@ -1209,10 +1462,11 @@ window.deleteHistoryItem = async function(id) {
       headers: getAuthHeaders(),
     });
     if (res.ok) {
+      showToast(`Đã xóa lượt quét #${id}.`, "success", 2500);
       loadHistoryAndStats();
     }
   } catch (err) {
-    alert("Lỗi xóa mục: " + err.message);
+    showToast("Lỗi xóa mục: " + err.message, "error");
   }
 };
 
@@ -1937,11 +2191,11 @@ function renderSelectedBatchFiles() {
 
 async function runClassroomBatchScan() {
   if (!isTeacherRole(currentUser)) {
-    alert("Vui lòng đăng nhập tài khoản Giảng viên để chấm bài lớp học.");
+    showToast("Vui lòng đăng nhập tài khoản Giảng viên để chấm bài lớp học.", "warning");
     return;
   }
   if (selectedBatchFiles.length === 0) {
-    alert("Vui lòng kéo thả tệp .ZIP hoặc chọn ít nhất 1 tệp bài nộp của sinh viên!");
+    showToast("Vui lòng kéo thả tệp .ZIP hoặc chọn ít nhất 1 tệp bài nộp của sinh viên!", "warning");
     return;
   }
 
@@ -1975,8 +2229,9 @@ async function runClassroomBatchScan() {
     renderSelectedBatchFiles();
     renderBatchDetail(data.batch, data.skipped_files || []);
     loadSavedBatches();
+    showToast(`Hoàn tất chấm lớp: ${data.batch.total_files} bài nộp!`, "success", 3600);
   } catch (err) {
-    alert("Lỗi chấm bài lớp học: " + err.message);
+    showToast("Lỗi chấm bài lớp học: " + err.message, "error", 5000);
   } finally {
     btnStartBatchScan.disabled = false;
     if (txtEl) txtEl.textContent = "🚀 Bắt Đầu Chấm Cả Lớp";
@@ -2109,7 +2364,7 @@ window.openClassroomBatch = async function(batchId) {
     const detail = await res.json();
     renderBatchDetail(detail, []);
   } catch (err) {
-    alert(err.message);
+    showToast(err.message, "error");
   }
 };
 
@@ -2125,10 +2380,11 @@ window.deleteClassroomBatch = async function(batchId) {
         batchResultPanel.classList.add("hidden");
         activeBatchDetail = null;
       }
+      showToast(`Đã xóa đợt chấm #${batchId}.`, "success", 2500);
       loadSavedBatches();
     }
   } catch (err) {
-    alert("Lỗi xóa đợt chấm: " + err.message);
+    showToast("Lỗi xóa đợt chấm: " + err.message, "error");
   }
 };
 
@@ -2150,8 +2406,9 @@ window.downloadBatchExport = async function(batchId, fmt = "xlsx") {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 30000);
+    showToast(`Đã tải xuống bảng điểm .${fmt.toUpperCase()} thành công!`, "success", 2800);
   } catch (err) {
-    alert("Lỗi xuất bảng điểm: " + err.message);
+    showToast("Lỗi xuất bảng điểm: " + err.message, "error");
   }
 };
 

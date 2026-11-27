@@ -41,14 +41,18 @@
 
       <nav class="nav-tabs">
         <button class="nav-tab active" data-tab="tab-inspect">Thẩm Định Văn Bản</button>
-        <button class="nav-tab" data-tab="tab-classroom">🏫 Chấm Bài Lớp Học</button>
+        <button class="nav-tab" data-tab="tab-classroom">
+          <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+          <span>Chấm Bài Lớp Học</span>
+        </button>
         <button class="nav-tab" data-tab="tab-history">Lịch Sử &amp; Thống Kê</button>
         <button class="nav-tab" data-tab="tab-architecture">Kiến Trúc Hệ Thống</button>
       </nav>
 
       <div class="nav-right">
         <button id="btn-open-verify" class="btn-action-pill btn-verify-nav" type="button" title="Tra cứu &amp; Xác thực mã chống giả mạo trên Biên bản PDF">
-          <span>🛡️ Xác Thực PDF</span>
+          <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+          <span>Xác Thực PDF</span>
         </button>
         <button id="btn-theme-toggle" class="theme-toggle-btn" type="button" aria-label="Chuyển chế độ Sáng / Tối" title="Chuyển chế độ Sáng / Tối">
           <span id="theme-toggle-icon" class="theme-icon-wrap" aria-hidden="true">
@@ -68,7 +72,8 @@
 
         <!-- Auth Controls (Login button & User Profile) -->
         <button id="btn-open-auth" class="btn-auth-pill" type="button">
-          <span>👤 Đăng Nhập</span>
+          <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <span>Đăng Nhập</span>
         </button>
 
         <div id="user-profile-box" class="user-profile-pill hidden">
@@ -99,15 +104,15 @@
         </p>
         <div class="trust-badges">
           <div class="trust-badge-item">
-            <span>🏆</span>
+            <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>
             <span>Độ chính xác 99,1% (VI - 8K Pre-2022) • 96,5% (EN)</span>
           </div>
           <div class="trust-badge-item">
-            <span>⚡</span>
+            <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
             <span>Kiểm tra &amp; Bóc tách từng câu</span>
           </div>
           <div class="trust-badge-item">
-            <span>🌐</span>
+            <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
             <span>Song ngữ Anh - Việt (SQL Server RBAC)</span>
           </div>
         </div>
@@ -161,20 +166,67 @@
         <!-- Bottom bar inside card -->
         <div class="card-bottom-bar">
           <div class="bottom-left-actions">
-            <button id="btn-upload" class="btn-action-pill" type="button">
-              <span>⬆️</span>
-              <span>Tải lên tập tin</span>
+            <button id="btn-upload" class="btn-action-pill" type="button" title="Tải tệp .PDF, .DOCX, .DOC hoặc .TXT">
+              <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <span>Tải tệp</span>
             </button>
-            <button id="btn-paste" class="btn-action-pill" type="button">
-              <span>📋</span>
-              <span>Dán văn bản</span>
+            <button id="btn-paste" class="btn-action-pill" type="button" title="Dán văn bản từ Clipboard">
+              <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+              <span>Dán</span>
             </button>
-            <button id="btn-sample-ai" class="btn-text-only" type="button" title="Mẫu tiếng Anh do AI sinh">🤖 Mẫu AI (EN)</button>
-            <button id="btn-sample-human" class="btn-text-only" type="button" title="Mẫu tiếng Anh do Người viết">👤 Mẫu Người (EN)</button>
-            <button id="btn-sample-ai-vi" class="btn-text-only" type="button" title="Mẫu tiếng Việt do ChatGPT sinh">🇻🇳 Mẫu AI (VI)</button>
-            <button id="btn-sample-human-vi" class="btn-text-only" type="button" title="Mẫu tiếng Việt báo chí chính thống">🇻🇳 Mẫu Người (VI)</button>
-            <button id="btn-sample-bypass" class="btn-text-only" type="button" title="Mẫu AI bị cài ký tự tàng hình Zero-Width & chữ Cyrillic giả mạo để thử Anti-Bypass">🕵️ Mẫu Lách Luật</button>
-            <button id="btn-clear" class="btn-text-only text-danger" type="button">🗑️ Xóa</button>
+
+            <!-- Dropdown chọn văn bản mẫu gọn gàng chuẩn SaaS -->
+            <div class="sample-dropdown-wrap">
+              <button id="btn-sample-menu" class="btn-action-pill" type="button" aria-haspopup="true" aria-expanded="false">
+                <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+                <span>Văn bản mẫu</span>
+                <svg class="ui-icon ui-icon-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <div id="sample-dropdown-menu" class="sample-dropdown-menu hidden" role="menu">
+                <div class="sample-dropdown-heading">Chọn nhanh mẫu kiểm thử</div>
+                <button id="btn-sample-ai-vi" class="sample-dropdown-item" type="button" role="menuitem">
+                  <span class="sample-item-badge badge-ai-dot">VI</span>
+                  <div class="sample-item-text">
+                    <strong>Mẫu AI Tiếng Việt</strong>
+                    <span>Đoạn học thuật do ChatGPT / LLM sinh</span>
+                  </div>
+                </button>
+                <button id="btn-sample-human-vi" class="sample-dropdown-item" type="button" role="menuitem">
+                  <span class="sample-item-badge badge-human-dot">VI</span>
+                  <div class="sample-item-text">
+                    <strong>Mẫu Người Tiếng Việt</strong>
+                    <span>Văn phong tự nhiên, giàu nhịp điệu</span>
+                  </div>
+                </button>
+                <button id="btn-sample-bypass" class="sample-dropdown-item" type="button" role="menuitem">
+                  <span class="sample-item-badge badge-warn-dot">!</span>
+                  <div class="sample-item-text">
+                    <strong>Mẫu Lách Luật (Anti-Bypass)</strong>
+                    <span>Cài ký tự ẩn Zero-Width, Cyrillic &amp; Tham khảo</span>
+                  </div>
+                </button>
+                <div class="sample-dropdown-divider"></div>
+                <button id="btn-sample-ai" class="sample-dropdown-item" type="button" role="menuitem">
+                  <span class="sample-item-badge badge-ai-dot">EN</span>
+                  <div class="sample-item-text">
+                    <strong>Mẫu AI Tiếng Anh</strong>
+                    <span>Bài luận học thuật (Ensemble 3 PLMs)</span>
+                  </div>
+                </button>
+                <button id="btn-sample-human" class="sample-dropdown-item" type="button" role="menuitem">
+                  <span class="sample-item-badge badge-human-dot">EN</span>
+                  <div class="sample-item-text">
+                    <strong>Mẫu Người Tiếng Anh</strong>
+                    <span>Nhật ký trải nghiệm tự nhiên</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            <button id="btn-clear" class="btn-text-only text-danger btn-clear-clean" type="button" title="Xóa trắng nội dung">
+              <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+              <span>Xóa</span>
+            </button>
           </div>
 
           <div class="bottom-right-controls">
@@ -190,11 +242,30 @@
               <span id="threshold-val" class="threshold-badge">50%</span>
             </div>
 
-            <button id="btn-submit" class="btn-submit-main" type="button">
+            <button id="btn-submit" class="btn-submit-main" type="button" title="Nhấn Ctrl + Enter để kiểm tra nhanh">
               <span class="btn-text">Kiểm tra nội dung AI</span>
+              <kbd class="kbd-hint">Ctrl+↵</kbd>
               <div id="spinner" class="spinner hidden"></div>
             </button>
           </div>
+        </div>
+      </div>
+
+      <!-- Smart 3-Step Analysis Progress Stepper (Reveals during AI inference) -->
+      <div id="analysis-progress-bar" class="analysis-progress-card hidden" aria-live="polite">
+        <div class="progress-step" id="prog-step-1">
+          <span class="prog-dot"></span>
+          <span>1. Quét Anti-Bypass &amp; Lọc học thuật</span>
+        </div>
+        <div class="progress-step-line"></div>
+        <div class="progress-step" id="prog-step-2">
+          <span class="prog-dot"></span>
+          <span>2. Suy luận AI Song ngữ (PhoBERT / Ensemble)</span>
+        </div>
+        <div class="progress-step-line"></div>
+        <div class="progress-step" id="prog-step-3">
+          <span class="prog-dot"></span>
+          <span>3. Bằng chứng XAI &amp; Tách câu</span>
         </div>
       </div>
 
@@ -217,9 +288,17 @@
             </div>
           </div>
 
-          <div class="verdict-score-pill">
-            <span id="verdict-percent" class="score-number">98.5%</span>
-            <span class="score-caption">Xác suất AI</span>
+          <div class="verdict-score-pill verdict-gauge-wrap">
+            <div class="verdict-ring-box">
+              <svg class="verdict-ring-svg" viewBox="0 0 88 88" aria-hidden="true">
+                <circle class="verdict-ring-track" cx="44" cy="44" r="36"/>
+                <circle id="verdict-ring-progress" class="verdict-ring-progress" cx="44" cy="44" r="36"/>
+              </svg>
+              <div class="verdict-ring-center">
+                <span id="verdict-percent" class="score-number">98.5%</span>
+                <span class="score-caption">AI</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -348,14 +427,23 @@
         <div class="sentences-inspect-box">
           <div class="sentences-box-header">
             <div class="hotspot-view-tabs">
-              <button type="button" id="btn-view-annotated" class="hotspot-tab-btn active">📄 Mạch văn gốc tô màu</button>
-              <button type="button" id="btn-view-list" class="hotspot-tab-btn">📑 Danh sách từng câu</button>
+              <button type="button" id="btn-view-annotated" class="hotspot-tab-btn active">Mạch văn gốc tô màu</button>
+              <button type="button" id="btn-view-list" class="hotspot-tab-btn">Danh sách từng câu</button>
             </div>
             <div class="sentences-legend">
               <div class="legend-tag"><span class="dot-red"></span> AI cao</div>
               <div class="legend-tag"><span class="dot-yellow"></span> Nghi vấn</div>
               <div class="legend-tag"><span class="dot-green"></span> Tự nhiên</div>
             </div>
+          </div>
+          <!-- Thanh tỷ lệ phân bố câu kiểu Turnitin -->
+          <div id="sentence-dist-wrap" class="sentence-dist-wrap hidden">
+            <div class="sentence-dist-bar">
+              <div id="dist-seg-red" class="dist-seg dist-red" style="width: 0%;"></div>
+              <div id="dist-seg-yellow" class="dist-seg dist-yellow" style="width: 0%;"></div>
+              <div id="dist-seg-green" class="dist-seg dist-green" style="width: 0%;"></div>
+            </div>
+            <div id="dist-summary-text" class="dist-summary-text"></div>
           </div>
           <div id="annotated-doc-container" class="annotated-doc-box">
             <!-- Turnitin-style inline highlighted essay -->
@@ -365,16 +453,23 @@
           </div>
         </div>
 
-        <!-- Footer Actions with Cryptographic Audit Code & PDF Export -->
+        <!-- Footer Actions with Cryptographic Audit Code, Copy Summary & PDF Export -->
         <div id="result-actions" class="result-footer-actions">
-          <button id="btn-copy-audit-code" class="audit-code-pill hidden" type="button" title="Nhấp để kiểm chứng chống giả mạo hoặc sao chép mã">
-            <span>🔐 Mã chứng thực:</span>
+          <button id="btn-copy-audit-code" class="audit-code-pill hidden" type="button" title="Nhấp để kiểm chứng chống giả mạo và sao chép mã">
+            <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+            <span>Mã chứng thực:</span>
             <strong id="result-audit-code">VT-000000-00000000</strong>
           </button>
-          <button id="btn-export-pdf" class="btn-export-pdf" type="button">
-            <span>📥</span>
-            <span>Xuất Báo Cáo Giám Định (PDF + QR)</span>
-          </button>
+          <div class="result-footer-right">
+            <button id="btn-copy-summary" class="btn-action-pill btn-copy-summary" type="button" title="Sao chép bản tóm tắt kết quả để gửi phản hồi cho sinh viên">
+              <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              <span>Sao chép nhận xét</span>
+            </button>
+            <button id="btn-export-pdf" class="btn-export-pdf" type="button">
+              <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span>Xuất Báo Cáo PDF + QR</span>
+            </button>
+          </div>
         </div>
 
       </div>
@@ -985,6 +1080,10 @@
       <span>VeriText AI • Hỗ trợ Chrome Extension, Web Dashboard & RESTful API</span>
     </div>
   </footer>
+
+  <!-- Floating Instant Sentence Tooltip & SaaS Toast Container -->
+  <div id="sentence-tooltip" class="sentence-tooltip hidden" role="tooltip"></div>
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
   <script src="/static/app.js"></script>
 </body>
