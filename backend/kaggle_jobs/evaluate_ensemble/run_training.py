@@ -31,9 +31,10 @@ else:
     print(f"[*] Đang tải mã nguồn từ GitHub: {REPO_URL} ...")
     subprocess.run(["git", "clone", "--depth", "1", REPO_URL, CLONE_DIR], check=True)
 
-# 3. Chuyển vào thư mục dự án
-os.chdir(CLONE_DIR)
-sys.path.insert(0, CLONE_DIR)
+# 3. Chuyển vào thư mục backend của dự án
+BACKEND_DIR = os.path.join(CLONE_DIR, "backend")
+os.chdir(BACKEND_DIR)
+sys.path.insert(0, BACKEND_DIR)
 
 # 4. Tìm kiếm tự động các file checkpoint trong /kaggle/input
 def find_checkpoint(filename):
@@ -62,12 +63,16 @@ if not (bert_ckpt and roberta_ckpt and longformer_ckpt):
 OUTPUT_DIR = "/kaggle/working"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# 6. Khởi động thực nghiệm Ensemble
-print("\n[*] BẮT ĐẦU CHẠY THỰC NGHIỆM ĐÁNH GIÁ ENSEMBLE TRÊN TẬP VAL VÀ TEST...")
+# 6. Khởi động thực nghiệm Ensemble + Temperature Scaling (Val đa miền + Test gốc 2.873 + TOEFL 252)
+VAL_CSV = "data/english_v2_val.csv" if os.path.exists("data/english_v2_val.csv") else "data/val.csv"
+print(f"\n[*] BẮT ĐẦU CHẠY THỰC NGHIỆM ENSEMBLE + TEMPERATURE SCALING (VAL={VAL_CSV})...")
 eval_cmd = [
     sys.executable,
     "ensemble.py",
     "--data_dir", "data",
+    "--val_file", VAL_CSV,
+    "--test_file", "data/test.csv",
+    "--toefl_file", "data/toefl_dataset.csv",
     "--output_dir", OUTPUT_DIR,
     "--bert_path", bert_ckpt,
     "--roberta_path", roberta_ckpt,

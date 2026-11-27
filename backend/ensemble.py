@@ -42,11 +42,63 @@ from sklearn.metrics import (
     classification_report,
 )
 from sklearn.linear_model import LogisticRegression
-from scipy.optimize import minimize
+from scipy.optimize import minimize, minimize_scalar
 import joblib
 
 # Import từ các module trong cùng dự án
 from models import build_model
+
+
+def compute_ece(probs: np.ndarray, labels: np.ndarray, n_bins: int = 10) -> float:
+    """Tính Expected Calibration Error (ECE) đo độ trung thực xác suất dự đoán."""
+    bins = np.linspace(0.0, 1.0, n_bins + 1)
+    ece = 0.0
+    n = len(probs)
+    if n == 0:
+        return 0.0
+    for i in range(n_bins):
+        lo, hi = bins[i], bins[i + 1]
+        mask = (probs >= lo) & (probs <= hi if i == n_bins - 1 else probs < hi)
+        if np.any(mask):
+            acc_bin = float(np.mean((probs[mask] >= 0.5) == labels[mask]))
+            conf_bin = float(np.mean(np.where(probs[mask] >= 0.5, probs[mask], 1.0 - probs[mask])))
+            ece += (np.sum(mask) / n) * abs(acc_bin - conf_bin)
+    return float(ece)
+
+
+def fit_temperature_for_logits(logits: np.ndarray, labels: np.ndarray) -> Dict[str, float]:
+    """Hiệu chuẩn Temperature Scaling T* tối thiểu hóa Validation NLL."""
+    logits_f = np.asarray(logits, dtype=np.float64)
+    labels_f = np.asarray(labels, dtype=np.float64)
+
+    def _nll(temp: float) -> float:
+        scaled = np.clip(logits_f / temp, -30.0, 30.0)
+        p = 1.0 / (1.0 + np.exp(-scaled))
+        p = np.clip(p, 1e-7, 1.0 - 1e-7)
+        return float(-np.mean(labels_f * np.log(p) + (1.0 - labels_f) * np.log(1.0 - p)))
+
+    nll_before = _nll(1.0)
+    p_before = 1.0 / (1.0 + np.exp(-np.clip(logits_f, -30.0, 30.0)))
+    ece_before = compute_ece(p_before, labels_f)
+
+    opt = minimize_scalar(_nll, bounds=(0.5, 4.5), method="bounded")
+    best_t = float(opt.x)
+    nll_after = _nll(best_t)
+    p_after = 1.0 / (1.0 + np.exp(-np.clip(logits_f / best_t, -30.0, 30.0)))
+    ece_after = compute_ece(p_after, labels_f)
+
+    return {
+        "temperature": round(best_t, 4),
+        "val_nll_before": round(nll_before, 5),
+        "val_nll_after": round(nll_after, 5),
+        "val_ece_before": round(ece_before, 5),
+        "val_ece_after": round(ece_after, 5),
+    }
+
+
+def apply_temperature(logits: np.ndarray, temp: float) -> np.ndarray:
+    scaled = np.clip(np.asarray(logits, dtype=np.float64) / max(float(temp), 0.2), -30.0, 30.0)
+    return 1.0 / (1.0 + np.exp(-scaled))
 
 
 class TextDataset(Dataset):
@@ -165,7 +217,7 @@ class EnsembleDetector:
         ).to(self.device)
 
         with torch.no_grad():
-            with torch.cuda.amp.autocast(enabled=self.use_fp16):
+            with torch.amp.autocast("cuda", enabled=self.use_fp16):
                 logits = self.model_bert(
                     input_ids=encoded["input_ids"],
                     attention_mask=encoded["attention_mask"],
@@ -173,7 +225,7 @@ class EnsembleDetector:
                 )
                 probs = torch.sigmoid(logits)
 
-        return logits.cpu().numpy(), probs.cpu().numpy()
+        return logits.float().cpu().numpy(), probs.float().cpu().numpy()
 
     def _predict_roberta_batch(self, texts: List[str], max_length: int = 512) -> Tuple[np.ndarray, np.ndarray]:
         """Dự đoán theo batch với RoBERTa."""
@@ -186,14 +238,14 @@ class EnsembleDetector:
         ).to(self.device)
 
         with torch.no_grad():
-            with torch.cuda.amp.autocast(enabled=self.use_fp16):
+            with torch.amp.autocast("cuda", enabled=self.use_fp16):
                 logits = self.model_roberta(
                     input_ids=encoded["input_ids"],
                     attention_mask=encoded["attention_mask"],
                 )
                 probs = torch.sigmoid(logits)
 
-        return logits.cpu().numpy(), probs.cpu().numpy()
+        return logits.float().cpu().numpy(), probs.float().cpu().numpy()
 
     def _predict_longformer_batch(self, texts: List[str], max_length: int = 1024) -> Tuple[np.ndarray, np.ndarray]:
         """Dự đoán theo batch với Longformer (kèm global attention cho token đầu)."""
@@ -209,7 +261,7 @@ class EnsembleDetector:
         global_attention_mask[:, 0] = 1
 
         with torch.no_grad():
-            with torch.cuda.amp.autocast(enabled=self.use_fp16):
+            with torch.amp.autocast("cuda", enabled=self.use_fp16):
                 logits = self.model_longformer(
                     input_ids=encoded["input_ids"],
                     attention_mask=encoded["attention_mask"],
@@ -217,7 +269,7 @@ class EnsembleDetector:
                 )
                 probs = torch.sigmoid(logits)
 
-        return logits.cpu().numpy(), probs.cpu().numpy()
+        return logits.float().cpu().numpy(), probs.float().cpu().numpy()
 
     def extract_predictions(
         self,
@@ -360,12 +412,19 @@ def run_ensemble_evaluation(args):
     os.makedirs(args.output_dir, exist_ok=True)
 
     # 1. Nạp dữ liệu Validation và Test
-    print("\n[*] Đang nạp dữ liệu từ thư mục:", args.data_dir)
-    val_df = pd.read_csv(os.path.join(args.data_dir, "val.csv"))
-    test_df = pd.read_csv(os.path.join(args.data_dir, "test.csv"))
+    def _resolve_csv(custom: Optional[str], fallback_name: str) -> str:
+        if not custom:
+            return os.path.join(args.data_dir, fallback_name)
+        return custom if os.path.isabs(custom) or os.path.exists(custom) else os.path.join(args.data_dir, custom)
 
-    val_texts, val_labels = val_df["text"].tolist(), val_df["label"].values
-    test_texts, test_labels = test_df["text"].tolist(), test_df["label"].values
+    val_csv = _resolve_csv(args.val_file, "val.csv")
+    test_csv = _resolve_csv(args.test_file, "test.csv")
+    print(f"\n[*] Đang nạp dữ liệu:\n    - Val : {val_csv}\n    - Test: {test_csv}")
+    val_df = pd.read_csv(val_csv)
+    test_df = pd.read_csv(test_csv)
+
+    val_texts, val_labels = val_df["text"].astype(str).tolist(), val_df["label"].values
+    test_texts, test_labels = test_df["text"].astype(str).tolist(), test_df["label"].values
 
     if args.max_samples is not None and args.max_samples > 0:
         print(f"[*] Chế độ giới hạn mẫu (max_samples): chỉ lấy {args.max_samples} mẫu đầu tiên để kiểm thử nhanh.")
@@ -383,74 +442,86 @@ def run_ensemble_evaluation(args):
         use_fp16=args.fp16,
     )
 
-    # 3. Trích xuất dự đoán trên tập Validation
+    # 3. Trích xuất dự đoán trên tập Validation + Hiệu chuẩn Temperature Scaling
     print("\n" + "-" * 60)
-    print("  GIAI ĐOẠN 1: TRÍCH XUẤT VÀ TỐI ƯU TRÊN TẬP VALIDATION")
+    print("  GIAI ĐOẠN 1: TRÍCH XUẤT, TEMPERATURE SCALING & TỐI ƯU TRÊN VAL")
     print("-" * 60)
     val_preds = detector.extract_predictions(val_texts, batch_size=args.batch_size)
 
+    calib_info = {
+        "bert": fit_temperature_for_logits(val_preds["bert_logits"], val_labels),
+        "roberta": fit_temperature_for_logits(val_preds["roberta_logits"], val_labels),
+        "longformer": fit_temperature_for_logits(val_preds["longformer_logits"], val_labels),
+    }
+    temps = {k: calib_info[k]["temperature"] for k in ("bert", "roberta", "longformer")}
+    print("[*] Kết quả Hiệu chuẩn Temperature Scaling (EN Validation):")
+    for k in ("bert", "roberta", "longformer"):
+        c = calib_info[k]
+        print(
+            f"    - {k:<10}: T*={c['temperature']:.4f} | "
+            f"NLL {c['val_nll_before']:.4f}->{c['val_nll_after']:.4f} | "
+            f"ECE {c['val_ece_before']:.4f}->{c['val_ece_after']:.4f}"
+        )
+
+    temp_path = os.path.join(args.output_dir, "en_temperature.json")
+    with open(temp_path, "w", encoding="utf-8") as f:
+        json.dump({"temperatures": temps, "calibration_metrics": calib_info}, f, indent=2, ensure_ascii=False)
+    print(f"  [v] Đã lưu cấu hình Temperature Scaling EN: {temp_path}")
+
     val_prob_matrix = np.column_stack([
-        val_preds["bert_probs"],
-        val_preds["roberta_probs"],
-        val_preds["longformer_probs"],
+        apply_temperature(val_preds["bert_logits"], temps["bert"]),
+        apply_temperature(val_preds["roberta_logits"], temps["roberta"]),
+        apply_temperature(val_preds["longformer_logits"], temps["longformer"]),
     ])
 
-    # Tối ưu trọng số Weighted Soft Voting
+    # Tối ưu trọng số Weighted Soft Voting trên xác suất đã hiệu chuẩn
     detector.fit_weights(val_prob_matrix, val_labels)
 
-    # Huấn luyện Stacking Meta-Classifier
+    # Huấn luyện Stacking Meta-Classifier trên xác suất đã hiệu chuẩn
     detector.fit_stacking(val_prob_matrix, val_labels)
 
-    # 4. Trích xuất dự đoán trên tập Test độc lập
-    print("\n" + "-" * 60)
-    print("  GIAI ĐOẠN 2: ĐÁNH GIÁ THỰC NGHIỆM TRÊN TẬP TEST NỘI MIỀN")
-    print("-" * 60)
-    test_preds = detector.extract_predictions(test_texts, batch_size=args.batch_size)
+    def _eval_split(split_title: str, texts_list: List[str], labels_arr: np.ndarray):
+        print("\n" + "-" * 60)
+        print(f"  ĐÁNH GIÁ TRÊN: {split_title} ({len(texts_list):,} mẫu)")
+        print("-" * 60)
+        sp_preds = detector.extract_predictions(texts_list, batch_size=args.batch_size)
+        pb = apply_temperature(sp_preds["bert_logits"], temps["bert"])
+        pr = apply_temperature(sp_preds["roberta_logits"], temps["roberta"])
+        pl = apply_temperature(sp_preds["longformer_logits"], temps["longformer"])
+        ps = detector.predict_ensemble(pb, pr, pl, method="simple")
+        pw = detector.predict_ensemble(pb, pr, pl, method="weighted")
+        pk = detector.predict_ensemble(pb, pr, pl, method="stacking")
+        rows_tbl, metrics_map = [], {}
+        models_eval = [
+            ("BERT (bert-base-uncased)", pb),
+            ("RoBERTa (roberta-base)", pr),
+            ("Longformer (longformer-base-4096)", pl),
+            ("Ensemble (Simple Soft Voting)", ps),
+            ("Ensemble (Weighted Soft Voting)", pw),
+            ("Ensemble (Stacking Meta-Classifier)", pk),
+        ]
+        print("=" * 95)
+        print(f"{'MÔ HÌNH / PHƯƠNG PHÁP':<38} | {'ACCURACY':<10} | {'PRECISION':<10} | {'RECALL':<10} | {'F1-SCORE':<10} | {'AUC-ROC':<10}")
+        print("=" * 95)
+        for name, probs in models_eval:
+            m = compute_metrics(labels_arr, probs)
+            metrics_map[name] = m
+            rows_tbl.append({
+                "model": name,
+                "accuracy": m["accuracy"],
+                "precision": m["precision"],
+                "recall": m["recall"],
+                "f1": m["f1"],
+                "auc": m["auc"],
+            })
+            print(f"{name:<38} | {m['accuracy']*100:>9.2f}% | {m['precision']*100:>9.2f}% | {m['recall']*100:>9.2f}% | {m['f1']*100:>9.2f}% | {m['auc']*100:>9.2f}%")
+        print("=" * 95)
+        return rows_tbl, metrics_map, (pb, pr, pl, ps, pw, pk)
 
-    test_prob_matrix = np.column_stack([
-        test_preds["bert_probs"],
-        test_preds["roberta_probs"],
-        test_preds["longformer_probs"],
-    ])
-
-    # 5. Tính toán kết quả cho từng mô hình và từng chiến lược Ensemble
-    p_bert = test_preds["bert_probs"]
-    p_roberta = test_preds["roberta_probs"]
-    p_longformer = test_preds["longformer_probs"]
-
-    p_ens_simple = detector.predict_ensemble(p_bert, p_roberta, p_longformer, method="simple")
-    p_ens_weighted = detector.predict_ensemble(p_bert, p_roberta, p_longformer, method="weighted")
-    p_ens_stacking = detector.predict_ensemble(p_bert, p_roberta, p_longformer, method="stacking")
-
-    results_table = []
-    models_to_eval = [
-        ("BERT (bert-base-uncased)", p_bert),
-        ("RoBERTa (roberta-base)", p_roberta),
-        ("Longformer (longformer-base-4096)", p_longformer),
-        ("Ensemble (Simple Soft Voting)", p_ens_simple),
-        ("Ensemble (Weighted Soft Voting)", p_ens_weighted),
-        ("Ensemble (Stacking Meta-Classifier)", p_ens_stacking),
-    ]
-
-    all_metrics = {}
-    print("\n" + "=" * 95)
-    print(f"{'MÔ HÌNH / PHƯƠNG PHÁP':<38} | {'ACCURACY':<10} | {'PRECISION':<10} | {'RECALL':<10} | {'F1-SCORE':<10} | {'AUC-ROC':<10}")
-    print("=" * 95)
-
-    for name, probs in models_to_eval:
-        m = compute_metrics(test_labels, probs)
-        all_metrics[name] = m
-        results_table.append({
-            "model": name,
-            "accuracy": m["accuracy"],
-            "precision": m["precision"],
-            "recall": m["recall"],
-            "f1": m["f1"],
-            "auc": m["auc"],
-        })
-        print(f"{name:<38} | {m['accuracy']*100:>9.2f}% | {m['precision']*100:>9.2f}% | {m['recall']*100:>9.2f}% | {m['f1']*100:>9.2f}% | {m['auc']*100:>9.2f}%")
-
-    print("=" * 95)
+    # 4. Đánh giá trên tập Test chính (test.csv = In-Domain 2.873 mẫu)
+    results_table, all_metrics, (p_bert, p_roberta, p_longformer, p_ens_simple, p_ens_weighted, p_ens_stacking) = _eval_split(
+        f"TẬP TEST CHÍNH ({os.path.basename(test_csv)})", test_texts, test_labels
+    )
 
     # 6. Lưu trữ kết quả thực nghiệm
     df_results = pd.DataFrame(results_table)
@@ -479,7 +550,6 @@ def run_ensemble_evaluation(args):
         joblib.dump(detector.meta_classifier, meta_path)
         print(f"[*] Đã lưu mô hình Stacking Meta-Learner: {meta_path}")
 
-    # Lưu file dự đoán xác suất để phục vụ vẽ biểu đồ ROC / Confusion Matrix
     preds_df = pd.DataFrame({
         "label": test_labels,
         "bert_prob": p_bert,
@@ -493,10 +563,62 @@ def run_ensemble_evaluation(args):
     preds_df.to_csv(preds_csv_path, index=False)
     print(f"[*] Đã lưu xác suất dự đoán chi tiết: {preds_csv_path}")
 
+    # 7. Đánh giá bổ sung trên Multi-Domain Test (english_v2_test.csv) nếu tồn tại & khác test_csv
+    v2_test_csv = os.path.join(args.data_dir, "english_v2_test.csv")
+    if os.path.exists(v2_test_csv) and os.path.abspath(v2_test_csv) != os.path.abspath(test_csv):
+        df_v2t = pd.read_csv(v2_test_csv)
+        v2_rows, v2_metrics, _ = _eval_split(
+            "TẬP TEST ĐA MIỀN (english_v2_test.csv)",
+            df_v2t["text"].astype(str).tolist(),
+            df_v2t["label"].values,
+        )
+        with open(os.path.join(args.output_dir, "english_v2_test_results.json"), "w", encoding="utf-8") as f:
+            json.dump(v2_metrics, f, indent=2, ensure_ascii=False)
+
+    # 8. Đánh giá ngoại miền độc lập trên TOEFL (252 bài luận chưa từng thấy)
+    toefl_csv = _resolve_csv(args.toefl_file, "toefl_dataset.csv")
+    if os.path.exists(toefl_csv):
+        df_toefl = pd.read_csv(toefl_csv)
+        t_rows, t_metrics, (tb, tr, tl, ts, tw, tk) = _eval_split(
+            "TẬP NGOẠI MIỀN ĐỘC LẬP TOEFL (252 ESSAYS — ZERO-SHOT)",
+            df_toefl["text"].astype(str).tolist(),
+            df_toefl["label"].values,
+        )
+        pd.DataFrame(t_rows).to_csv(os.path.join(args.output_dir, "toefl_comparison_table.csv"), index=False)
+        pd.DataFrame({
+            "essay_id": df_toefl["essay_id"] if "essay_id" in df_toefl.columns else range(len(df_toefl)),
+            "label": df_toefl["label"].values,
+            "bert_prob": tb,
+            "roberta_prob": tr,
+            "longformer_prob": tl,
+            "ensemble_simple_prob": ts,
+            "ensemble_weighted_prob": tw,
+            "ensemble_stacking_prob": tk,
+        }).to_csv(os.path.join(args.output_dir, "toefl_predictions.csv"), index=False)
+
+        shift = {}
+        for m_name, tm in t_metrics.items():
+            im = all_metrics.get(m_name)
+            if im:
+                shift[m_name] = {
+                    "in_domain_accuracy": float(im["accuracy"]),
+                    "toefl_accuracy": float(tm["accuracy"]),
+                    "delta_accuracy": float(tm["accuracy"] - im["accuracy"]),
+                    "in_domain_f1": float(im["f1"]),
+                    "toefl_f1": float(tm["f1"]),
+                    "delta_f1": float(tm["f1"] - im["f1"]),
+                }
+        with open(os.path.join(args.output_dir, "toefl_domain_shift_analysis.json"), "w", encoding="utf-8") as f:
+            json.dump(shift, f, indent=2, ensure_ascii=False)
+        print(f"[*] Đã lưu kết quả ngoại miền TOEFL & phân tích Domain Shift.")
+
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Đánh giá mô hình Ensemble PLMs")
+    parser = argparse.ArgumentParser(description="Đánh giá mô hình Ensemble PLMs + Temperature Scaling")
     parser.add_argument("--data_dir", type=str, default="data", help="Thư mục chứa val.csv, test.csv")
+    parser.add_argument("--val_file", type=str, default=None, help="File CSV validation (vd: english_v2_val.csv)")
+    parser.add_argument("--test_file", type=str, default=None, help="File CSV test chính (mặc định: test.csv)")
+    parser.add_argument("--toefl_file", type=str, default=None, help="File CSV TOEFL ngoại miền")
     parser.add_argument("--output_dir", type=str, default="output", help="Thư mục lưu kết quả")
     parser.add_argument("--bert_path", type=str, default="output/bert_best.pt", help="Đường dẫn bert_best.pt")
     parser.add_argument("--roberta_path", type=str, default="output/roberta_best.pt", help="Đường dẫn roberta_best.pt")

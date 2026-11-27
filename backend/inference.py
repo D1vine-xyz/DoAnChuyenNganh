@@ -179,6 +179,36 @@ class AITextDetector:
             except Exception as e:
                 print(f"[!] Không nạp được mô hình Stacking: {e}")
 
+        # 9. Nạp thông số hiệu chuẩn xác suất (Post-hoc Temperature Scaling) cho VI & EN
+        self.phobert_temperature = 1.0
+        phobert_temp_file = os.path.join(self.models_dir, "phobert_temperature.json")
+        if os.path.exists(phobert_temp_file):
+            try:
+                with open(phobert_temp_file, "r", encoding="utf-8") as f:
+                    self.phobert_temperature = max(0.2, float(json.load(f).get("temperature", 1.0)))
+                print(f"  [v] Hiệu chuẩn Temperature Scaling (PhoBERT VI): T* = {self.phobert_temperature:.4f}")
+            except Exception as e:
+                print(f"[!] Lỗi đọc {phobert_temp_file}: {e}, dùng T=1.0.")
+
+        self.en_temperatures = {"bert": 1.0, "roberta": 1.0, "longformer": 1.0}
+        en_temp_file = os.path.join(self.models_dir, "en_temperature.json")
+        if os.path.exists(en_temp_file):
+            try:
+                with open(en_temp_file, "r", encoding="utf-8") as f:
+                    t_data = json.load(f)
+                t_map = t_data.get("temperatures", t_data)
+                for k in ("bert", "roberta", "longformer"):
+                    if k in t_map:
+                        self.en_temperatures[k] = max(0.2, float(t_map[k]))
+                print(
+                    f"  [v] Hiệu chuẩn Temperature Scaling (EN): "
+                    f"BERT={self.en_temperatures['bert']:.4f}, "
+                    f"RoBERTa={self.en_temperatures['roberta']:.4f}, "
+                    f"Longformer={self.en_temperatures['longformer']:.4f}"
+                )
+            except Exception as e:
+                print(f"[!] Lỗi đọc {en_temp_file}: {e}, dùng T=1.0.")
+
         print("=" * 70 + "\n")
 
     def _load_tokenizer(self, local_subdir: str, hf_name: str):
@@ -221,11 +251,13 @@ class AITextDetector:
         use_token_type_ids: bool = False,
         use_global_attention: bool = False,
         batch_size: int = 16,
+        temperature: float = 1.0,
     ) -> np.ndarray:
-        """Chạy suy luận theo mini-batch (tự động bật FP16 autocast nếu dùng CUDA)."""
+        """Chạy suy luận theo mini-batch (tự động bật FP16 autocast nếu dùng CUDA) kèm Temperature Scaling."""
         if model is None or tokenizer is None or not texts:
             return np.full(len(texts), 0.5)
 
+        safe_temp = max(float(temperature), 0.2)
         all_probs = []
         for start in range(0, len(texts), batch_size):
             chunk = texts[start:start + batch_size]
@@ -252,7 +284,7 @@ class AITextDetector:
                 with torch.inference_mode():
                     with torch.amp.autocast("cuda", enabled=self.use_fp16):
                         logits = model(**kwargs)
-                    probs = torch.sigmoid(logits).float().cpu().numpy().flatten()
+                    probs = torch.sigmoid(logits.float() / safe_temp).cpu().numpy().flatten()
             all_probs.append(probs)
 
         return np.concatenate(all_probs) if all_probs else np.array([])
@@ -260,19 +292,33 @@ class AITextDetector:
     def _predict_bert(self, texts: List[str]) -> np.ndarray:
         """Dự đoán xác suất theo batch cho BERT (max 512 tokens)."""
         return self._run_batch_inference(
-            self.model_bert, self.tokenizer_bert, texts, max_length=512, use_token_type_ids=True
+            self.model_bert,
+            self.tokenizer_bert,
+            texts,
+            max_length=512,
+            use_token_type_ids=True,
+            temperature=self.en_temperatures.get("bert", 1.0),
         )
 
     def _predict_roberta(self, texts: List[str]) -> np.ndarray:
         """Dự đoán xác suất theo batch cho RoBERTa (max 512 tokens)."""
         return self._run_batch_inference(
-            self.model_roberta, self.tokenizer_roberta, texts, max_length=512
+            self.model_roberta,
+            self.tokenizer_roberta,
+            texts,
+            max_length=512,
+            temperature=self.en_temperatures.get("roberta", 1.0),
         )
 
     def _predict_longformer(self, texts: List[str]) -> np.ndarray:
         """Dự đoán xác suất theo batch cho Longformer (max 1024 tokens + global attention)."""
         return self._run_batch_inference(
-            self.model_longformer, self.tokenizer_longformer, texts, max_length=1024, use_global_attention=True
+            self.model_longformer,
+            self.tokenizer_longformer,
+            texts,
+            max_length=1024,
+            use_global_attention=True,
+            temperature=self.en_temperatures.get("longformer", 1.0),
         )
 
     def _segment_vietnamese(self, texts: List[str]) -> List[str]:
@@ -282,13 +328,17 @@ class AITextDetector:
         return [_ViTokenizer.tokenize(t) for t in texts]
 
     def _predict_phobert(self, texts: List[str], pre_segmented: Optional[List[str]] = None) -> np.ndarray:
-        """Dự đoán xác suất theo batch cho PhoBERT Tiếng Việt (max 256 tokens)."""
+        """Dự đoán xác suất theo batch cho PhoBERT Tiếng Việt (max 256 tokens + Temperature Scaling)."""
         if self.model_phobert is None or self.tokenizer_phobert is None:
             return np.full(len(texts), 0.5)
 
         segmented_texts = pre_segmented if pre_segmented is not None else self._segment_vietnamese(texts)
         return self._run_batch_inference(
-            self.model_phobert, self.tokenizer_phobert, segmented_texts, max_length=256
+            self.model_phobert,
+            self.tokenizer_phobert,
+            segmented_texts,
+            max_length=256,
+            temperature=self.phobert_temperature,
         )
 
     @staticmethod
@@ -548,7 +598,11 @@ class AITextDetector:
                             "chunk_count": chunk_cnt,
                             "weight": 1.0,
                             "weight_pct": "100%",
-                            "model_name": "PhoBERT base v2 (8K Pre-2022)",
+                            "model_name": (
+                                f"PhoBERT v3 (12K Pre-2022 • T={self.phobert_temperature:.2f})"
+                                if abs(self.phobert_temperature - 1.0) > 1e-3
+                                else "PhoBERT base v2 (Pre-2022)"
+                            ),
                         },
                         "bert": {"probability": round(p_mean, 4), "weight": 0.65 if chunk_cnt > 1 else 1.0, "weight_pct": "Mean Chunks"},
                         "roberta": {"probability": round(p_peak, 4), "weight": 0.35 if chunk_cnt > 1 else 0.0, "weight_pct": "Peak Hotspot"},

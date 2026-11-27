@@ -38,8 +38,12 @@ BACKEND_DIR = os.path.join(CLONE_DIR, "backend")
 os.chdir(BACKEND_DIR)
 sys.path.insert(0, BACKEND_DIR)
 
-# 4. Kiểm tra file dữ liệu Pre-2022 8K đa thể loại (fallback sang tập 5K cũ nếu chưa có)
-if os.path.exists("data/vietnamese_pre2022_train.csv"):
+# 4. Ưu tiên nạp bộ dữ liệu Tiếng Việt v3 (12K Academic Pre-2022 + Humanized AI)
+if os.path.exists("data/vietnamese_v3_train.csv"):
+    TRAIN_CSV = "data/vietnamese_v3_train.csv"
+    VAL_CSV = "data/vietnamese_v3_val.csv"
+    TEST_CSV = "data/vietnamese_v3_test.csv"
+elif os.path.exists("data/vietnamese_pre2022_train.csv"):
     TRAIN_CSV = "data/vietnamese_pre2022_train.csv"
     VAL_CSV = "data/vietnamese_pre2022_val.csv"
     TEST_CSV = "data/vietnamese_pre2022_test.csv"
@@ -85,6 +89,10 @@ if os.path.exists("output/phobert_test_results.json"):
 
 if os.path.exists("output/training_log_phobert.csv"):
     shutil.copy("output/training_log_phobert.csv", os.path.join(OUTPUT_DIR, "training_log_phobert.csv"))
+
+if os.path.exists("output/phobert_temperature.json"):
+    shutil.copy("output/phobert_temperature.json", os.path.join(OUTPUT_DIR, "phobert_temperature.json"))
+    print(f"  [v] Đã lưu thông số Temperature Scaling: {OUTPUT_DIR}/phobert_temperature.json")
 
 print("=" * 75)
 print("  HOÀN TẤT HUẤN LUYỆN KAGGLE PHOBERT!")

@@ -82,7 +82,7 @@ def evaluate(
             if global_attention_mask is not None:
                 global_attention_mask = global_attention_mask.to(device)
 
-            with torch.cuda.amp.autocast(enabled=use_fp16):
+            with torch.amp.autocast("cuda", enabled=use_fp16):
                 logits = model(
                     input_ids=input_ids,
                     attention_mask=attention_mask,
@@ -152,6 +152,10 @@ def train_longformer(args):
         data_dir=args.data_dir,
         batch_size=args.batch_size,
         max_length=args.max_length,
+        train_file=args.train_file,
+        val_file=args.val_file,
+        test_file=args.test_file,
+        length_bucketing=args.length_bucketing,
     )
     print(f"  [v] Train Loader : {len(train_loader)} batches ({len(train_loader.dataset):,} mẫu)")
     print(f"  [v] Val Loader   : {len(val_loader)} batches ({len(val_loader.dataset):,} mẫu)")
@@ -195,7 +199,8 @@ def train_longformer(args):
     criterion = nn.BCEWithLogitsLoss()
 
     # Khởi tạo GradScaler cho Mixed Precision FP16
-    scaler = torch.cuda.amp.GradScaler(enabled=use_fp16)
+    scaler = torch.amp.GradScaler("cuda", enabled=use_fp16)
+    eps = max(0.0, min(0.15, float(args.label_smoothing)))
 
     print(f"\n[*] Thông số Huấn luyện Longformer:")
     print(f"  - Epochs                     : {args.epochs}")
@@ -237,18 +242,19 @@ def train_longformer(args):
             input_ids = batch["input_ids"].to(device)
             attention_mask = batch["attention_mask"].to(device)
             labels = batch["labels"].to(device)
+            smooth_labels = labels * (1.0 - eps) + 0.5 * eps
 
             global_attention_mask = batch.get("global_attention_mask")
             if global_attention_mask is not None:
                 global_attention_mask = global_attention_mask.to(device)
 
-            with torch.cuda.amp.autocast(enabled=use_fp16):
+            with torch.amp.autocast("cuda", enabled=use_fp16):
                 logits = model(
                     input_ids=input_ids,
                     attention_mask=attention_mask,
                     global_attention_mask=global_attention_mask,
                 )
-                loss = criterion(logits, labels)
+                loss = criterion(logits, smooth_labels)
                 # Chia loss theo số bước tích lũy gradient
                 loss_scaled = loss / args.gradient_accumulation_steps
 
@@ -370,6 +376,11 @@ def train_longformer(args):
 def parse_args():
     parser = argparse.ArgumentParser(description="Huấn luyện mô hình Longformer phân loại văn bản AI")
     parser.add_argument("--data_dir", type=str, default="data", help="Thư mục chứa train.csv, val.csv, test.csv")
+    parser.add_argument("--train_file", type=str, default=None, help="File CSV huấn luyện tùy chỉnh")
+    parser.add_argument("--val_file", type=str, default=None, help="File CSV validation tùy chỉnh")
+    parser.add_argument("--test_file", type=str, default=None, help="File CSV test tùy chỉnh")
+    parser.add_argument("--label_smoothing", type=float, default=0.05, help="Label smoothing (0.0 - 0.1) chống overconfidence")
+    parser.add_argument("--length_bucketing", action="store_true", default=False, help="Gom cụm độ dài mini-batch tăng tốc 2.5x cho Longformer")
     parser.add_argument("--output_dir", type=str, default="output", help="Thư mục lưu checkpoint và log")
     parser.add_argument("--epochs", type=int, default=3, help="Số epochs huấn luyện")
     parser.add_argument("--batch_size", type=int, default=4, help="Kích thước micro-batch (Khuyến nghị 4 cho Longformer 1024)")

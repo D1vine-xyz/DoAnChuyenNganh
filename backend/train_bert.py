@@ -79,7 +79,7 @@ def evaluate(
 
             labels = batch["labels"].to(device)
 
-            with torch.cuda.amp.autocast(enabled=use_fp16):
+            with torch.amp.autocast("cuda", enabled=use_fp16):
                 logits = model(
                     input_ids=input_ids,
                     attention_mask=attention_mask,
@@ -149,6 +149,9 @@ def train_bert(args):
         data_dir=args.data_dir,
         batch_size=args.batch_size,
         max_length=args.max_length,
+        train_file=args.train_file,
+        val_file=args.val_file,
+        test_file=args.test_file,
     )
     print(f"  [v] Train Loader : {len(train_loader)} batches ({len(train_loader.dataset):,} mẫu)")
     print(f"  [v] Val Loader   : {len(val_loader)} batches ({len(val_loader.dataset):,} mẫu)")
@@ -189,7 +192,8 @@ def train_bert(args):
     criterion = nn.BCEWithLogitsLoss()
 
     # Khởi tạo GradScaler cho Mixed Precision FP16
-    scaler = torch.cuda.amp.GradScaler(enabled=use_fp16)
+    scaler = torch.amp.GradScaler("cuda", enabled=use_fp16)
+    eps = max(0.0, min(0.15, float(args.label_smoothing)))
 
     print(f"\n[*] Thông số Huấn luyện:")
     print(f"  - Epochs               : {args.epochs}")
@@ -230,16 +234,17 @@ def train_bert(args):
             if token_type_ids is not None:
                 token_type_ids = token_type_ids.to(device)
             labels = batch["labels"].to(device)
+            smooth_labels = labels * (1.0 - eps) + 0.5 * eps
 
             optimizer.zero_grad()
 
-            with torch.cuda.amp.autocast(enabled=use_fp16):
+            with torch.amp.autocast("cuda", enabled=use_fp16):
                 logits = model(
                     input_ids=input_ids,
                     attention_mask=attention_mask,
                     token_type_ids=token_type_ids,
                 )
-                loss = criterion(logits, labels)
+                loss = criterion(logits, smooth_labels)
 
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)
@@ -355,6 +360,10 @@ def train_bert(args):
 def parse_args():
     parser = argparse.ArgumentParser(description="Huấn luyện mô hình BERT phân loại văn bản AI")
     parser.add_argument("--data_dir", type=str, default="data", help="Thư mục chứa train.csv, val.csv, test.csv")
+    parser.add_argument("--train_file", type=str, default=None, help="File CSV huấn luyện tùy chỉnh (vd: english_v2_train.csv)")
+    parser.add_argument("--val_file", type=str, default=None, help="File CSV validation tùy chỉnh")
+    parser.add_argument("--test_file", type=str, default=None, help="File CSV test tùy chỉnh")
+    parser.add_argument("--label_smoothing", type=float, default=0.05, help="Label smoothing (0.0 - 0.1) chống overconfidence")
     parser.add_argument("--output_dir", type=str, default="output", help="Thư mục lưu checkpoint và log")
     parser.add_argument("--epochs", type=int, default=3, help="Số epochs huấn luyện")
     parser.add_argument("--batch_size", type=int, default=16, help="Kích thước batch")

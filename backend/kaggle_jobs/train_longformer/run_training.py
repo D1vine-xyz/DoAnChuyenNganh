@@ -31,20 +31,22 @@ else:
     print(f"[*] Đang tải mã nguồn từ GitHub: {REPO_URL} ...")
     subprocess.run(["git", "clone", "--depth", "1", REPO_URL, CLONE_DIR], check=True)
 
-# 3. Chuyển vào thư mục dự án
-os.chdir(CLONE_DIR)
-sys.path.insert(0, CLONE_DIR)
+# 3. Chuyển vào thư mục backend của dự án
+BACKEND_DIR = os.path.join(CLONE_DIR, "backend")
+os.chdir(BACKEND_DIR)
+sys.path.insert(0, BACKEND_DIR)
 
-# 4. Kiểm tra sự sẵn sàng của dữ liệu và mã nguồn
-required_files = [
-    "data/train.csv",
-    "data/val.csv",
-    "data/test.csv",
-    "dataset.py",
-    "models.py",
-    "train_longformer.py"
-]
-for f in required_files:
+# 4. Ưu tiên nạp bộ dữ liệu Tiếng Anh Đa Miền v2 (News + Student Essays + HC3 + Humanized AI)
+if os.path.exists("data/english_v2_train.csv"):
+    TRAIN_CSV = "data/english_v2_train.csv"
+    VAL_CSV = "data/english_v2_val.csv"
+    TEST_CSV = "data/english_v2_test.csv"
+else:
+    TRAIN_CSV = "data/train.csv"
+    VAL_CSV = "data/val.csv"
+    TEST_CSV = "data/test.csv"
+
+for f in [TRAIN_CSV, VAL_CSV, TEST_CSV, "dataset.py", "models.py", "train_longformer.py"]:
     if os.path.exists(f):
         print(f"  [v] Sẵn sàng: {f}")
     else:
@@ -54,20 +56,25 @@ for f in required_files:
 OUTPUT_DIR = "/kaggle/working"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# 6. Khởi động huấn luyện Longformer với Mixed Precision FP16 và Gradient Accumulation
-print("\n[*] BẮT ĐẦU CHẠY HUẤN LUYỆN LONGFORMER (MAX_LENGTH=1024, BATCH=4, ACCUM=4)...")
+# 6. Khởi động huấn luyện Longformer với Mixed Precision FP16, Length Bucketing (2.5x nhanh hơn) & Label Smoothing
+print("\n[*] BẮT ĐẦU CHẠY HUẤN LUYỆN LONGFORMER ĐA MIỀN (MAX_LENGTH=1024, LENGTH BUCKETING, 2 EPOCHS)...")
 train_cmd = [
     sys.executable,
     "train_longformer.py",
     "--data_dir", "data",
+    "--train_file", TRAIN_CSV,
+    "--val_file", VAL_CSV,
+    "--test_file", TEST_CSV,
     "--output_dir", OUTPUT_DIR,
-    "--epochs", "3",
+    "--epochs", "2",
     "--batch_size", "4",
     "--gradient_accumulation_steps", "4",
     "--max_length", "1024",
-    "--lr", "3e-5",
+    "--lr", "2.5e-5",
     "--weight_decay", "0.01",
     "--warmup_ratio", "0.1",
+    "--label_smoothing", "0.05",
+    "--length_bucketing",
     "--seed", "42",
     "--fp16"
 ]

@@ -92,7 +92,67 @@ def collate_fn(batch, pad_token_id=1):
     }
 
 
-def evaluate(model, dataloader, criterion, device, genres: List[str] = None, use_fp16: bool = False):
+def compute_ece(probs: np.ndarray, labels: np.ndarray, n_bins: int = 10) -> float:
+    """Tính Expected Calibration Error (ECE) đo độ trung thực của xác suất dự đoán."""
+    bins = np.linspace(0.0, 1.0, n_bins + 1)
+    ece = 0.0
+    n = len(probs)
+    if n == 0:
+        return 0.0
+    for i in range(n_bins):
+        lo, hi = bins[i], bins[i + 1]
+        mask = (probs >= lo) & (probs <= hi if i == n_bins - 1 else probs < hi)
+        if np.any(mask):
+            acc_bin = float(np.mean((probs[mask] >= 0.5) == labels[mask]))
+            conf_bin = float(np.mean(np.where(probs[mask] >= 0.5, probs[mask], 1.0 - probs[mask])))
+            ece += (np.sum(mask) / n) * abs(acc_bin - conf_bin)
+    return float(ece)
+
+
+def fit_temperature_scaling(model, dataloader, device, use_fp16: bool = False) -> Dict[str, float]:
+    """Hiệu chuẩn xác suất hậu kiểm (Post-hoc Temperature Scaling) tối ưu NLL trên tập Validation."""
+    from scipy.optimize import minimize_scalar
+
+    model.eval()
+    all_logits, all_labels = [], []
+    with torch.inference_mode():
+        for batch in dataloader:
+            input_ids = batch["input_ids"].to(device)
+            attention_mask = batch["attention_mask"].to(device)
+            with torch.amp.autocast("cuda", enabled=use_fp16):
+                logits = model(input_ids=input_ids, attention_mask=attention_mask)
+            all_logits.append(logits.float().cpu().numpy())
+            all_labels.append(batch["labels"].numpy())
+
+    logits_arr = np.concatenate(all_logits)
+    labels_arr = np.concatenate(all_labels).astype(np.float64)
+
+    def _nll(temp: float) -> float:
+        scaled = np.clip(logits_arr / temp, -30.0, 30.0)
+        p = 1.0 / (1.0 + np.exp(-scaled))
+        p = np.clip(p, 1e-7, 1.0 - 1e-7)
+        return float(-np.mean(labels_arr * np.log(p) + (1.0 - labels_arr) * np.log(1.0 - p)))
+
+    nll_before = _nll(1.0)
+    probs_before = 1.0 / (1.0 + np.exp(-np.clip(logits_arr, -30.0, 30.0)))
+    ece_before = compute_ece(probs_before, labels_arr)
+
+    opt = minimize_scalar(_nll, bounds=(0.5, 4.5), method="bounded")
+    best_temp = float(opt.x)
+    nll_after = _nll(best_temp)
+    probs_after = 1.0 / (1.0 + np.exp(-np.clip(logits_arr / best_temp, -30.0, 30.0)))
+    ece_after = compute_ece(probs_after, labels_arr)
+
+    return {
+        "temperature": round(best_temp, 4),
+        "val_nll_before": round(nll_before, 5),
+        "val_nll_after": round(nll_after, 5),
+        "val_ece_before": round(ece_before, 5),
+        "val_ece_after": round(ece_after, 5),
+    }
+
+
+def evaluate(model, dataloader, criterion, device, genres: List[str] = None, use_fp16: bool = False, temperature: float = 1.0):
     model.eval()
     total_loss = 0.0
     all_preds, all_labels, all_probs = [], [], []
@@ -105,10 +165,11 @@ def evaluate(model, dataloader, criterion, device, genres: List[str] = None, use
 
             with torch.amp.autocast("cuda", enabled=use_fp16):
                 logits = model(input_ids=input_ids, attention_mask=attention_mask)
-                loss = criterion(logits, labels)
+                scaled_logits = logits / max(float(temperature), 0.1)
+                loss = criterion(scaled_logits, labels)
             total_loss += loss.item()
 
-            probs = torch.sigmoid(logits).float().cpu().numpy()
+            probs = torch.sigmoid(scaled_logits).float().cpu().numpy()
             preds = (probs >= 0.5).astype(int)
 
             all_probs.extend(probs.tolist())
@@ -306,13 +367,25 @@ def main():
     tokenizer.save_pretrained(tokenizer_dir)
     print(f"[v] Đã lưu Tokenizer PhoBERT vào: {tokenizer_dir}")
 
-    # 6. ĐÁNH GIÁ TRÊN TẬP TEST ĐỘC LẬP + PHÂN RÃ THEO THỂ LOẠI
+    # 6. HIỆU CHUẨN XÁC SUẤT (TEMPERATURE SCALING) & ĐÁNH GIÁ TẬP TEST ĐỘC LẬP
     print("\n" + "=" * 75)
-    print(f"  ĐÁNH GIÁ TRÊN TẬP TEST TIẾNG VIỆT ĐỘC LẬP ({os.path.basename(test_file)})")
+    print(f"  HIỆU CHUẨN TEMPERATURE SCALING & ĐÁNH GIÁ TEST ({os.path.basename(test_file)})")
     print("=" * 75)
 
     model.load_state_dict(torch.load(best_checkpoint_path, map_location=device, weights_only=True))
-    test_metrics = evaluate(model, test_loader, criterion, device, genres=test_ds.genres, use_fp16=use_fp16)
+    calib = fit_temperature_scaling(model, val_loader, device, use_fp16=use_fp16)
+    best_temp = calib["temperature"]
+    print(f"  [*] Optimal Temperature T* = {best_temp:.4f}")
+    print(f"      - Val NLL : {calib['val_nll_before']:.5f} -> {calib['val_nll_after']:.5f}")
+    print(f"      - Val ECE : {calib['val_ece_before']:.5f} -> {calib['val_ece_after']:.5f}")
+
+    temp_path = os.path.join(output_dir, "phobert_temperature.json")
+    with open(temp_path, "w", encoding="utf-8") as f:
+        json.dump(calib, f, indent=2, ensure_ascii=False)
+    print(f"  [v] Đã lưu thông số hiệu chuẩn vào: {temp_path}")
+
+    test_metrics = evaluate(model, test_loader, criterion, device, genres=test_ds.genres, use_fp16=use_fp16, temperature=best_temp)
+    test_metrics["calibration"] = calib
 
     print(f"  - Accuracy  : {test_metrics['accuracy']*100:.2f}%")
     print(f"  - Precision : {test_metrics['precision']*100:.2f}%")
