@@ -306,7 +306,26 @@ REFERENCE_HEADING_PATTERN = re.compile(
     r"(?im)^\s*(?:\d+\.?\s*)?(?:tài\s+liệu\s+tham\s+khảo|danh\s+mục\s+tài\s+liệu\s+tham\s+khảo|references|bibliography|works\s+cited)\s*:?\s*$"
 )
 
-LONG_QUOTE_PATTERN = re.compile(r'(["“«])([^"”»]{35,})(["”»])')
+LONG_QUOTE_PATTERN = re.compile(r'"([^"\n]{35,})"|“([^”\n]{35,})”|«([^»\n]{35,})»')
+
+
+def split_sentences_smart(text: str) -> List[str]:
+    """Tách câu theo dấu ngắt dòng và dấu kết thúc câu, giữ nguyên tiền tố đánh số đầu mục (vd: '1. Mở đầu')."""
+    sentences: List[str] = []
+    for line in re.split(r"\n+", text.strip()):
+        line = line.strip()
+        if not line:
+            continue
+        m_prefix = re.match(r"^(\d{1,2}\.)\s+(.*)$", line)
+        if m_prefix:
+            prefix, rest = m_prefix.group(1), m_prefix.group(2)
+            parts = [p.strip() for p in re.split(r"(?<=[.!?…])\s+", rest) if p.strip()]
+            if parts:
+                parts[0] = f"{prefix} {parts[0]}"
+        else:
+            parts = [p.strip() for p in re.split(r"(?<=[.!?…])\s+", line) if p.strip()]
+        sentences.extend(parts)
+    return sentences
 
 
 def apply_academic_filters(
@@ -335,7 +354,7 @@ def apply_academic_filters(
     if filter_quotes and working:
         def _replace_long_quote(match: re.Match) -> str:
             nonlocal quotes_removed
-            inner = match.group(2).strip()
+            inner = (match.group(1) or match.group(2) or match.group(3) or "").strip()
             if len(inner.split()) >= 8:
                 quotes_removed += 1
                 return " "
@@ -437,9 +456,9 @@ def analyze_linguistic_xai(text: str, language: str = "en") -> Dict[str, Any]:
             "explanation_bullets": [],
         }
 
-    # 1. Phân tích cấp câu -> Burstiness
-    raw_sentences = re.split(r"(?<=[.!?…\n])\s+", clean)
-    sentences = [s.strip() for s in raw_sentences if len(s.strip().split()) >= 2]
+    # 1. Phân tích cấp câu -> Burstiness (đồng bộ bộ tách câu theo ngắt dòng & dấu kết thúc câu)
+    raw_sentences = split_sentences_smart(clean)
+    sentences = [s for s in raw_sentences if len(s.split()) >= 2]
     if not sentences:
         sentences = [clean]
 

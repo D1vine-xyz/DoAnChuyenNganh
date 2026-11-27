@@ -4,6 +4,7 @@ Module Tiền xử lý & Trích xuất Văn bản từ File Upload (.txt, .docx,
 """
 
 import io
+import re
 from typing import Tuple
 
 
@@ -56,36 +57,48 @@ def extract_text_from_file(filename: str, content_bytes: bytes) -> Tuple[str, st
         import pypdf
         pdf_stream = io.BytesIO(content_bytes)
         reader = pypdf.PdfReader(pdf_stream)
+        if reader.is_encrypted:
+            try:
+                if reader.decrypt("") == 0:
+                    raise ValueError("Tệp PDF đang được bảo vệ bằng mật khẩu, không thể trích xuất văn bản.")
+            except ValueError:
+                raise
+            except Exception:
+                raise ValueError("Tệp PDF được mã hóa bằng mật khẩu, vui lòng gỡ mật khẩu trước khi tải lên.")
         full_text = []
         for page in reader.pages:
             t = page.extract_text()
             if t:
                 full_text.append(t.strip())
-        return "\n\n".join(full_text).strip(), "pdf"
+        extracted = "\n\n".join(full_text).strip()
+        if not extracted:
+            raise ValueError(
+                "Tệp PDF không chứa lớp văn bản có thể đọc được (có thể là PDF ảnh scan). "
+                "Vui lòng tải bản PDF gốc dạng chữ hoặc tệp .DOCX."
+            )
+        return extracted, "pdf"
 
     elif fn_lower.endswith(".doc"):
         import olefile
-        import re
         try:
             ole_stream = io.BytesIO(content_bytes)
-            ole = olefile.OleFileIO(ole_stream)
-            if ole.exists("WordDocument"):
-                stream = ole.openstream("WordDocument").read()
-                decoded = stream.decode("utf-16-le", errors="ignore")
-                paragraphs = [p.strip() for p in re.split(r'[\r\n\x00-\x1f\x7f-\x9f]+', decoded) if len(p.strip()) > 10]
-                # Lọc bỏ các đoạn chứa ký tự rác nhị phân (binary junk)
-                cleaned = []
-                for p in paragraphs:
-                    valid_chars = sum(1 for c in p if c.isalnum() or c.isspace() or c in ".,;:!?()-_'\"/\\@#%&*+=<>[]{}")
-                    if len(p) > 0 and (valid_chars / len(p)) >= 0.70:
-                        cleaned.append(p)
-                if cleaned:
-                    return "\n\n".join(cleaned).strip(), "doc"
+            with olefile.OleFileIO(ole_stream) as ole:
+                if ole.exists("WordDocument"):
+                    stream = ole.openstream("WordDocument").read()
+                    decoded = stream.decode("utf-16-le", errors="ignore")
+                    paragraphs = [p.strip() for p in re.split(r'[\r\n\x00-\x1f\x7f-\x9f]+', decoded) if len(p.strip()) > 10]
+                    # Lọc bỏ các đoạn chứa ký tự rác nhị phân (binary junk)
+                    cleaned = []
+                    for p in paragraphs:
+                        valid_chars = sum(1 for c in p if c.isalnum() or c.isspace() or c in ".,;:!?()-_'\"/\\@#%&*+=<>[]{}")
+                        if len(p) > 0 and (valid_chars / len(p)) >= 0.70:
+                            cleaned.append(p)
+                    if cleaned:
+                        return "\n\n".join(cleaned).strip(), "doc"
         except Exception:
             pass
 
         # Fallback đọc text thô nếu olefile không trích xuất được
-        import re
         text = content_bytes.decode("latin-1", errors="ignore")
         clean = re.findall(r'[\w\s\.,;:!?\(\)\-\'\"]{10,}', text)
         return "\n\n".join(clean).strip(), "doc"

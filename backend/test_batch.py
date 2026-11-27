@@ -106,6 +106,11 @@ class TestBatchProcessor(unittest.TestCase):
         self.assertEqual(ext, "txt")
         self.assertFalse(txt_out.startswith("\ufeff"))
 
+        # 1b. Kiểm tra bóc tách nhãn sinh viên từ thư mục Moodle/LMS ZIP
+        moodle_lbl = bp.parse_student_label("22110001_NguyenVanA_88421_assignsubmission_file_/bai_nop.docx")
+        self.assertIn("22110001 NguyenVanA", moodle_lbl)
+        self.assertIn("bai nop", moodle_lbl)
+
         # 2. File .DOCX chỉ có nội dung trong bảng (Table) vẫn phải trích xuất được
         doc = docx.Document()
         tbl = doc.add_table(rows=1, cols=2)

@@ -161,14 +161,24 @@ document.addEventListener("mouseup", (e) => {
 
     const rect = selection.getRangeAt(0).getBoundingClientRect();
     const btn = getOrCreateFloatingBtn();
+    const minLeft = window.scrollX + 8;
+    const maxLeft = Math.max(minLeft, window.scrollX + window.innerWidth - 120);
     btn.style.top = `${window.scrollY + rect.bottom + 6}px`;
-    btn.style.left = `${window.scrollX + rect.right - 70}px`;
+    btn.style.left = `${Math.max(minLeft, Math.min(maxLeft, window.scrollX + rect.right - 70))}px`;
     btn.classList.remove("hidden");
   } else {
     if (floatingBtn) floatingBtn.classList.add("hidden");
     if (tooltipModal && !tooltipModal.contains(e.target)) {
       tooltipModal.classList.add("hidden");
     }
+  }
+});
+
+// Đóng nhanh khung kết quả nổi bằng phím Escape
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    if (floatingBtn) floatingBtn.classList.add("hidden");
+    if (tooltipModal) tooltipModal.classList.add("hidden");
   }
 });
 
@@ -352,14 +362,17 @@ function renderModalResults(data, authUser, isSynced) {
     `;
   }
 
-  // Sync status chip (đối chiếu cờ saved_by_user thực tế từ Backend)
+  // Sync status chip (đối chiếu cờ saved_by_user thực tế từ Backend + mã chứng thực chống giả mạo)
   const actuallySynced = Boolean(data.saved_by_user);
   const ownerDisplay = data.saved_user_name || (authUser && (authUser.full_name || authUser.email)) || "Tài khoản";
+  const auditChip = data.audit_code
+    ? ` • <a href="${API_BASE_URL}/?verify=${encodeURIComponent(data.audit_code)}" target="_blank" rel="noopener" style="color: inherit; text-decoration: underline;">🔐 ${escapeHtml(data.audit_code)}</a>`
+    : "";
   const syncHtml = actuallySynced
-    ? `<div class="ai-detect-sync-chip synced">✓ Đã đồng bộ SQL Server (#${escapeHtml(data.scan_id || "")}) • ${escapeHtml(ownerDisplay)}</div>`
+    ? `<div class="ai-detect-sync-chip synced">✓ Đã đồng bộ SQL Server (#${escapeHtml(data.scan_id || "")}) • ${escapeHtml(ownerDisplay)}${auditChip}</div>`
     : isSynced
-    ? `<div class="ai-detect-sync-chip guest">⚠️ Phiên đăng nhập hết hạn • Đăng nhập lại ở Popup Extension để đồng bộ</div>`
-    : `<div class="ai-detect-sync-chip guest">ℹ️ Chế độ khách • Đăng nhập ở Popup Extension để lưu lịch sử</div>`;
+    ? `<div class="ai-detect-sync-chip guest">⚠️ Phiên đăng nhập hết hạn • Đăng nhập lại ở Popup Extension để đồng bộ${auditChip}</div>`
+    : `<div class="ai-detect-sync-chip guest">ℹ️ Chế độ khách • Đăng nhập ở Popup Extension để lưu lịch sử${auditChip}</div>`;
 
   let sentencesHtml = "";
   if (data.sentences && data.sentences.length > 0) {

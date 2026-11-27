@@ -18,6 +18,14 @@ from contextlib import contextmanager
 import pyodbc
 import bcrypt
 
+try:
+    from dotenv import load_dotenv
+    _DB_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    load_dotenv(os.path.join(_DB_BASE_DIR, "..", ".env"))
+    load_dotenv(os.path.join(_DB_BASE_DIR, ".env"))
+except Exception:
+    pass
+
 EMAIL_REGEX = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
 
 # Đảm bảo in tiếng Việt UTF-8 chuẩn trên Windows Console
@@ -51,7 +59,7 @@ _db_initialized = False
 @contextmanager
 def get_connection():
     """Khởi tạo kết nối tới Microsoft SQL Server và tự động đóng khi hoàn tất."""
-    conn = pyodbc.connect(DB_CONNECTION_STRING, autocommit=False)
+    conn = pyodbc.connect(DB_CONNECTION_STRING, autocommit=False, timeout=15)
     try:
         yield conn
     except Exception as e:
@@ -215,15 +223,19 @@ def seed_sample_users():
         ("giangvien@veritext.ai", "123456", "TS. Hoàng Văn Thầy (Giảng viên)", "teacher"),
         ("sinhvien@veritext.ai", "123456", "Nguyễn Văn Sinh Viên (K16)", "student"),
     ]
+    missing_accounts = []
     with get_connection() as conn:
         cursor = conn.cursor()
-        for email, pwd, full_name, role in sample_accounts:
-            cursor.execute("SELECT 1 FROM users WHERE email = ?;", (email,))
+        for acc in sample_accounts:
+            cursor.execute("SELECT 1 FROM users WHERE email = ?;", (acc[0],))
             if not cursor.fetchone():
-                try:
-                    create_user(email=email, password=pwd, full_name=full_name, role=role)
-                except Exception:
-                    pass
+                missing_accounts.append(acc)
+
+    for email, pwd, full_name, role in missing_accounts:
+        try:
+            create_user(email=email, password=pwd, full_name=full_name, role=role)
+        except Exception:
+            pass
 
 
 # ==============================================================================
@@ -444,7 +456,8 @@ def change_user_password(user_id: int, old_password: Optional[str], new_password
             raise ValueError("Tài khoản không tồn tại.")
 
         pwd_hash, provider = row
-        if (provider or "local") == "local":
+        # Cả tài khoản 'local' lẫn 'hybrid' (Google đã từng đặt mật khẩu) đều bắt buộc xác thực mật khẩu cũ
+        if (provider or "local") != "google":
             if not old_password or not verify_password(old_password, pwd_hash):
                 raise ValueError("Mật khẩu hiện tại không chính xác!")
 
@@ -583,12 +596,23 @@ def get_history(
 
         if search_query and search_query.strip():
             q_raw = search_query.strip()
-            like_pat = f"%{q_raw}%"
+            # Escape các ký tự wildcard của T-SQL LIKE (\, %, _, [) để tìm chính xác chuỗi như "[LMS/Web]"
+            q_escaped = (
+                q_raw.replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_")
+                .replace("[", "\\[")
+            )
+            like_pat = f"%{q_escaped}%"
             if q_raw.lstrip("#").isdigit():
-                conditions.append("(h.id = ? OR h.title LIKE ? OR u.full_name LIKE ?)")
+                conditions.append(
+                    "(h.id = ? OR h.title LIKE ? ESCAPE '\\' OR u.full_name LIKE ? ESCAPE '\\')"
+                )
                 params.extend([int(q_raw.lstrip("#")), like_pat, like_pat])
             else:
-                conditions.append("(h.title LIKE ? OR u.full_name LIKE ? OR h.student_label LIKE ?)")
+                conditions.append(
+                    "(h.title LIKE ? ESCAPE '\\' OR u.full_name LIKE ? ESCAPE '\\' OR h.student_label LIKE ? ESCAPE '\\')"
+                )
                 params.extend([like_pat, like_pat, like_pat])
 
         if language in ("vi", "en"):
@@ -725,6 +749,7 @@ def get_scan_by_id(scan_id: int, user_id: Optional[int] = None, role: Optional[s
             "details": {
                 "sentences": sentences,
                 "model_breakdown": model_breakdown,
+                "text_stats": model_breakdown.get("text_stats") if isinstance(model_breakdown, dict) else None,
                 "xai_metrics": xai_metrics,
                 "bypass_report": bypass_report,
             }

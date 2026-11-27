@@ -5,6 +5,7 @@ Script Khởi chạy Máy chủ và Tự động Bật Trình duyệt khi Mô h�
 
 import os
 import sys
+import json
 import time
 import threading
 import webbrowser
@@ -37,7 +38,10 @@ def wait_and_open_browser(url: str = "http://localhost:8000", max_wait_sec: int 
         try:
             with urllib.request.urlopen(health_url, timeout=1.5) as response:
                 if response.status == 200:
-                    time.sleep(0.5)
+                    payload = json.loads(response.read().decode("utf-8", errors="ignore") or "{}")
+                    if not payload.get("ready"):
+                        continue
+                    time.sleep(0.4)
                     print("\n" + "=" * 70)
                     print(f"  [v] SERVER ĐÃ SẴN SÀNG! ĐANG TỰ ĐỘNG MỞ TRÌNH DUYỆT...")
                     print(f"  🌐 Truy cập Web Dashboard tại: {url}")
@@ -59,10 +63,10 @@ def main():
     host = os.environ.get("HOST", "0.0.0.0")
 
     print("\n" + "=" * 70)
-    print("  KHỞI ĐỘNG HỆ THỐNG THẨM ĐỊNH VĂN BẢN AI (FASTAPI + ENSEMBLE PLMs)")
+    print("  KHỞI ĐỘNG HỆ THỐNG VERITEXT AI PRO (FASTAPI + SONG NGỮ EN / VI)")
     print("======================================================================")
-    print("[*] Đang khởi tạo và nạp 3 mô hình BERT, RoBERTa, Longformer vào RAM...")
-    print("[*] Quá trình này mất khoảng 10 - 15 giây. Vui lòng chờ...")
+    print("[*] Đang nạp 4 mô hình BERT, RoBERTa, Longformer & PhoBERT v2 vào RAM...")
+    print("[*] Chế độ khởi động Offline-Ready (từ checkpoint cục bộ), chỉ mất vài giây...")
     print("======================================================================\n")
 
     # Kích hoạt thread kiểm tra và mở trình duyệt khi server sẵn sàng

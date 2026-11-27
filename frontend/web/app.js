@@ -286,6 +286,14 @@ document.addEventListener("DOMContentLoaded", () => {
   initHotspotViewTabs();
   initHistoryFilters();
   initVerifyCertificateModal();
+
+  // Đóng nhanh các hộp thoại Modal bằng phím Escape
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    authModal?.classList.add("hidden");
+    document.getElementById("profile-modal")?.classList.add("hidden");
+    verifyModal?.classList.add("hidden");
+  });
 });
 
 async function checkServerHealth() {
@@ -408,12 +416,16 @@ function handleFileSelected(file) {
   }
 }
 
+function clearSelectedUploadFile() {
+  currentUploadedFile = null;
+  if (fileInput) fileInput.value = "";
+  if (fileInfoBar) fileInfoBar.classList.add("hidden");
+  if (textInput) textInput.placeholder = "Nhập văn bản vào đây hoặc tải lên tệp để kiểm tra Nội dung AI.";
+}
+
 btnRemoveFile.addEventListener("click", (e) => {
   e.stopPropagation();
-  currentUploadedFile = null;
-  fileInput.value = "";
-  fileInfoBar.classList.add("hidden");
-  textInput.placeholder = "Nhập văn bản vào đây hoặc tải lên tệp để kiểm tra Nội dung AI.";
+  clearSelectedUploadFile();
   textInput.value = "";
   updateTextCounts();
 });
@@ -422,6 +434,7 @@ btnRemoveFile.addEventListener("click", (e) => {
 btnPaste.addEventListener("click", async () => {
   try {
     const text = await navigator.clipboard.readText();
+    clearSelectedUploadFile();
     textInput.value = text;
     updateTextCounts();
   } catch (err) {
@@ -434,16 +447,14 @@ btnClear.addEventListener("click", () => {
   updateTextCounts();
   currentScanId = null;
   currentAuditCode = null;
-  currentUploadedFile = null;
-  fileInput.value = "";
-  fileInfoBar.classList.add("hidden");
-  textInput.placeholder = "Nhập văn bản vào đây hoặc tải lên tệp để kiểm tra Nội dung AI.";
+  clearSelectedUploadFile();
   resultContent.classList.add("hidden");
   resultActions.classList.add("hidden");
   if (btnCopyAuditCode) btnCopyAuditCode.classList.add("hidden");
 });
 
 btnSampleAi.addEventListener("click", () => {
+  clearSelectedUploadFile();
   textInput.value = (
     "Artificial intelligence models have demonstrated exceptional capabilities across various natural language processing domains. "
     + "These sophisticated architectures leverage deep contextual self-attention layers to produce coherent, syntactically fluent discourse. "
@@ -454,6 +465,7 @@ btnSampleAi.addEventListener("click", () => {
 });
 
 btnSampleHuman.addEventListener("click", () => {
+  clearSelectedUploadFile();
   textInput.value = (
     "Last Sunday morning, my roommate and I decided to take a spontaneous road trip out to the coast. "
     + "We packed a couple of sandwiches, some cold drinks, and hit the highway before the morning traffic started piling up. "
@@ -465,6 +477,7 @@ btnSampleHuman.addEventListener("click", () => {
 
 if (btnSampleAiVi) {
   btnSampleAiVi.addEventListener("click", () => {
+    clearSelectedUploadFile();
     textInput.value = (
       "Trí tuệ nhân tạo (AI) ngày nay đang đóng vai trò then chốt trong sự phát triển của nền công nghệ toàn cầu. "
       + "Các mô hình xử lý ngôn ngữ tự nhiên hiện đại có khả năng tiếp nhận và xử lý lượng thông tin khổng lồ một cách ấn tượng. "
@@ -477,6 +490,7 @@ if (btnSampleAiVi) {
 
 if (btnSampleHumanVi) {
   btnSampleHumanVi.addEventListener("click", () => {
+    clearSelectedUploadFile();
     textInput.value = (
       "Chè cam tào phớ giải nhiệt mùa hè là một món giải khát rất dễ làm, vừa giúp thanh lọc cơ thể lại không bị béo ngậy. "
       + "Cam tươi gọt sạch vỏ, bóc lấy phần tép và giữ lại một chút vỏ thái chỉ để tạo mùi thơm dịu nhẹ. "
@@ -489,6 +503,7 @@ if (btnSampleHumanVi) {
 
 if (btnSampleBypass) {
   btnSampleBypass.addEventListener("click", () => {
+    clearSelectedUploadFile();
     // Mẫu AI bị cài ký tự tàng hình Zero-Width (\u200b) + chữ Cyrillic giả Latin (\u0430, \u0435, \u043e) + mục Tài liệu tham khảo
     textInput.value = (
       "Trí\u200b tuệ\u200b nhân\u200b t\u0430o (AI) đóng v\u0430i trò then chốt tr\u043eng bối c\u0430nh chuyển đổi số hiện n\u0430y. "
@@ -964,7 +979,16 @@ async function openAuthenticatedPdf(scanId) {
     }
     const blob = await res.blob();
     const blobUrl = URL.createObjectURL(blob);
-    window.open(blobUrl, "_blank");
+    const popup = window.open(blobUrl, "_blank");
+    if (!popup) {
+      // Fallback tải trực tiếp nếu trình duyệt chặn cửa sổ bật lên (Popup Blocker)
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `AI_Audit_Report_${String(scanId).padStart(6, "0")}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
     setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
   } catch (err) {
     alert("Lỗi xuất báo cáo PDF: " + err.message);
@@ -986,6 +1010,7 @@ btnExportPdf.addEventListener("click", () => {
 // ==============================================================================
 
 let historyFilterTimer = null;
+let historyAbortCtrl = null;
 
 function initHistoryFilters() {
   if (histSearchInput) {
@@ -1013,20 +1038,14 @@ function hasActiveHistoryFilter() {
 }
 
 async function loadHistoryAndStats() {
-  try {
-    // 1. Thống kê KPI
-    const statsRes = await fetch(`${API_BASE}/api/v1/stats`, {
-      headers: getAuthHeaders(),
-    });
-    if (statsRes.ok) {
-      const stats = await statsRes.json();
-      kpiTotalScans.textContent = stats.total_scans.toLocaleString();
-      kpiAiRate.textContent = `${stats.ai_percentage}%`;
-      kpiTotalWords.textContent = stats.total_words_scanned.toLocaleString();
-      kpiAvgLatency.textContent = `${stats.avg_inference_time_ms} ms`;
-    }
+  if (historyAbortCtrl) {
+    historyAbortCtrl.abort();
+  }
+  historyAbortCtrl = new AbortController();
+  const { signal } = historyAbortCtrl;
 
-    // 2. Bảng dữ liệu có lọc đa tiêu chí từ SQL Server
+  try {
+    // 1. Thống kê KPI & 2. Bảng dữ liệu có lọc đa tiêu chí (chạy song song, tự hủy request cũ tránh race condition)
     const params = new URLSearchParams({ limit: "50" });
     const qVal = histSearchInput ? histSearchInput.value.trim() : "";
     const langVal = histFilterLang ? histFilterLang.value : "";
@@ -1038,14 +1057,25 @@ async function loadHistoryAndStats() {
     if (verdictVal) params.set("verdict", verdictVal);
     if (bypassVal) params.set("bypass_only", "true");
 
-    const histRes = await fetch(`${API_BASE}/api/v1/history?${params.toString()}`, {
-      headers: getAuthHeaders(),
-    });
+    const [statsRes, histRes] = await Promise.all([
+      fetch(`${API_BASE}/api/v1/stats`, { headers: getAuthHeaders(), signal }),
+      fetch(`${API_BASE}/api/v1/history?${params.toString()}`, { headers: getAuthHeaders(), signal }),
+    ]);
+
+    if (statsRes.ok) {
+      const stats = await statsRes.json();
+      kpiTotalScans.textContent = stats.total_scans.toLocaleString();
+      kpiAiRate.textContent = `${stats.ai_percentage}%`;
+      kpiTotalWords.textContent = stats.total_words_scanned.toLocaleString();
+      kpiAvgLatency.textContent = `${stats.avg_inference_time_ms} ms`;
+    }
+
     if (histRes.ok) {
       const data = await histRes.json();
       renderHistoryTable(data.history || [], data.current_user);
     }
   } catch (err) {
+    if (err && err.name === "AbortError") return;
     console.error("Lỗi nạp lịch sử:", err);
   }
 }
@@ -1777,9 +1807,13 @@ const TIER_SHORT_LABELS = {
   HUMAN_PURE: "👤 Tự viết",
 };
 
+function isTeacherRole(user) {
+  return Boolean(user && (user.role === "teacher" || user.role === "admin"));
+}
+
 function syncClassroomAccessUI() {
-  const isTeacher = currentUser && currentUser.role === "teacher";
-  if (classroomTeacherGate) classroomTeacherGate.classList.toggle("hidden", !!isTeacher);
+  const isTeacher = isTeacherRole(currentUser);
+  if (classroomTeacherGate) classroomTeacherGate.classList.toggle("hidden", isTeacher);
   if (classroomWorkspace) classroomWorkspace.classList.toggle("hidden", !isTeacher);
   if (isTeacher) {
     loadSavedBatches();
@@ -1894,7 +1928,7 @@ function renderSelectedBatchFiles() {
 }
 
 async function runClassroomBatchScan() {
-  if (!currentUser || currentUser.role !== "teacher") {
+  if (!isTeacherRole(currentUser)) {
     alert("Vui lòng đăng nhập tài khoản Giảng viên để chấm bài lớp học.");
     return;
   }
@@ -2018,7 +2052,7 @@ function renderBatchSubmissionsTable(submissions) {
 }
 
 async function loadSavedBatches() {
-  if (!savedBatchesList || !currentUser || currentUser.role !== "teacher") return;
+  if (!savedBatchesList || !isTeacherRole(currentUser)) return;
   try {
     const res = await fetch(`${API_BASE}/api/v1/classroom/batches`, {
       headers: getAuthHeaders(),

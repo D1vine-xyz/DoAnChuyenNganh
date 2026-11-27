@@ -225,7 +225,7 @@ function renderAuthUI() {
     loginDrawer.classList.add("hidden");
     authUserView.classList.remove("hidden");
 
-    const isTeacher = currentAuthUser.role === "teacher";
+    const isTeacher = currentAuthUser.role === "teacher" || currentAuthUser.role === "admin";
     authUserName.textContent = currentAuthUser.full_name || currentAuthUser.email;
     authUserSub.textContent = isTeacher
       ? "👨‍🏫 Giảng viên • Đồng bộ SQL Server"
@@ -533,6 +533,7 @@ btnClear.addEventListener("click", () => {
 btnAnalyze.addEventListener("click", runAnalysis);
 
 async function runAnalysis() {
+  if (btnAnalyze.disabled) return;
   const text = textInput.value.trim();
   if (text.length < 10) {
     showError("Vui lòng nhập ít nhất 10 ký tự (tiếng Anh hoặc tiếng Việt) để mô hình phân tích chính xác.");
@@ -641,13 +642,20 @@ function renderResults(fullResponse, data, sentences) {
     xaiStrip.classList.add("hidden");
   }
 
-  // 6. Breakdown các mô hình
+  // 6. Breakdown các mô hình (hỗ trợ hiển thị Sliding-Window đa đoạn cho bài luận dài Tiếng Việt)
   if (data.model_breakdown && data.model_breakdown.individual_models) {
     const m = data.model_breakdown.individual_models;
+    const chunkInfo = data.model_breakdown.chunk_analysis;
     if (data.language === "vi") {
-      scoreLongformer.textContent = `${aiPct}% (PhoBERT)`;
-      scoreBert.textContent = "100% (PyVi)";
-      scoreRoberta.textContent = "Tiếng Việt 🇻🇳";
+      if (chunkInfo && chunkInfo.chunk_count > 1) {
+        scoreLongformer.textContent = `${aiPct}% (${chunkInfo.chunk_count} đoạn)`;
+        scoreBert.textContent = `TB ${(chunkInfo.mean_probability * 100).toFixed(1)}%`;
+        scoreRoberta.textContent = `Đỉnh ${(chunkInfo.peak_probability * 100).toFixed(1)}%`;
+      } else {
+        scoreLongformer.textContent = `${aiPct}% (PhoBERT)`;
+        scoreBert.textContent = "100% (PyVi)";
+        scoreRoberta.textContent = "Tiếng Việt 🇻🇳";
+      }
     } else {
       scoreLongformer.textContent = `${(m.longformer.probability * 100).toFixed(1)}% AI`;
       scoreBert.textContent = `${(m.bert.probability * 100).toFixed(1)}% AI`;
@@ -655,17 +663,18 @@ function renderResults(fullResponse, data, sentences) {
     }
   }
 
-  // 7. Trạng thái đồng bộ SQL Server (kiểm chứng thực tế từ cờ saved_by_user của Backend)
+  // 7. Trạng thái đồng bộ SQL Server & mã chứng thực (kiểm chứng thực tế từ cờ saved_by_user)
   if (fullResponse.scan_id) {
+    const auditSuffix = fullResponse.audit_code ? ` • ${fullResponse.audit_code}` : "";
     if (fullResponse.saved_by_user) {
       const ownerName = fullResponse.saved_user_name || (currentAuthUser && currentAuthUser.full_name) || "Tài khoản";
-      syncResultText.textContent = `✓ Đã lưu lịch sử #${fullResponse.scan_id} (${ownerName})`;
+      syncResultText.textContent = `✓ Đã lưu #${fullResponse.scan_id} (${ownerName})${auditSuffix}`;
     } else if (currentAuthToken) {
       // Token hết hạn -> dọn phiên và báo rõ cho người dùng
       clearAuthSession();
-      syncResultText.textContent = `⚠️ Phiên đăng nhập hết hạn • Đã quét chế độ khách (#${fullResponse.scan_id})`;
+      syncResultText.textContent = `⚠️ Hết hạn phiên • Quét khách (#${fullResponse.scan_id})${auditSuffix}`;
     } else {
-      syncResultText.textContent = `✓ Đã phân tích (#${fullResponse.scan_id}) • Đăng nhập để lưu riêng`;
+      syncResultText.textContent = `✓ Đã quét (#${fullResponse.scan_id})${auditSuffix}`;
     }
     syncResultBar.classList.remove("hidden");
   } else {

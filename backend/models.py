@@ -22,6 +22,28 @@ import torch.nn as nn
 from transformers import AutoModel, AutoConfig
 
 
+def _load_hf_config_and_backbone(pretrained_name: str, init_pretrained: bool = True):
+    """
+    Nạp AutoConfig & AutoModel ưu tiên cache cục bộ (offline-ready, tăng tốc khởi động):
+    - Khi `init_pretrained=False` (dùng khi suy luận nạp thẳng checkpoint `*_best.pt`):
+      chỉ khởi tạo kiến trúc từ config mà không đọc thừa trọng số gốc từ HuggingFace Hub.
+    """
+    try:
+        config = AutoConfig.from_pretrained(pretrained_name, local_files_only=True)
+    except Exception:
+        config = AutoConfig.from_pretrained(pretrained_name)
+
+    if not init_pretrained:
+        backbone = AutoModel.from_config(config)
+        return config, backbone
+
+    try:
+        backbone = AutoModel.from_pretrained(pretrained_name, config=config, local_files_only=True)
+    except Exception:
+        backbone = AutoModel.from_pretrained(pretrained_name, config=config)
+    return config, backbone
+
+
 class BERTTextClassifier(nn.Module):
     """
     Mô hình phát hiện văn bản do AI sinh dựa trên BERT (bert-base-uncased).
@@ -33,11 +55,11 @@ class BERTTextClassifier(nn.Module):
         pretrained_name: str = "bert-base-uncased",
         dropout_rate: float = 0.3,
         freeze_backbone: bool = False,
+        init_pretrained: bool = True,
     ):
         super().__init__()
         self.pretrained_name = pretrained_name
-        self.config = AutoConfig.from_pretrained(pretrained_name)
-        self.bert = AutoModel.from_pretrained(pretrained_name, config=self.config)
+        self.config, self.bert = _load_hf_config_and_backbone(pretrained_name, init_pretrained=init_pretrained)
 
         if freeze_backbone:
             for param in self.bert.parameters():
@@ -88,11 +110,11 @@ class RoBERTATextClassifier(nn.Module):
         pretrained_name: str = "roberta-base",
         dropout_rate: float = 0.3,
         freeze_backbone: bool = False,
+        init_pretrained: bool = True,
     ):
         super().__init__()
         self.pretrained_name = pretrained_name
-        self.config = AutoConfig.from_pretrained(pretrained_name)
-        self.roberta = AutoModel.from_pretrained(pretrained_name, config=self.config)
+        self.config, self.roberta = _load_hf_config_and_backbone(pretrained_name, init_pretrained=init_pretrained)
 
         if freeze_backbone:
             for param in self.roberta.parameters():
@@ -131,11 +153,11 @@ class LongformerTextClassifier(nn.Module):
         pretrained_name: str = "allenai/longformer-base-4096",
         dropout_rate: float = 0.3,
         freeze_backbone: bool = False,
+        init_pretrained: bool = True,
     ):
         super().__init__()
         self.pretrained_name = pretrained_name
-        self.config = AutoConfig.from_pretrained(pretrained_name)
-        self.longformer = AutoModel.from_pretrained(pretrained_name, config=self.config)
+        self.config, self.longformer = _load_hf_config_and_backbone(pretrained_name, init_pretrained=init_pretrained)
 
         if freeze_backbone:
             for param in self.longformer.parameters():
@@ -181,11 +203,11 @@ class PhoBERTTextClassifier(nn.Module):
         pretrained_name: str = "vinai/phobert-base-v2",
         dropout_rate: float = 0.3,
         freeze_backbone: bool = False,
+        init_pretrained: bool = True,
     ):
         super().__init__()
         self.pretrained_name = pretrained_name
-        self.config = AutoConfig.from_pretrained(pretrained_name)
-        self.phobert = AutoModel.from_pretrained(pretrained_name, config=self.config)
+        self.config, self.phobert = _load_hf_config_and_backbone(pretrained_name, init_pretrained=init_pretrained)
 
         if freeze_backbone:
             for param in self.phobert.parameters():
@@ -216,6 +238,7 @@ def build_model(
     pretrained_name: Optional[str] = None,
     dropout_rate: float = 0.3,
     freeze_backbone: bool = False,
+    init_pretrained: bool = True,
 ) -> nn.Module:
     """
     Factory function khởi tạo mô hình chuẩn hóa cho Ensemble Pipeline.
@@ -223,21 +246,22 @@ def build_model(
     :param pretrained_name: Tên checkpoint Hugging Face (nếu None sẽ lấy mặc định)
     :param dropout_rate: Tỷ lệ Dropout cho head phân loại
     :param freeze_backbone: Có đóng băng tầng backbone hay không
+    :param init_pretrained: True khi train từ pretrained HF, False khi nạp trực tiếp state_dict đã fine-tune
     :return: Thực thể nn.Module tương ứng
     """
     model_type = model_type.lower().strip()
     if model_type == "bert":
         name = pretrained_name or "bert-base-uncased"
-        return BERTTextClassifier(pretrained_name=name, dropout_rate=dropout_rate, freeze_backbone=freeze_backbone)
+        return BERTTextClassifier(pretrained_name=name, dropout_rate=dropout_rate, freeze_backbone=freeze_backbone, init_pretrained=init_pretrained)
     elif model_type == "roberta":
         name = pretrained_name or "roberta-base"
-        return RoBERTATextClassifier(pretrained_name=name, dropout_rate=dropout_rate, freeze_backbone=freeze_backbone)
+        return RoBERTATextClassifier(pretrained_name=name, dropout_rate=dropout_rate, freeze_backbone=freeze_backbone, init_pretrained=init_pretrained)
     elif model_type == "longformer":
         name = pretrained_name or "allenai/longformer-base-4096"
-        return LongformerTextClassifier(pretrained_name=name, dropout_rate=dropout_rate, freeze_backbone=freeze_backbone)
+        return LongformerTextClassifier(pretrained_name=name, dropout_rate=dropout_rate, freeze_backbone=freeze_backbone, init_pretrained=init_pretrained)
     elif model_type in ["phobert", "phobert-base", "phobert-base-v2"]:
         name = pretrained_name or "vinai/phobert-base-v2"
-        return PhoBERTTextClassifier(pretrained_name=name, dropout_rate=dropout_rate, freeze_backbone=freeze_backbone)
+        return PhoBERTTextClassifier(pretrained_name=name, dropout_rate=dropout_rate, freeze_backbone=freeze_backbone, init_pretrained=init_pretrained)
     else:
         raise ValueError(f"Loại mô hình '{model_type}' không được hỗ trợ. Chọn trong: ['bert', 'roberta', 'longformer', 'phobert']")
 

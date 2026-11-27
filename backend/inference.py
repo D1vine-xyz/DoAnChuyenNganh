@@ -129,26 +129,19 @@ class AITextDetector:
             print(f"    - Tên GPU          : {torch.cuda.get_device_name(0)}")
             print(f"    - Mixed Precision  : {self.use_fp16}")
 
-        # 1. Nạp Tokenizers Tiếng Anh
+        # 1. Nạp Tokenizers Tiếng Anh (ưu tiên bản lưu cục bộ trong output/ -> offline-ready)
         print("[*] Đang nạp Tokenizers Tiếng Anh...")
-        self.tokenizer_bert = AutoTokenizer.from_pretrained("bert-base-uncased")
-        self.tokenizer_roberta = AutoTokenizer.from_pretrained("roberta-base")
-        self.tokenizer_longformer = AutoTokenizer.from_pretrained("allenai/longformer-base-4096")
+        self.tokenizer_bert = self._load_tokenizer("tokenizer_bert", "bert-base-uncased")
+        self.tokenizer_roberta = self._load_tokenizer("tokenizer_roberta", "roberta-base")
+        self.tokenizer_longformer = self._load_tokenizer("tokenizer_longformer", "allenai/longformer-base-4096")
 
         # 2. Nạp Tokenizer PhoBERT (Tiếng Việt)
         print("[*] Đang nạp Tokenizer PhoBERT Tiếng Việt...")
-        self.tokenizer_phobert = None
-        phobert_tok_dir = os.path.join(self.models_dir, "tokenizer_phobert")
-        if os.path.exists(phobert_tok_dir):
-            try:
-                self.tokenizer_phobert = AutoTokenizer.from_pretrained(phobert_tok_dir)
-            except Exception:
-                self.tokenizer_phobert = AutoTokenizer.from_pretrained("vinai/phobert-base-v2")
-        else:
-            try:
-                self.tokenizer_phobert = AutoTokenizer.from_pretrained("vinai/phobert-base-v2")
-            except Exception as e:
-                print(f"[!] Không thể nạp Tokenizer PhoBERT: {e}")
+        try:
+            self.tokenizer_phobert = self._load_tokenizer("tokenizer_phobert", "vinai/phobert-base-v2")
+        except Exception as e:
+            print(f"[!] Không thể nạp Tokenizer PhoBERT: {e}")
+            self.tokenizer_phobert = None
 
         # 3-6. Nạp các mô hình thành phần qua helper chung
         self.model_bert = self._load_model_component("bert", "bert_best.pt", "BERT") if load_bert else None
@@ -188,14 +181,27 @@ class AITextDetector:
 
         print("=" * 70 + "\n")
 
+    def _load_tokenizer(self, local_subdir: str, hf_name: str):
+        """Ưu tiên nạp tokenizer cục bộ từ output/ để khởi động tức thì và chạy tốt khi mất Internet."""
+        local_dir = os.path.join(self.models_dir, local_subdir)
+        if os.path.isdir(local_dir):
+            try:
+                return AutoTokenizer.from_pretrained(local_dir, local_files_only=True)
+            except Exception:
+                pass
+        try:
+            return AutoTokenizer.from_pretrained(hf_name, local_files_only=True)
+        except Exception:
+            return AutoTokenizer.from_pretrained(hf_name)
+
     def _load_model_component(self, model_type: str, ckpt_name: str, display_name: str):
-        """Nạp checkpoint PyTorch cho một mô hình thành phần."""
+        """Nạp checkpoint PyTorch đã fine-tune trực tiếp từ config (bỏ qua đọc thừa trọng số gốc HF)."""
         ckpt_path = os.path.join(self.models_dir, ckpt_name)
         if not os.path.exists(ckpt_path):
             return None
         print(f"[*] Nạp checkpoint {display_name.split(' ')[0]} từ: {ckpt_path}")
         try:
-            model = build_model(model_type).to(self.device)
+            model = build_model(model_type, init_pretrained=False).to(self.device)
             ckpt = torch.load(ckpt_path, map_location=self.device, weights_only=False)
             state_dict = ckpt["model_state_dict"] if (isinstance(ckpt, dict) and "model_state_dict" in ckpt) else ckpt
             model.load_state_dict(state_dict)
@@ -528,6 +534,7 @@ class AITextDetector:
                     "ensemble_weighted": {"probability": round(p_phobert, 4), "is_champion": True},
                     "ensemble_simple": {"probability": round(p_mean, 4)},
                     "ensemble_stacking": {"probability": round(p_peak, 4)},
+                    "text_stats": dict(result["text_stats"]),
                     "chunk_analysis": {
                         "chunk_count": chunk_cnt,
                         "mean_probability": round(p_mean, 4),
@@ -634,6 +641,7 @@ class AITextDetector:
                 "ensemble_stacking": {
                     "probability": round(p_stacking, 4),
                 },
+                "text_stats": dict(result["text_stats"]),
                 "individual_models": {
                     "bert": {
                         "probability": round(p_bert, 4),

@@ -7,7 +7,6 @@ import os
 import re
 import hmac
 import hashlib
-import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 import jwt
@@ -113,7 +112,7 @@ async def get_current_user_optional(
     if not token:
         return None
     payload = decode_access_token(token)
-    if not payload:
+    if not payload or payload.get("id") is None:
         return None
     return {
         "id": payload.get("id"),
@@ -148,7 +147,7 @@ async def get_current_user_from_header_or_query(
     if not raw_token:
         return None
     payload = decode_access_token(raw_token)
-    if not payload:
+    if not payload or payload.get("id") is None:
         return None
     return {
         "id": payload.get("id"),

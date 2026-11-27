@@ -20,7 +20,7 @@ from typing import Dict, Any, List, Optional
 from contextlib import asynccontextmanager
 
 import torch
-from fastapi import FastAPI, HTTPException, status, UploadFile, File, Form, Query, Depends, Header
+from fastapi import FastAPI, HTTPException, status, UploadFile, File, Form, Query, Depends, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, Response
@@ -92,11 +92,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Cấu hình CORS mở để Chrome Extension và Frontend web gọi API dễ dàng
+# Cấu hình CORS mở để Chrome Extension và Frontend web gọi API dễ dàng (xác thực qua Bearer JWT, không dùng Cookie)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -237,7 +237,7 @@ def _build_auth_response(user: Dict[str, Any], message: str) -> Dict[str, Any]:
 
 
 @app.get("/api/v1/auth/config", tags=["Authentication"])
-async def get_auth_config():
+def get_auth_config():
     """Trả về cấu hình xác thực công khai (bao gồm Google OAuth Client ID nếu đã cấu hình)."""
     google_cid = auth.get_google_client_id()
     return {
@@ -247,7 +247,7 @@ async def get_auth_config():
 
 
 @app.post("/api/v1/auth/register", tags=["Authentication"])
-async def register_account(req: RegisterRequest):
+def register_account(req: RegisterRequest):
     """Đăng ký tài khoản người dùng mới (Sinh viên hoặc Giảng viên) vào Microsoft SQL Server."""
     if req.confirm_password is not None and req.password != req.confirm_password:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mật khẩu xác nhận không khớp!")
@@ -266,7 +266,7 @@ async def register_account(req: RegisterRequest):
 
 
 @app.post("/api/v1/auth/login", tags=["Authentication"])
-async def login_account(req: LoginRequest):
+def login_account(req: LoginRequest):
     """Đăng nhập tài khoản, xác thực mật khẩu qua bcrypt và trả về JWT Access Token."""
     user = db.authenticate_user(req.email, req.password)
     if not user:
@@ -279,7 +279,7 @@ async def login_account(req: LoginRequest):
 
 
 @app.post("/api/v1/auth/google", tags=["Authentication"])
-async def login_with_google(req: GoogleAuthRequest):
+def login_with_google(req: GoogleAuthRequest):
     """
     Đăng nhập / Đăng ký 1-Click bằng tài khoản Google (Google Identity Services / OAuth 2.0):
     Xác thực chữ ký ID Token trực tiếp từ Google -> Đồng bộ tài khoản vào SQL Server VeriTextAI -> Cấp JWT.
@@ -301,7 +301,7 @@ async def login_with_google(req: GoogleAuthRequest):
 
 
 @app.get("/api/v1/auth/me", tags=["Authentication"])
-async def get_my_profile(current_user: Dict[str, Any] = Depends(auth.get_current_user)):
+def get_my_profile(current_user: Dict[str, Any] = Depends(auth.get_current_user)):
     """Lấy thông tin tài khoản đang đăng nhập từ JWT Token."""
     user = db.get_user_by_id(current_user["id"])
     if not user:
@@ -310,7 +310,7 @@ async def get_my_profile(current_user: Dict[str, Any] = Depends(auth.get_current
 
 
 @app.put("/api/v1/auth/profile", tags=["Authentication"])
-async def update_my_profile(
+def update_my_profile(
     req: UpdateProfileRequest,
     current_user: Dict[str, Any] = Depends(auth.get_current_user),
 ):
@@ -329,7 +329,7 @@ async def update_my_profile(
 
 
 @app.post("/api/v1/auth/change-password", tags=["Authentication"])
-async def change_my_password(
+def change_my_password(
     req: ChangePasswordRequest,
     current_user: Dict[str, Any] = Depends(auth.get_current_user),
 ):
@@ -755,7 +755,7 @@ async def detect_batch(req: BatchDetectRequest):
 # ==============================================================================
 
 @app.get("/api/v1/history", tags=["History"])
-async def get_scan_history(
+def get_scan_history(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     q: Optional[str] = Query(None, description="Từ khóa tìm kiếm tên tài liệu, người nộp hoặc mã ID"),
@@ -787,7 +787,7 @@ async def get_scan_history(
 
 
 @app.get("/api/v1/history/{scan_id}", tags=["History"])
-async def get_scan_detail(
+def get_scan_detail(
     scan_id: int,
     current_user: Optional[Dict[str, Any]] = Depends(auth.get_current_user_optional),
 ):
@@ -806,7 +806,7 @@ async def get_scan_detail(
 
 
 @app.delete("/api/v1/history/{scan_id}", tags=["History"])
-async def delete_scan_record(
+def delete_scan_record(
     scan_id: int,
     current_user: Optional[Dict[str, Any]] = Depends(auth.get_current_user_optional),
 ):
@@ -820,7 +820,7 @@ async def delete_scan_record(
 
 
 @app.get("/api/v1/stats", tags=["History"])
-async def get_dashboard_stats(
+def get_dashboard_stats(
     current_user: Optional[Dict[str, Any]] = Depends(auth.get_current_user_optional),
 ):
     """Lấy các chỉ số KPI thống kê tổng hợp phục vụ hiển thị trên Dashboard."""
@@ -830,13 +830,14 @@ async def get_dashboard_stats(
 
 
 @app.get("/api/v1/report/pdf/{scan_id}", tags=["Audit Report"])
-async def export_pdf_report(
+def export_pdf_report(
     scan_id: int,
+    request: Request,
     current_user: Optional[Dict[str, Any]] = Depends(auth.get_current_user_from_header_or_query),
 ):
     """
     Sinh và tải về Báo Cáo Giám Định Nguồn Gốc Văn Bản dạng PDF (AI Audit Certificate)
-    có đánh số trang, đóng dấu phân rã mô hình và bảng cấp câu AI Hotspots (có kiểm tra RBAC).
+    có đánh số trang, đóng dấu phân rã mô hình, mã QR động và bảng cấp câu AI Hotspots (có kiểm tra RBAC).
     """
     user_id = current_user["id"] if current_user else None
     role = current_user["role"] if current_user else None
@@ -849,6 +850,10 @@ async def export_pdf_report(
             scan_id=scan_data["id"],
             ai_probability=scan_data["ai_probability"],
             word_count=scan_data["word_count"],
+        )
+        scan_data["verify_base_url"] = (
+            os.environ.get("PUBLIC_BASE_URL", "").strip()
+            or str(request.base_url).rstrip("/")
         )
         pdf_bytes = generate_pdf_report(scan_data)
         filename = f"AI_Audit_Report_{scan_id:06d}.pdf"
@@ -868,7 +873,7 @@ async def export_pdf_report(
 
 
 @app.get("/api/v1/verify/{audit_code}", tags=["Audit Report"])
-async def verify_audit_certificate(audit_code: str):
+def verify_audit_certificate(audit_code: str):
     """
     Cổng Xác Thực Chống Làm Giả Biên Bản Kiểm Định PDF (HMAC-SHA256 + QR Code):
     Kiểm tra chữ ký mật mã của mã chứng thực (dạng VT-000123-A8F912BC) đối chiếu trực tiếp
@@ -920,7 +925,7 @@ async def classroom_batch_scan(
     filter_quotes: bool = Form(False),
     filter_references: bool = Form(True),
     files: List[UploadFile] = File(...),
-    current_user: Dict[str, Any] = Depends(require_role(["teacher"])),
+    current_user: Dict[str, Any] = Depends(require_role(["teacher", "admin"])),
 ):
     """
     Chấm bài hàng loạt cả lớp dành riêng cho Giảng viên (RBAC role='teacher'):
@@ -1027,19 +1032,19 @@ async def classroom_batch_scan(
 
 
 @app.get("/api/v1/classroom/batches", tags=["Classroom Grading"])
-async def list_classroom_batches(
+def list_classroom_batches(
     limit: int = Query(30, ge=1, le=100),
-    current_user: Dict[str, Any] = Depends(require_role(["teacher"])),
+    current_user: Dict[str, Any] = Depends(require_role(["teacher", "admin"])),
 ):
-    """Lấy danh sách các đợt chấm bài lớp học đã lưu (Chỉ Giảng viên)."""
+    """Lấy danh sách các đợt chấm bài lớp học đã lưu (Chỉ Giảng viên / Admin)."""
     batches = db.get_classroom_batches(limit=limit)
     return {"total": len(batches), "batches": batches}
 
 
 @app.get("/api/v1/classroom/batches/{batch_id}", tags=["Classroom Grading"])
-async def get_classroom_batch(
+def get_classroom_batch(
     batch_id: int,
-    current_user: Dict[str, Any] = Depends(require_role(["teacher"])),
+    current_user: Dict[str, Any] = Depends(require_role(["teacher", "admin"])),
 ):
     """Xem chi tiết một đợt chấm bài lớp học kèm danh sách xếp hạng sinh viên."""
     detail = db.get_classroom_batch_detail(batch_id)
@@ -1049,9 +1054,9 @@ async def get_classroom_batch(
 
 
 @app.delete("/api/v1/classroom/batches/{batch_id}", tags=["Classroom Grading"])
-async def remove_classroom_batch(
+def remove_classroom_batch(
     batch_id: int,
-    current_user: Dict[str, Any] = Depends(require_role(["teacher"])),
+    current_user: Dict[str, Any] = Depends(require_role(["teacher", "admin"])),
 ):
     """Xóa một đợt chấm bài lớp học khỏi CSDL."""
     deleted = db.delete_classroom_batch(batch_id)
@@ -1061,16 +1066,16 @@ async def remove_classroom_batch(
 
 
 @app.get("/api/v1/classroom/batches/{batch_id}/export", tags=["Classroom Grading"])
-async def export_classroom_batch_grades(
+def export_classroom_batch_grades(
     batch_id: int,
     format: str = Query("xlsx", pattern="^(xlsx|csv)$"),
     current_user: Optional[Dict[str, Any]] = Depends(auth.get_current_user_from_header_or_query),
 ):
     """
     Xuất Bảng Điểm Kiểm Định Toàn Lớp dạng Excel (.xlsx tô màu rủi ro) hoặc CSV (UTF-8 BOM).
-    Yêu cầu quyền Giảng viên (role='teacher').
+    Yêu cầu quyền Giảng viên (role='teacher' hoặc 'admin').
     """
-    if not current_user or current_user.get("role") != "teacher":
+    if not current_user or current_user.get("role") not in ("teacher", "admin"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Chỉ tài khoản Giảng viên mới có quyền xuất bảng điểm lớp học!",

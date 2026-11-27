@@ -16,6 +16,7 @@
   --text-main: #111827;
   --text-muted: #6B7280;
   --text-sub: #4B5563;
+  --text-secondary: var(--text-sub);
 
   --btn-primary-bg: #111827;
   --btn-primary-text: #FFFFFF;
@@ -2600,4 +2601,23 @@ textarea.main-textarea::placeholder {
   .verify-form-row {
     flex-direction: column;
   }
+}
+
+/* Theme-aware highlight rows for Architecture Benchmark Table (Light & Dark Mode) */
+.row-highlight-en {
+  background-color: #F3F4F6;
+  font-weight: 600;
+}
+
+.row-highlight-vi {
+  background-color: #ECFDF5;
+  font-weight: 600;
+}
+
+[data-theme="dark"] .row-highlight-en {
+  background-color: rgba(59, 130, 246, 0.14);
+}
+
+[data-theme="dark"] .row-highlight-vi {
+  background-color: rgba(16, 185, 129, 0.15);
 }

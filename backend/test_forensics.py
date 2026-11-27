@@ -122,6 +122,15 @@ class TestTextForensics(unittest.TestCase):
         self.assertTrue(rep_mid["has_bypass_warning"])
         self.assertEqual(rep_mid["zero_width_count"], 1)
 
+    def test_08_smart_sentence_split_preserves_numbered_headings(self):
+        """Bộ tách câu XAI tách chính xác theo xuống dòng mà vẫn giữ nguyên tiền tố đánh số tiêu đề mục."""
+        text = "1. Mở đầu\nHôm qua trời nắng nhẹ. Cả nhóm đi bộ dọc công viên.\n2. Kết luận\nBài làm hoàn toàn tự nhiên."
+        sents = tfx.split_sentences_smart(text)
+        self.assertEqual(sents[0], "1. Mở đầu")
+        self.assertEqual(sents[1], "Hôm qua trời nắng nhẹ.")
+        self.assertEqual(sents[3], "2. Kết luận")
+        self.assertEqual(len(sents), 5)
+
 
 if __name__ == "__main__":
     unittest.main()

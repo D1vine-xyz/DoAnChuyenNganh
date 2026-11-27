@@ -627,6 +627,76 @@ class TestDetectionAPI(unittest.TestCase):
         # Dọn bản ghi test khỏi SQL Server
         self.client.delete(f"/api/v1/history/{scan_id}")
 
+    def test_17_regression_hybrid_pwd_sql_like_and_history_text_stats(self):
+        """Kiểm thử hồi quy: bảo mật đổi mật khẩu tài khoản hybrid, escape T-SQL LIKE '[LMS/Web]' và lưu text_stats."""
+        from unittest.mock import patch
+        import database as db_mod
+
+        # 1. Bảo mật tài khoản Google -> Hybrid: sau khi đặt mật khẩu lần 1, lần 2 BẮT BUỘC đúng old_password
+        hybrid_email = "hybrid_sec_test@gmail.com"
+        with db_mod.get_connection() as conn:
+            conn.cursor().execute("DELETE FROM users WHERE email = ?;", (hybrid_email,))
+            conn.commit()
+
+        mock_g = {
+            "google_id": "google-sub-hybrid-999",
+            "email": hybrid_email,
+            "full_name": "Hybrid Security User",
+            "avatar_url": "",
+        }
+        with patch("auth.verify_google_id_token", return_value=mock_g):
+            g_res = self.client.post("/api/v1/auth/google", json={"credential": "fake.google.token.123", "role": "student"})
+            self.assertEqual(g_res.status_code, 200)
+            g_token = g_res.json()["access_token"]
+
+        # Lần 1 (provider='google'): cho phép thiết lập mật khẩu mới không cần old_password
+        set_pwd = self.client.post(
+            "/api/v1/auth/change-password",
+            json={"old_password": None, "new_password": "FirstPassword123"},
+            headers={"Authorization": f"Bearer {g_token}"},
+        )
+        self.assertEqual(set_pwd.status_code, 200)
+
+        # Lần 2 (provider='hybrid'): bỏ trống hoặc sai old_password PHẢI bị chặn 400
+        bad_pwd = self.client.post(
+            "/api/v1/auth/change-password",
+            json={"old_password": "WrongPassword", "new_password": "SecondPassword123"},
+            headers={"Authorization": f"Bearer {g_token}"},
+        )
+        self.assertEqual(bad_pwd.status_code, 400)
+
+        ok_pwd = self.client.post(
+            "/api/v1/auth/change-password",
+            json={"old_password": "FirstPassword123", "new_password": "SecondPassword123"},
+            headers={"Authorization": f"Bearer {g_token}"},
+        )
+        self.assertEqual(ok_pwd.status_code, 200)
+
+        # 2. Escape ký tự '[' trong T-SQL LIKE khi tìm tiêu đề "[LMS/Web] ..." & kiểm tra details.text_stats
+        scan_res = self.client.post("/api/v1/detect/web", json={
+            "text": "Hôm nay thời tiết rất đẹp, sinh viên chúng em đang kiểm tra độ ổn định của bộ tìm kiếm SQL Server.",
+            "threshold": 0.5,
+            "title": "[LMS/Web] KiemThu_Like_Escape_2026",
+        })
+        self.assertEqual(scan_res.status_code, 200)
+        sid = scan_res.json()["scan_id"]
+
+        search_res = self.client.get("/api/v1/history", params={"q": "[LMS/Web] KiemThu_Like_Escape"})
+        self.assertEqual(search_res.status_code, 200)
+        ids = [it["id"] for it in search_res.json().get("history", [])]
+        self.assertIn(sid, ids)
+
+        detail_res = self.client.get(f"/api/v1/history/{sid}")
+        self.assertEqual(detail_res.status_code, 200)
+        self.assertIsNotNone(detail_res.json()["details"].get("text_stats"))
+        self.assertIn("context_coverage", detail_res.json()["details"]["text_stats"])
+
+        # Dọn sạch dữ liệu test khỏi SQL Server
+        self.client.delete(f"/api/v1/history/{sid}")
+        with db_mod.get_connection() as conn:
+            conn.cursor().execute("DELETE FROM users WHERE email = ?;", (hybrid_email,))
+            conn.commit()
+
 
 if __name__ == "__main__":
     unittest.main()

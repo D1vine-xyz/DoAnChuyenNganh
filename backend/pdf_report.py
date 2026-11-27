@@ -11,7 +11,6 @@ from xml.sax.saxutils import escape as xml_escape
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
-from reportlab.lib.units import cm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import (
     SimpleDocTemplate,
@@ -19,8 +18,6 @@ from reportlab.platypus import (
     Spacer,
     Table,
     TableStyle,
-    HRFlowable,
-    KeepTogether,
 )
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
@@ -164,7 +161,17 @@ def generate_pdf_report(scan_data: Dict[str, Any]) -> bytes:
     char_count = int(scan_data.get("char_count", 0))
     proc_time = scan_data.get("inference_time_ms", 0.0)
     ai_prob_meta = float(scan_data.get("ai_probability", 0.0))
-    method_label = "PhoBERT v2 Sliding-Window (VI)" if is_vi else "Weighted Ensemble 3 PLMs (EN)"
+    details_meta = scan_data.get("details") or {}
+    chunk_meta = (details_meta.get("model_breakdown") or {}).get("chunk_analysis") or {}
+    chunk_count_meta = int(chunk_meta.get("chunk_count") or 1)
+    if is_vi:
+        method_label = (
+            f"PhoBERT v2 Sliding-Window ({chunk_count_meta} đoạn)"
+            if chunk_count_meta > 1
+            else "PhoBERT v2 (Full 256 tokens)"
+        )
+    else:
+        method_label = "Weighted Ensemble 3 PLMs (EN)"
 
     audit_code = scan_data.get("audit_code")
     if not audit_code and isinstance(scan_id, int):
@@ -409,13 +416,28 @@ def generate_pdf_report(scan_data: Dict[str, Any]) -> bytes:
                 Paragraph("<b>100.0%</b> (Chuyên biệt VN)", body_style),
                 Paragraph(f"<b>{p_phobert*100:.2f}%</b>", body_style),
             ],
-            [
-                Paragraph("<b>PyVi Word Segmenter</b>", body_style),
-                Paragraph("Tách từ ghép tiếng Việt chuẩn hóa BPE 64.000 tokens", body_style),
-                Paragraph("Tiền xử lý", body_style),
-                Paragraph("Hoàn tất", body_style),
-            ],
         ]
+        if chunk_count_meta > 1:
+            p_mean_c = float(chunk_meta.get("mean_probability", p_phobert))
+            p_peak_c = float(chunk_meta.get("peak_probability", p_phobert))
+            breakdown_data.append([
+                Paragraph(f"<b>Sliding-Window Mean</b> ({chunk_count_meta} đoạn)", body_style),
+                Paragraph("Trung bình trọng số theo độ dài từng đoạn chồng lấp", body_style),
+                Paragraph("<b>65.0%</b> (Độ dài)", body_style),
+                Paragraph(f"<b>{p_mean_c*100:.2f}%</b>", body_style),
+            ])
+            breakdown_data.append([
+                Paragraph("<b>Peak Hotspot Segment</b>", body_style),
+                Paragraph("Đỉnh cục bộ phát hiện đoạn trộn văn bản AI trong bài dài", body_style),
+                Paragraph("<b>35.0%</b> (Đỉnh cục bộ)", body_style),
+                Paragraph(f"<b>{p_peak_c*100:.2f}%</b>", body_style),
+            ])
+        breakdown_data.append([
+            Paragraph("<b>PyVi Word Segmenter</b>", body_style),
+            Paragraph("Tách từ ghép tiếng Việt chuẩn hóa BPE 64.000 tokens", body_style),
+            Paragraph("Tiền xử lý", body_style),
+            Paragraph("Hoàn tất", body_style),
+        ])
     else:
         score_longformer = mb.get("longformer", {}).get("probability", scan_data.get("score_longformer", ai_prob))
         score_bert = mb.get("bert", {}).get("probability", scan_data.get("score_bert", ai_prob))
@@ -486,7 +508,15 @@ def generate_pdf_report(scan_data: Dict[str, Any]) -> bytes:
 
         for s in sentences[:30]:  # Tối đa 30 câu đầu tiên trong báo cáo PDF để tránh tràn trang
             color_hex = "#EF4444" if s["highlight_color"] == "red" else "#EAB308" if s["highlight_color"] == "yellow" else "#10B981"
-            level_text = "Chắc chắn AI" if s["highlight_color"] == "red" else "Nghi vấn" if s["highlight_color"] == "yellow" else "Tự nhiên"
+            assessment = str(s.get("assessment") or "")
+            if s["highlight_color"] == "red":
+                level_text = "Chắc chắn AI"
+            elif s["highlight_color"] == "yellow":
+                level_text = "Nghi vấn"
+            elif "Tiêu đề" in assessment:
+                level_text = "Tiêu đề / Trung tính"
+            else:
+                level_text = "Tự nhiên"
 
             row = [
                 Paragraph(str(s["sentence_index"]), body_style),

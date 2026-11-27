@@ -55,12 +55,31 @@ def classify_risk_level(ai_prob: float, has_bypass_warning: bool = False, thresh
 
 
 def parse_student_label(filename: str) -> str:
-    """Chuẩn hóa tên file thành tên hiển thị Sinh viên / Tài liệu gọn gàng."""
-    base = os.path.basename(filename or "Khong_ten")
+    """
+    Chuẩn hóa đường dẫn/tên tệp thành nhãn hiển thị Sinh viên / Tài liệu gọn gàng.
+    Hỗ trợ cả cấu trúc thư mục nộp bài từ Moodle/LMS (vd: '22110001_NguyenVanA_12345_assignsubmission_file_/bai_nop.docx').
+    """
+    norm_path = (filename or "Khong_ten").replace("\\", "/")
+    parts = [p for p in norm_path.split("/") if p]
+    base = parts[-1] if parts else "Khong_ten"
     stem, _ = os.path.splitext(base)
-    clean = re.sub(r"[_\-]+", " ", stem).strip()
-    clean = re.sub(r"\s{2,}", " ", clean)
-    return clean[:120] if clean else base
+    clean_stem = re.sub(r"\s{2,}", " ", re.sub(r"[_\-]+", " ", stem)).strip()
+
+    # Nếu tệp nằm trong thư mục con tên sinh viên (Moodle/Classroom ZIP), ưu tiên giữ danh tính sinh viên
+    if len(parts) >= 2:
+        parent = parts[-2]
+        parent_cleaned = re.sub(r"_\d+_assignsubmission_file_?$", "", parent, flags=re.IGNORECASE)
+        parent_label = re.sub(r"\s{2,}", " ", re.sub(r"[_\-]+", " ", parent_cleaned)).strip()
+        generic_folders = {"submissions", "bai nop", "bainop", "files", "docs", "data", "upload", "uploads", "root"}
+        if (
+            parent_label
+            and parent_label.lower() not in generic_folders
+            and parent_label.lower() not in clean_stem.lower()
+        ):
+            combined = f"{parent_label} - {clean_stem}" if clean_stem else parent_label
+            return combined[:120]
+
+    return clean_stem[:120] if clean_stem else base
 
 
 def _decode_zip_member_name(info: zipfile.ZipInfo) -> str:
@@ -158,7 +177,7 @@ def extract_files_from_uploads(
                         if len(raw) > MAX_SINGLE_FILE_BYTES:
                             skipped_files.append({"filename": os.path.basename(member_name), "reason": "Tệp thực tế trong ZIP vượt quá 15 MB."})
                             continue
-                        _process_single_doc(os.path.basename(member_name), raw)
+                        _process_single_doc(member_name, raw)
             except zipfile.BadZipFile:
                 skipped_files.append({"filename": fname, "reason": "Tệp ZIP không hợp lệ hoặc bị hỏng."})
             except Exception as e:
@@ -343,8 +362,8 @@ def generate_batch_excel_bytes(batch_detail: Dict[str, Any]) -> bytes:
             if col_idx == 5:
                 cell.number_format = '0.00"%"'
 
-    # Auto-fit column widths
-    col_widths = [6, 34, 16, 10, 16, 15, 25, 16, 12, 16, 16, 14, 15]
+    # Auto-fit column widths (cột M = 22 đủ hiển thị mã VT-000101-XXXXXXXX không bị ###)
+    col_widths = [6, 34, 16, 10, 16, 15, 25, 16, 12, 16, 16, 14, 22]
     for col_idx, width in enumerate(col_widths, start=1):
         ws.column_dimensions[get_column_letter(col_idx)].width = width
 
@@ -358,9 +377,9 @@ def generate_batch_excel_bytes(batch_detail: Dict[str, Any]) -> bytes:
         ("Giảng viên phụ trách", batch_detail.get("teacher_name", "")),
         ("Thời gian thực hiện", batch_detail.get("created_at", "")),
         ("Tổng số bài đã chấm", batch_detail.get("total_files", 0)),
-        ("Số bài Nguy cơ cao (Đỏ - >=75% AI hoặc Bypass)", batch_detail.get("high_risk_count", 0)),
-        ("Số bài Nghi vấn / Cần xem xét (Vàng - 45-75% AI)", batch_detail.get("moderate_risk_count", 0)),
-        ("Số bài An toàn (Xanh - <45% AI)", batch_detail.get("safe_count", 0)),
+        ("Số bài Nguy cơ cao (Đỏ - Xác suất AI cao hoặc Bypass)", batch_detail.get("high_risk_count", 0)),
+        ("Số bài Nghi vấn / Cần xem xét (Vàng)", batch_detail.get("moderate_risk_count", 0)),
+        ("Số bài An toàn (Xanh)", batch_detail.get("safe_count", 0)),
         ("Số bài phát hiện tiểu xảo Anti-Bypass", batch_detail.get("bypass_count", 0)),
         ("Xác suất AI trung bình toàn lớp (%)", round(float(batch_detail.get("avg_ai_probability", 0.0)) * 100, 2)),
     ]
