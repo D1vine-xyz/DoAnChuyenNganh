@@ -121,7 +121,7 @@
       <!-- Main Input Card (JustDone Card Layout) -->
       <div id="drop-zone" class="input-main-card">
         <!-- Hidden file input -->
-        <input type="file" id="file-input" accept=".txt,.docx,.doc,.pdf" class="hidden">
+        <input type="file" id="file-input" accept=".txt,.docx,.doc,.pdf,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff" class="hidden">
         <div class="drop-zone-content hidden"></div>
 
         <!-- File selected bar (Revealed when file uploaded) -->
@@ -166,9 +166,9 @@
         <!-- Bottom bar inside card -->
         <div class="card-bottom-bar">
           <div class="bottom-left-actions">
-            <button id="btn-upload" class="btn-action-pill" type="button" title="Tải tệp .PDF, .DOCX, .DOC hoặc .TXT">
+            <button id="btn-upload" class="btn-action-pill" type="button" title="Tải tệp .PDF (cả bản scan), .DOCX, .DOC, .TXT hoặc ảnh .PNG, .JPG">
               <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              <span>Tải tệp</span>
+              <span>Tải tệp / Ảnh</span>
             </button>
             <button id="btn-paste" class="btn-action-pill" type="button" title="Dán văn bản từ Clipboard">
               <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
@@ -317,6 +317,12 @@
         <div id="filter-info-banner" class="filter-info-banner hidden">
           <span>🧹</span>
           <span id="filter-info-text"></span>
+        </div>
+
+        <!-- OCR Extraction Info Notice -->
+        <div id="ocr-info-banner" class="filter-info-banner hidden">
+          <span>📷</span>
+          <span id="ocr-info-text"></span>
         </div>
 
         <!-- 4-Tier Authorship Classification Box -->
@@ -508,7 +514,7 @@
             <div class="classroom-card-header">
               <div>
                 <h3>🏫 Tạo Đợt Chấm Bài Cả Lớp (.ZIP hoặc Nhiều Tệp)</h3>
-                <p>Kéo thả 1 tệp nén <b>.ZIP</b> tải từ LMS hoặc chọn đồng thời nhiều bài tiểu luận (.docx, .doc, .pdf, .txt).</p>
+                <p>Kéo thả 1 tệp nén <b>.ZIP</b> tải từ LMS hoặc chọn nhiều bài (.docx, .doc, .pdf, PDF scan, ảnh .png/.jpg, .txt).</p>
               </div>
             </div>
 
@@ -539,10 +545,10 @@
             </div>
 
             <div id="batch-drop-zone" class="batch-drop-zone">
-              <input type="file" id="batch-file-input" accept=".zip,.docx,.doc,.pdf,.txt" multiple class="hidden">
+              <input type="file" id="batch-file-input" accept=".zip,.docx,.doc,.pdf,.txt,.png,.jpg,.jpeg,.webp,.bmp" multiple class="hidden">
               <div class="batch-drop-icon">📦</div>
               <div class="batch-drop-title">Kéo thả tệp <b>.ZIP</b> cả lớp hoặc nhấp để chọn nhiều tệp bài nộp</div>
-              <div class="batch-drop-sub">Hỗ trợ .ZIP, .DOCX, .DOC, .PDF, .TXT • Tối đa 100 tệp/đợt • Tự động quét Anti-Bypass &amp; XAI</div>
+              <div class="batch-drop-sub">Hỗ trợ .ZIP, .DOCX, .DOC, .PDF (cả Scan OCR), Ảnh (.PNG/.JPG), .TXT • Tối đa 100 tệp/đợt</div>
             </div>
 
             <div id="batch-selected-wrap" class="batch-selected-wrap hidden">
@@ -740,6 +746,7 @@
           <h4>2. TẦNG DỊCH VỤ BACKEND &amp; PHÁP Y VĂN BẢN (FASTAPI GATEWAY)</h4>
           <div class="arch-chips-row">
             <span class="arch-chip-item">🛡️ Anti-Bypass &amp; Smart Academic Filter</span>
+            <span class="arch-chip-item">📷 Offline OCR Song Ngữ (PyMuPDF + EasyOCR)</span>
             <span class="arch-chip-item">🔬 Explainable AI (Burstiness • MATTR • Clichés)</span>
             <span class="arch-chip-item">🏫 Classroom Batch (.ZIP ➔ Excel .XLSX / .CSV)</span>
             <span class="arch-chip-item">🔐 JWT + Bcrypt + Google OAuth 2.0 RBAC</span>

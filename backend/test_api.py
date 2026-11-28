@@ -697,6 +697,54 @@ class TestDetectionAPI(unittest.TestCase):
             conn.cursor().execute("DELETE FROM users WHERE email = ?;", (hybrid_email,))
             conn.commit()
 
+    def test_18_ocr_upload_png_and_scanned_pdf(self):
+        """Kiểm tra upload ảnh chụp (.PNG) và PDF ảnh scan lên POST /api/v1/detect/upload kích hoạt OCR tự động."""
+        from PIL import Image, ImageDraw, ImageFont
+        import pymupdf
+
+        img = Image.new("RGB", (1300, 320), color="white")
+        draw = ImageDraw.Draw(img)
+        font_path = r"C:\Windows\Fonts\arial.ttf"
+        font = ImageFont.truetype(font_path, 34) if os.path.exists(font_path) else ImageFont.load_default()
+        draw.text((30, 50), "Trí tuệ nhân tạo ngày nay đóng vai trò then chốt trong công nghệ.", fill="black", font=font)
+        draw.text((30, 140), "Các mô hình ngôn ngữ lớn xử lý thông tin nhanh chóng và mạch lạc.", fill="black", font=font)
+
+        png_buf = io.BytesIO()
+        img.save(png_buf, format="PNG")
+        png_bytes = png_buf.getvalue()
+
+        # 1. Upload ảnh .PNG
+        res_img = self.client.post(
+            "/api/v1/detect/upload",
+            files={"file": ("chup_man_hinh.png", io.BytesIO(png_bytes), "image/png")},
+            data={"threshold": 0.5},
+        )
+        self.assertEqual(res_img.status_code, 200)
+        d_img = res_img.json()
+        self.assertTrue(d_img["ocr_report"]["ocr_used"])
+        self.assertEqual(d_img["overall"]["language"], "vi")
+        self.assertIn("trí tuệ", d_img["extracted_text"].lower())
+        self.client.delete(f"/api/v1/history/{d_img['scan_id']}")
+
+        # 2. Upload PDF ảnh scan thuần
+        pdf_doc = pymupdf.open()
+        page = pdf_doc.new_page(width=1300, height=320)
+        page.insert_image(page.rect, stream=png_bytes)
+        scanned_pdf_bytes = pdf_doc.tobytes()
+        pdf_doc.close()
+
+        res_pdf = self.client.post(
+            "/api/v1/detect/upload",
+            files={"file": ("tieu_luan_scan.pdf", io.BytesIO(scanned_pdf_bytes), "application/pdf")},
+            data={"threshold": 0.5},
+        )
+        self.assertEqual(res_pdf.status_code, 200)
+        d_pdf = res_pdf.json()
+        self.assertTrue(d_pdf["ocr_report"]["ocr_used"])
+        self.assertEqual(d_pdf["ocr_report"]["ocr_pages"], 1)
+        self.assertEqual(d_pdf["overall"]["language"], "vi")
+        self.client.delete(f"/api/v1/history/{d_pdf['scan_id']}")
+
 
 if __name__ == "__main__":
     unittest.main()

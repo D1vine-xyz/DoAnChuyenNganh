@@ -21,10 +21,10 @@ import zipfile
 from datetime import datetime
 from typing import Dict, Any, List, Tuple
 
-from file_parser import extract_text_from_file
+from file_parser import extract_text_from_file, extract_text_with_meta, IMAGE_EXTENSIONS
 import auth
 
-SUPPORTED_DOC_EXTENSIONS = (".txt", ".docx", ".doc", ".pdf")
+SUPPORTED_DOC_EXTENSIONS = (".txt", ".docx", ".doc", ".pdf") + IMAGE_EXTENSIONS
 MAX_BATCH_FILES = 100
 MAX_SINGLE_FILE_BYTES = 15 * 1024 * 1024     # 15 MB / file
 MAX_TOTAL_UNCOMPRESSED_BYTES = 100 * 1024 * 1024  # 100 MB / đợt chấm
@@ -137,7 +137,8 @@ def extract_files_from_uploads(
             return
 
         try:
-            text, ext = extract_text_from_file(doc_name, raw_bytes)
+            meta = extract_text_with_meta(doc_name, raw_bytes)
+            text, ext = meta["text"], meta["extension"]
         except Exception as e:
             skipped_files.append({"filename": doc_name, "reason": f"Lỗi đọc tệp: {str(e)}"})
             return
@@ -152,6 +153,10 @@ def extract_files_from_uploads(
             "student_label": parse_student_label(doc_name),
             "extension": ext,
             "text": text,
+            "ocr_used": bool(meta.get("ocr_used")),
+            "ocr_pages": int(meta.get("ocr_pages", 0)),
+            "ocr_total_pages": int(meta.get("ocr_total_pages", 0)),
+            "ocr_note": meta.get("ocr_note", ""),
         })
 
     for fname, content in uploaded_items:
@@ -187,7 +192,7 @@ def extract_files_from_uploads(
         else:
             skipped_files.append({
                 "filename": fname,
-                "reason": "Định dạng không hỗ trợ (chỉ chấp nhận .zip, .docx, .doc, .pdf, .txt).",
+                "reason": "Định dạng không hỗ trợ (chỉ chấp nhận .zip, .docx, .doc, .pdf, .txt, .png, .jpg).",
             })
 
     return valid_docs, skipped_files

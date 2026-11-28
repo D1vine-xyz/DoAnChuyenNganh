@@ -124,6 +124,8 @@ const bypassSamplesRow = document.getElementById("bypass-samples-row");
 
 const filterInfoBanner = document.getElementById("filter-info-banner");
 const filterInfoText = document.getElementById("filter-info-text");
+const ocrInfoBanner = document.getElementById("ocr-info-banner");
+const ocrInfoText = document.getElementById("ocr-info-text");
 
 const authorshipTierBox = document.getElementById("authorship-tier-box");
 const authorshipTierBadge = document.getElementById("authorship-tier-badge");
@@ -496,9 +498,10 @@ fileInput.addEventListener("change", () => {
 });
 
 function handleFileSelected(file) {
-  const ext = file.name.split(".").pop().toLowerCase();
-  if (!["txt", "docx", "doc", "pdf"].includes(ext)) {
-    showToast("Chỉ hỗ trợ tệp tin định dạng: .PDF, .DOCX, .DOC, hoặc .TXT", "warning");
+  const ext = (file.name.split(".").pop() || "").toLowerCase();
+  const allowed = ["txt", "docx", "doc", "pdf", "png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff"];
+  if (!allowed.includes(ext)) {
+    showToast("Chỉ hỗ trợ: .PDF (cả scan), .DOCX, .DOC, .TXT hoặc ảnh .PNG, .JPG, .WEBP, .BMP", "warning");
     return;
   }
   currentUploadedFile = file;
@@ -514,9 +517,11 @@ function handleFileSelected(file) {
       updateTextCounts();
     };
     reader.readAsText(file);
+  } else if (["png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff"].includes(ext)) {
+    textInput.placeholder = `[Đã chọn ảnh chụp: ${file.name} (${(file.size / 1024).toFixed(1)} KB)]\nNhấn "Kiểm tra nội dung AI" để OCR ngoại tuyến (Anh-Việt) bóc tách chữ và phân tích.`;
   } else {
-    // Với tài liệu .docx, .doc, .pdf
-    textInput.placeholder = `[Đã chọn tệp: ${file.name} (${(file.size / 1024).toFixed(1)} KB)]\nNhấn "Kiểm tra nội dung AI" để máy chủ tự động bóc tách và phân tích toàn bộ văn bản.`;
+    // Với tài liệu .docx, .doc, .pdf (kể cả PDF scan)
+    textInput.placeholder = `[Đã chọn tệp: ${file.name} (${(file.size / 1024).toFixed(1)} KB)]\nNhấn "Kiểm tra nội dung AI" để máy chủ tự động bóc tách (tự chạy OCR nếu là PDF scan) và phân tích.`;
   }
 }
 
@@ -951,6 +956,19 @@ function renderForensicsAndXai(data) {
       if (filterInfoText) filterInfoText.textContent = flt.filter_summary;
     } else {
       filterInfoBanner.classList.add("hidden");
+    }
+  }
+
+  // 2b. OCR Extraction Notice
+  const ocr = data.ocr_report || (data.details ? data.details.ocr_report : null);
+  if (ocrInfoBanner) {
+    if (ocr && ocr.ocr_used) {
+      ocrInfoBanner.classList.remove("hidden");
+      if (ocrInfoText) {
+        ocrInfoText.textContent = ocr.ocr_note || "Đã bóc tách văn bản bằng OCR ngoại tuyến (PyMuPDF + EasyOCR Anh-Việt).";
+      }
+    } else {
+      ocrInfoBanner.classList.add("hidden");
     }
   }
 
@@ -1442,6 +1460,7 @@ window.viewHistoryItem = async function(id) {
         },
         authorship_tier: data.authorship_tier || (data.details ? data.details.authorship_tier : null),
         bypass_report: data.bypass_report || (data.details ? data.details.bypass_report : null),
+        ocr_report: data.ocr_report || (data.details ? data.details.ocr_report : null),
         xai_metrics: data.xai_metrics || (data.details ? data.details.xai_metrics : null),
         sentences: data.details ? data.details.sentences : [],
         total_processing_time_ms: data.inference_time_ms,
@@ -2161,7 +2180,7 @@ function initClassroomBatchUI() {
 }
 
 function addBatchFiles(fileList) {
-  const allowed = ["zip", "docx", "doc", "pdf", "txt"];
+  const allowed = ["zip", "docx", "doc", "pdf", "txt", "png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff"];
   fileList.forEach((f) => {
     const ext = (f.name.split(".").pop() || "").toLowerCase();
     if (!allowed.includes(ext)) return;
@@ -2187,7 +2206,12 @@ function renderSelectedBatchFiles() {
   selectedBatchFiles.forEach((f) => {
     const chip = document.createElement("span");
     chip.className = "batch-file-chip";
-    const icon = f.name.toLowerCase().endsWith(".zip") ? "📦" : "📄";
+    const lowerName = f.name.toLowerCase();
+    const icon = lowerName.endsWith(".zip")
+      ? "📦"
+      : /\.(png|jpe?g|webp|bmp|tiff?)$/.test(lowerName)
+        ? "🖼️"
+        : "📄";
     chip.textContent = `${icon} ${f.name} (${(f.size / 1024).toFixed(1)} KB)`;
     batchSelectedChips.appendChild(chip);
   });

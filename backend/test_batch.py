@@ -134,6 +134,43 @@ class TestBatchProcessor(unittest.TestCase):
                 valid_docs, _ = bp.extract_files_from_uploads([("Lop_K16_TieuLuan_Demo.zip", f.read())])
             self.assertGreaterEqual(len(valid_docs), 5)
 
+    def test_04_ocr_image_and_scanned_pdf_extraction(self):
+        """Kiểm tra trích xuất OCR ngoại tuyến từ ảnh (.PNG) và PDF ảnh scan (không có lớp text)."""
+        from PIL import Image, ImageDraw, ImageFont
+        import pymupdf
+        from file_parser import extract_text_with_meta
+
+        img = Image.new("RGB", (1300, 320), color="white")
+        draw = ImageDraw.Draw(img)
+        font_path = r"C:\Windows\Fonts\arial.ttf"
+        font = ImageFont.truetype(font_path, 34) if os.path.exists(font_path) else ImageFont.load_default()
+        draw.text((30, 50), "Trí tuệ nhân tạo đóng vai trò then chốt trong giáo dục đại học.", fill="black", font=font)
+        draw.text((30, 140), "Artificial intelligence transforms academic research and software testing.", fill="black", font=font)
+
+        png_buf = io.BytesIO()
+        img.save(png_buf, format="PNG")
+        png_bytes = png_buf.getvalue()
+
+        # 1. Test OCR trực tiếp từ ảnh .PNG
+        img_meta = extract_text_with_meta("anh_chup_bai_lam.png", png_bytes)
+        self.assertTrue(img_meta["ocr_used"])
+        self.assertEqual(img_meta["extension"], "png")
+        self.assertIn("giáo dục", img_meta["text"].lower())
+        self.assertIn("artificial intelligence", img_meta["text"].lower())
+
+        # 2. Tạo PDF ảnh scan thuần (chỉ chèn raster image, không có lớp text)
+        pdf_doc = pymupdf.open()
+        page = pdf_doc.new_page(width=1300, height=320)
+        page.insert_image(page.rect, stream=png_bytes)
+        scanned_pdf_bytes = pdf_doc.tobytes()
+        pdf_doc.close()
+
+        pdf_meta = extract_text_with_meta("bai_nop_scan.pdf", scanned_pdf_bytes)
+        self.assertTrue(pdf_meta["ocr_used"])
+        self.assertEqual(pdf_meta["extension"], "pdf")
+        self.assertEqual(pdf_meta["ocr_pages"], 1)
+        self.assertIn("artificial intelligence", pdf_meta["text"].lower())
+
 
 if __name__ == "__main__":
     unittest.main()

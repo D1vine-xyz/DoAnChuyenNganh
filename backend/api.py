@@ -33,7 +33,7 @@ import auth
 import text_forensics as tfx
 import batch_processor as bp
 from auth import get_current_user, get_current_user_optional, require_role
-from file_parser import extract_text_from_file
+from file_parser import extract_text_from_file, extract_text_with_meta
 from pdf_report import generate_pdf_report
 
 # Biến toàn cục lưu trữ Singleton detector
@@ -464,6 +464,7 @@ def _execute_full_analysis_and_save(
     current_user: Optional[Dict[str, Any]] = None,
     batch_id: Optional[int] = None,
     student_label: Optional[str] = None,
+    ocr_report: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Helper dùng chung: Tiền kiểm Anti-Bypass -> Lọc học thuật -> Suy luận Song ngữ (AI + Cấp câu)
@@ -551,6 +552,7 @@ def _execute_full_analysis_and_save(
             "xai_metrics": xai_metrics,
             "bypass_report": bypass_public,
             "filter_report": filter_public,
+            "ocr_report": ocr_report,
             "authorship_tier": authorship_tier,
         },
         user_id=current_user["id"] if current_user else None,
@@ -584,6 +586,7 @@ def _execute_full_analysis_and_save(
         "authorship_tier": authorship_tier,
         "bypass_report": bypass_public,
         "filter_report": filter_public,
+        "ocr_report": ocr_report,
         "xai_metrics": xai_metrics,
         "sentence_summary": {
             "total_sentences": len(sentences),
@@ -669,9 +672,9 @@ async def detect_uploaded_file(
     current_user: Optional[Dict[str, Any]] = Depends(auth.get_current_user_optional),
 ):
     """
-    Tiếp nhận tệp tin tải lên (.PDF, .DOCX, .DOC, .TXT):
-    Tự động trích xuất văn bản sạch, kiểm tra Anti-Bypass, lọc trích dẫn/tài liệu tham khảo,
-    suy luận AI + XAI và lưu lịch sử thẩm định kèm tên tệp gốc.
+    Tiếp nhận tệp tin tải lên (.PDF, .PDF scan, .DOCX, .DOC, .TXT, và ảnh .PNG, .JPG, .JPEG, .WEBP, .BMP):
+    Tự động trích xuất văn bản sạch (kích hoạt OCR ngoại tuyến nếu là ảnh hoặc PDF scan), kiểm tra Anti-Bypass,
+    lọc trích dẫn/tài liệu tham khảo, suy luận AI + XAI và lưu lịch sử thẩm định kèm tên tệp gốc.
     """
     if detector_instance is None:
         raise HTTPException(
@@ -692,7 +695,8 @@ async def detect_uploaded_file(
         )
 
     try:
-        extracted_text, ext = extract_text_from_file(file.filename, content_bytes)
+        parse_meta = await run_in_threadpool(extract_text_with_meta, file.filename, content_bytes)
+        extracted_text = parse_meta["text"]
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -705,6 +709,14 @@ async def detect_uploaded_file(
             detail="Nội dung văn bản trong tệp quá ngắn (yêu cầu ít nhất 5 từ).",
         )
 
+    ocr_report = {
+        "ocr_used": bool(parse_meta.get("ocr_used")),
+        "source_extension": parse_meta.get("extension", ""),
+        "ocr_pages": int(parse_meta.get("ocr_pages", 0)),
+        "ocr_total_pages": int(parse_meta.get("ocr_total_pages", 0)),
+        "ocr_note": parse_meta.get("ocr_note", ""),
+    }
+
     res = await run_in_threadpool(
         _execute_full_analysis_and_save,
         clean_text=extracted_text,
@@ -714,6 +726,7 @@ async def detect_uploaded_file(
         filter_quotes=filter_quotes,
         filter_references=filter_references,
         current_user=current_user,
+        ocr_report=ocr_report if ocr_report["ocr_used"] else None,
     )
     res["filename"] = file.filename
     res["extracted_text"] = extracted_text
@@ -980,6 +993,17 @@ async def classroom_batch_scan(
 
         for doc in valid_docs:
             try:
+                doc_ocr_report = (
+                    {
+                        "ocr_used": True,
+                        "source_extension": doc.get("extension", ""),
+                        "ocr_pages": int(doc.get("ocr_pages", 0)),
+                        "ocr_total_pages": int(doc.get("ocr_total_pages", 0)),
+                        "ocr_note": doc.get("ocr_note", ""),
+                    }
+                    if doc.get("ocr_used")
+                    else None
+                )
                 res = _execute_full_analysis_and_save(
                     clean_text=doc["text"],
                     threshold=threshold,
@@ -991,6 +1015,7 @@ async def classroom_batch_scan(
                     current_user=current_user,
                     batch_id=batch_id,
                     student_label=doc["student_label"],
+                    ocr_report=doc_ocr_report,
                 )
                 r_level = res["risk_level"]
                 if r_level == "high":
