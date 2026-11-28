@@ -579,10 +579,10 @@ btnSampleAi.addEventListener("click", () => {
 
 btnSampleHuman.addEventListener("click", () => {
   applySampleText(
-    "Last Sunday morning, my roommate and I decided to take a spontaneous road trip out to the coast. "
-    + "We packed a couple of sandwiches, some cold drinks, and hit the highway before the morning traffic started piling up. "
-    + "The weather was completely overcast with a cool breeze coming off the ocean, but the seafood shack by the pier was fantastic. "
-    + "It was honestly one of the most relaxing weekends we have had all semester.",
+    "Animal cognition encompasses the mental capacities of non-human animals including insect cognition. "
+    + "The study of animal conditioning and learning used in this field was developed from comparative psychology. "
+    + "It has also been strongly influenced by research in ethology, behavioral ecology, and evolutionary psychology; the alternative name cognitive ethology is sometimes used. "
+    + "Many behaviors associated with the term animal intelligence are also subsumed within animal cognition.",
     "Mẫu Người Tiếng Anh"
   );
 });
@@ -602,10 +602,10 @@ if (btnSampleAiVi) {
 if (btnSampleHumanVi) {
   btnSampleHumanVi.addEventListener("click", () => {
     applySampleText(
-      "Chè cam tào phớ giải nhiệt mùa hè là một món giải khát rất dễ làm, vừa giúp thanh lọc cơ thể lại không bị béo ngậy. "
-      + "Cam tươi gọt sạch vỏ, bóc lấy phần tép và giữ lại một chút vỏ thái chỉ để tạo mùi thơm dịu nhẹ. "
-      + "Nước cam hòa cùng đường phèn đun sôi liu riu trên bếp, thêm chút bột năng khuấy đều đến khi sánh mịn thì tắt bếp. "
-      + "Múc từng lát tào phớ mềm mượt ra bát, chan nước cam lên trên và thưởng thức cùng vài viên đá mát lạnh.",
+      "Tôi cũng nhiều lúc rơi vào tình trạng cuồng chân. "
+      + "Đi du lịch không được, về quê không xong, gặp gỡ, thăm nom ai đó cũng phải hỏi kỹ càng bởi chỗ nào cũng bị cảnh báo. "
+      + "Bố mẹ, anh chị, hàng xóm của tôi đều là F2, F3, con phố tôi ở cũng có người F0 rồi. "
+      + "Đành bó chân ở nhà viết bài, đọc sách, nghiên cứu tài liệu, soạn bài giảng, dạy con học và tập thể dục qua ngày.",
       "Mẫu Người Tiếng Việt"
     );
   });
@@ -846,8 +846,8 @@ function renderResults(data) {
   // 3. Model Breakdown
   if (modelsBoxTitle) {
     modelsBoxTitle.textContent = isVi
-      ? "Đánh giá từ Mô hình Chuyên biệt Tiếng Việt (PhoBERT base v2 & PyVi):"
-      : "Đóng góp từ 3 Mô hình Nền tảng (Ensemble PLMs):";
+      ? "Đánh giá từ Mô hình Chuyên biệt Tiếng Việt (PhoBERT v3.1 - 15K & PyVi):"
+      : "Đóng góp từ 3 Mô hình Nền tảng (Ensemble Stacking + Temp Scaling):";
   }
 
   if (isVi) {
@@ -872,7 +872,7 @@ function renderResults(data) {
       barRoberta.style.width = `${peakPct}%`;
     } else {
       if (nameModel1) nameModel1.textContent = "PhoBERT v2";
-      if (weightModel1) weightModel1.textContent = "Chuyên biệt (100%)";
+      if (weightModel1) weightModel1.textContent = "Chuyên biệt 15K (100%)";
       probLongformer.textContent = `${aiPct}%`;
       barLongformer.style.width = `${aiPct}%`;
 
@@ -887,14 +887,18 @@ function renderResults(data) {
       barRoberta.style.width = "100%";
     }
   } else if (overall.model_breakdown && overall.model_breakdown.individual_models) {
-    if (nameModel1) nameModel1.textContent = "Longformer";
-    if (weightModel1) weightModel1.textContent = "Trụ cột (48.7%)";
-    if (nameModel2) nameModel2.textContent = "BERT";
-    if (weightModel2) weightModel2.textContent = "Trọng số 34.0%";
-    if (nameModel3) nameModel3.textContent = "RoBERTa";
-    if (weightModel3) weightModel3.textContent = "Trọng số 17.4%";
-
     const m = overall.model_breakdown.individual_models;
+    const wLong = (m.longformer && m.longformer.weight_pct) || "15.9%";
+    const wBert = (m.bert && m.bert.weight_pct) || "46.6%";
+    const wRob = (m.roberta && m.roberta.weight_pct) || "37.5%";
+
+    if (nameModel1) nameModel1.textContent = "Longformer";
+    if (weightModel1) weightModel1.textContent = `1024 Tokens (${wLong})`;
+    if (nameModel2) nameModel2.textContent = "BERT";
+    if (weightModel2) weightModel2.textContent = `Trụ cột (${wBert})`;
+    if (nameModel3) nameModel3.textContent = "RoBERTa";
+    if (weightModel3) weightModel3.textContent = `Trọng số ${wRob}`;
+
     const pLong = (m.longformer.probability * 100).toFixed(1);
     const pBert = (m.bert.probability * 100).toFixed(1);
     const pRob = (m.roberta.probability * 100).toFixed(1);

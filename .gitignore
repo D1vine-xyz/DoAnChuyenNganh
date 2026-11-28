@@ -35,6 +35,8 @@ output/*.pt
 output/tokenizer_*/
 backend/output/*.pt
 backend/output/tokenizer_*/
+backend/output/backup_*/
+output/backup_*/
 
 # Database runtime files
 *.db

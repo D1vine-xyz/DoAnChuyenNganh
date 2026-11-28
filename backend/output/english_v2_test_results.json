@@ -1,0 +1,50 @@
+{
+  "BERT (bert-base-uncased)": {
+    "accuracy": 0.9391666666666667,
+    "precision": 0.9175911251980983,
+    "recall": 0.965,
+    "f1": 0.9406986190089358,
+    "auc": 0.9849833333333333,
+    "threshold": 0.5
+  },
+  "RoBERTa (roberta-base)": {
+    "accuracy": 0.9233333333333333,
+    "precision": 0.8871951219512195,
+    "recall": 0.97,
+    "f1": 0.9267515923566879,
+    "auc": 0.9669916666666667,
+    "threshold": 0.5
+  },
+  "Longformer (longformer-base-4096)": {
+    "accuracy": 0.9083333333333333,
+    "precision": 0.8656716417910447,
+    "recall": 0.9666666666666667,
+    "f1": 0.9133858267716536,
+    "auc": 0.9830249999999998,
+    "threshold": 0.5
+  },
+  "Ensemble (Simple Soft Voting)": {
+    "accuracy": 0.9316666666666666,
+    "precision": 0.9009287925696594,
+    "recall": 0.97,
+    "f1": 0.9341894060995185,
+    "auc": 0.9868916666666666,
+    "threshold": 0.5
+  },
+  "Ensemble (Weighted Soft Voting)": {
+    "accuracy": 0.9425,
+    "precision": 0.9234449760765551,
+    "recall": 0.965,
+    "f1": 0.9437652811735942,
+    "auc": 0.9855555555555555,
+    "threshold": 0.5
+  },
+  "Ensemble (Stacking Meta-Classifier)": {
+    "accuracy": 0.9508333333333333,
+    "precision": 0.9398373983739837,
+    "recall": 0.9633333333333334,
+    "f1": 0.951440329218107,
+    "auc": 0.9860222222222222,
+    "threshold": 0.5
+  }
+}

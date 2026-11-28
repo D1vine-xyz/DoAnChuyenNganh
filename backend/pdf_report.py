@@ -412,7 +412,7 @@ def generate_pdf_report(scan_data: Dict[str, Any]) -> bytes:
             ],
             [
                 Paragraph("<b>PhoBERT v2</b> (vinai/phobert-base-v2)", body_style),
-                Paragraph("Ngữ cảnh 256 tokens, Huấn luyện 8.000 mẫu Pre-2022 12 thể loại (Acc 99.08%)", body_style),
+                Paragraph("Ngữ cảnh 256 tokens (Sliding-Window), 15.000 mẫu Pre-2022 v3.1 - 22 nhóm (Acc 98.58%)", body_style),
                 Paragraph("<b>100.0%</b> (Chuyên biệt VN)", body_style),
                 Paragraph(f"<b>{p_phobert*100:.2f}%</b>", body_style),
             ],
@@ -442,6 +442,9 @@ def generate_pdf_report(scan_data: Dict[str, Any]) -> bytes:
         score_longformer = mb.get("longformer", {}).get("probability", scan_data.get("score_longformer", ai_prob))
         score_bert = mb.get("bert", {}).get("probability", scan_data.get("score_bert", ai_prob))
         score_roberta = mb.get("roberta", {}).get("probability", scan_data.get("score_roberta", ai_prob))
+        w_bert_pct = mb.get("bert", {}).get("weight_pct", "46.6%")
+        w_roberta_pct = mb.get("roberta", {}).get("weight_pct", "37.5%")
+        w_long_pct = mb.get("longformer", {}).get("weight_pct", "15.9%")
         breakdown_data = [
             [
                 Paragraph("<b>Mô hình nền tảng (PLM)</b>", body_bold),
@@ -450,26 +453,26 @@ def generate_pdf_report(scan_data: Dict[str, Any]) -> bytes:
                 Paragraph("<b>Xác suất dự đoán AI</b>", body_bold),
             ],
             [
-                Paragraph("<b>Longformer</b> (longformer-base-4096)", body_style),
-                Paragraph("Ngữ cảnh 1024 tokens, Sliding Window Attention", body_style),
-                Paragraph("<b>48.65%</b> (Trụ cột)", body_style),
-                Paragraph(f"<b>{score_longformer*100:.2f}%</b>", body_style),
-            ],
-            [
                 Paragraph("<b>BERT</b> (bert-base-uncased)", body_style),
-                Paragraph("Ngữ cảnh 512 tokens, Tối ưu câu đơn và tin ngắn", body_style),
-                Paragraph("<b>33.96%</b>", body_style),
+                Paragraph("Ngữ cảnh 512 tokens, Tối ưu cấu trúc câu và luận điểm", body_style),
+                Paragraph(f"<b>{w_bert_pct}</b> (Trụ cột)", body_style),
                 Paragraph(f"<b>{score_bert*100:.2f}%</b>", body_style),
             ],
             [
                 Paragraph("<b>RoBERTa</b> (roberta-base)", body_style),
-                Paragraph("Ngữ cảnh 512 tokens, Nhạy bén biến thể AI", body_style),
-                Paragraph("<b>17.38%</b>", body_style),
+                Paragraph("Ngữ cảnh 512 tokens, Nhạy bén biến thể AI &amp; Paraphrase", body_style),
+                Paragraph(f"<b>{w_roberta_pct}</b>", body_style),
                 Paragraph(f"<b>{score_roberta*100:.2f}%</b>", body_style),
             ],
             [
-                Paragraph("<b>Ensemble (Weighted Soft Voting)</b>", body_bold),
-                Paragraph("Dung hợp đa mô hình tối ưu theo hàm Log Loss", body_bold),
+                Paragraph("<b>Longformer</b> (longformer-base-4096)", body_style),
+                Paragraph("Ngữ cảnh 1024 tokens, Sliding Window Attention bài dài", body_style),
+                Paragraph(f"<b>{w_long_pct}</b>", body_style),
+                Paragraph(f"<b>{score_longformer*100:.2f}%</b>", body_style),
+            ],
+            [
+                Paragraph("<b>Ensemble (Stacking + Temp Scaling)</b>", body_bold),
+                Paragraph("Meta-Classifier đa miền 12.000 mẫu (Acc 95.08% • TOEFL 83.33%)", body_bold),
                 Paragraph("<b>100.0%</b>", body_bold),
                 Paragraph(f"<b>{ai_prob*100:.2f}% AI</b>", body_bold),
             ],

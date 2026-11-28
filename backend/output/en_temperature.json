@@ -1,0 +1,30 @@
+{
+  "temperatures": {
+    "bert": 1.1454,
+    "roberta": 1.3377,
+    "longformer": 1.39
+  },
+  "calibration_metrics": {
+    "bert": {
+      "temperature": 1.1454,
+      "val_nll_before": 0.19366,
+      "val_nll_after": 0.19036,
+      "val_ece_before": 0.0404,
+      "val_ece_after": 0.04125
+    },
+    "roberta": {
+      "temperature": 1.3377,
+      "val_nll_before": 0.24678,
+      "val_nll_after": 0.22915,
+      "val_ece_before": 0.0536,
+      "val_ece_after": 0.05181
+    },
+    "longformer": {
+      "temperature": 1.39,
+      "val_nll_before": 0.27813,
+      "val_nll_after": 0.25504,
+      "val_ece_before": 0.07189,
+      "val_ece_after": 0.06588
+    }
+  }
+}

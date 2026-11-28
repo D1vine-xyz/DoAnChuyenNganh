@@ -599,9 +599,9 @@ class AITextDetector:
                             "weight": 1.0,
                             "weight_pct": "100%",
                             "model_name": (
-                                f"PhoBERT v3 (12K Pre-2022 • T={self.phobert_temperature:.2f})"
+                                f"PhoBERT v3.1 (15K Pre-2022 • T={self.phobert_temperature:.2f})"
                                 if abs(self.phobert_temperature - 1.0) > 1e-3
-                                else "PhoBERT base v2 (Pre-2022)"
+                                else "PhoBERT v3.1 (15K Pre-2022)"
                             ),
                         },
                         "bert": {"probability": round(p_mean, 4), "weight": 0.65 if chunk_cnt > 1 else 1.0, "weight_pct": "Mean Chunks"},
@@ -654,8 +654,9 @@ class AITextDetector:
 
         inference_time_ms = (time.time() - t0) * 1000
 
-        # 3. Quyết định phân loại nhị phân & độ tin cậy
-        final_ai_prob = p_weighted
+        # 3. Quyết định phân loại nhị phân & độ tin cậy (Ưu tiên Stacking Meta-Learner đã hiệu chuẩn đa miền)
+        use_stacking_champion = self.meta_classifier is not None
+        final_ai_prob = p_stacking if use_stacking_champion else p_weighted
         is_ai = final_ai_prob >= threshold
         label = "AI-generated" if is_ai else "Human-written"
         label_vi = "Do AI sinh (ChatGPT/LLM)" if is_ai else "Do người viết (Human)"
@@ -672,7 +673,7 @@ class AITextDetector:
             "threshold_used": threshold,
             "language": "en",
             "language_label": "Tiếng Anh 🇬🇧",
-            "detected_model": "Ensemble PLMs (Longformer + BERT + RoBERTa)",
+            "detected_model": "Ensemble PLMs (Stacking Calibrated)" if use_stacking_champion else "Ensemble PLMs (Longformer + BERT + RoBERTa)",
             "text_stats": {
                 "word_count": word_count,
                 "char_count": char_count,
@@ -687,13 +688,14 @@ class AITextDetector:
             result["model_breakdown"] = {
                 "ensemble_weighted": {
                     "probability": round(p_weighted, 4),
-                    "is_champion": True,
+                    "is_champion": not use_stacking_champion,
                 },
                 "ensemble_simple": {
                     "probability": round(p_simple, 4),
                 },
                 "ensemble_stacking": {
                     "probability": round(p_stacking, 4),
+                    "is_champion": use_stacking_champion,
                 },
                 "text_stats": dict(result["text_stats"]),
                 "individual_models": {
@@ -749,11 +751,15 @@ class AITextDetector:
 
         if self.device.type == "cuda" and self.model_longformer:
             p_longformer = self._predict_longformer(eval_sentences)
-            p_weighted = (
-                self.weights[0] * p_bert +
-                self.weights[1] * p_roberta +
-                self.weights[2] * p_longformer
-            )
+            if self.meta_classifier is not None:
+                X_sent = np.column_stack([p_bert, p_roberta, p_longformer])
+                p_final_sent = self.meta_classifier.predict_proba(X_sent)[:, 1]
+            else:
+                p_final_sent = (
+                    self.weights[0] * p_bert +
+                    self.weights[1] * p_roberta +
+                    self.weights[2] * p_longformer
+                )
         else:
             w_sum = float(self.weights[0] + self.weights[1])
             if w_sum > 0:
@@ -761,9 +767,14 @@ class AITextDetector:
                 w_roberta = self.weights[1] / w_sum
             else:
                 w_bert, w_roberta = 0.5, 0.5
-            p_weighted = w_bert * p_bert + w_roberta * p_roberta
+            p_proxy_lf = w_bert * p_bert + w_roberta * p_roberta
+            if self.meta_classifier is not None:
+                X_sent = np.column_stack([p_bert, p_roberta, p_proxy_lf])
+                p_final_sent = self.meta_classifier.predict_proba(X_sent)[:, 1]
+            else:
+                p_final_sent = p_proxy_lf
 
-        return self._format_sentence_results(eval_sentences, p_weighted, threshold=threshold)
+        return self._format_sentence_results(eval_sentences, p_final_sent, threshold=threshold)
 
     def benchmark_latency(self, num_runs: int = 5) -> Dict[str, Any]:
         """Đo đạc độ trễ suy luận chuẩn khoa học trên cả tiếng Anh và tiếng Việt."""

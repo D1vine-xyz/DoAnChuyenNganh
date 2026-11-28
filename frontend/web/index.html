@@ -105,7 +105,7 @@
         <div class="trust-badges">
           <div class="trust-badge-item">
             <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>
-            <span>Độ chính xác 99,1% (VI - 8K Pre-2022) • 96,5% (EN)</span>
+            <span>Độ chính xác 98,6% (VI - 15K Pre-2022) • 95,1% (EN Đa miền)</span>
           </div>
           <div class="trust-badge-item">
             <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
@@ -386,12 +386,12 @@
 
         <!-- Ensemble / Model Breakdown -->
         <div class="models-breakdown-box">
-          <div id="models-box-title" class="models-box-title">Đóng góp từ 3 Mô hình Nền tảng (Ensemble PLMs):</div>
+          <div id="models-box-title" class="models-box-title">Đóng góp từ 3 Mô hình Nền tảng (Ensemble Stacking + Temp Scaling):</div>
           <div class="models-row-grid">
             <div class="model-stat-col primary-col" id="col-model-1">
               <div class="model-col-header">
                 <span class="model-name" id="name-model-1">Longformer</span>
-                <span class="model-weight" id="weight-model-1">Trụ cột (48.7%)</span>
+                <span class="model-weight" id="weight-model-1">1024 Tokens (15.9%)</span>
               </div>
               <div class="model-mini-bar">
                 <div id="bar-longformer" class="model-mini-fill" style="width: 98%;"></div>
@@ -402,7 +402,7 @@
             <div class="model-stat-col" id="col-model-2">
               <div class="model-col-header">
                 <span class="model-name" id="name-model-2">BERT</span>
-                <span class="model-weight" id="weight-model-2">Trọng số 34.0%</span>
+                <span class="model-weight" id="weight-model-2">Trụ cột (46.6%)</span>
               </div>
               <div class="model-mini-bar">
                 <div id="bar-bert" class="model-mini-fill" style="width: 95%;"></div>
@@ -413,7 +413,7 @@
             <div class="model-stat-col" id="col-model-3">
               <div class="model-col-header">
                 <span class="model-name" id="name-model-3">RoBERTa</span>
-                <span class="model-weight" id="weight-model-3">Trọng số 17.4%</span>
+                <span class="model-weight" id="weight-model-3">Trọng số 37.5%</span>
               </div>
               <div class="model-mini-bar">
                 <div id="bar-roberta" class="model-mini-fill" style="width: 93%;"></div>
@@ -728,40 +728,41 @@
         <div class="arch-layer-box">
           <h4>1. TẦNG KHÁCH HÀNG (CLIENT APPLICATION LAYER)</h4>
           <div class="arch-chips-row">
-            <span class="arch-chip-item">🌐 Web Dashboard (SPA - HTML5/CSS3/Vanilla JS)</span>
-            <span class="arch-chip-item">🧩 Chrome Extension (Manifest v3 - In-page selection)</span>
-            <span class="arch-chip-item">💻 CLI Interface (inference.py interactive)</span>
+            <span class="arch-chip-item">🌐 Web Dashboard SPA (Dark/Light • Chấm lớp .ZIP • Xác thực QR)</span>
+            <span class="arch-chip-item">🧩 Chrome Extension v3.0 PRO (Quét toàn trang LMS &amp; Đồng bộ JWT)</span>
+            <span class="arch-chip-item">💻 CLI Interface (inference.py interactive &amp; benchmark)</span>
           </div>
         </div>
 
-        <div class="arch-arrow-divider">⬇️ HTTP / JSON RESTful Endpoints (FastAPI CORS Enabled)</div>
+        <div class="arch-arrow-divider">⬇️ HTTP / JSON RESTful Endpoints (FastAPI Non-blocking Threadpool)</div>
 
         <div class="arch-layer-box">
-          <h4>2. TẦNG DỊCH VỤ BACKEND (FASTAPI &amp; UVICORN API GATEWAY)</h4>
+          <h4>2. TẦNG DỊCH VỤ BACKEND &amp; PHÁP Y VĂN BẢN (FASTAPI GATEWAY)</h4>
           <div class="arch-chips-row">
-            <span class="arch-chip-item">⚙️ Lifespan Singleton Manager</span>
-            <span class="arch-chip-item">🔐 JWT + Bcrypt RBAC Auth</span>
-            <span class="arch-chip-item">📁 File Parser (.pdf, .docx, .doc, .txt)</span>
+            <span class="arch-chip-item">🛡️ Anti-Bypass &amp; Smart Academic Filter</span>
+            <span class="arch-chip-item">🔬 Explainable AI (Burstiness • MATTR • Clichés)</span>
+            <span class="arch-chip-item">🏫 Classroom Batch (.ZIP ➔ Excel .XLSX / .CSV)</span>
+            <span class="arch-chip-item">🔐 JWT + Bcrypt + Google OAuth 2.0 RBAC</span>
             <span class="arch-chip-item">🗄️ Microsoft SQL Server 2022 (VeriTextAI)</span>
-            <span class="arch-chip-item">📄 ReportLab PDF Audit Generator</span>
+            <span class="arch-chip-item">📄 ReportLab PDF + Chữ ký số HMAC-SHA256 QR</span>
           </div>
         </div>
 
-        <div class="arch-arrow-divider">⬇️ Dynamic Language Router &amp; PyTorch Batch Tensors (CUDA/CPU)</div>
+        <div class="arch-arrow-divider">⬇️ Dynamic Language Router &amp; Sliding-Window Multi-Chunk Tensors (CUDA/CPU)</div>
 
         <div class="arch-layer-box">
-          <h4>3. TẦNG SUY LUẬN TRÍ TUỆ NHÂN TẠO (SONG NGỮ EN / VI)</h4>
+          <h4>3. TẦNG SUY LUẬN TRÍ TUỆ NHÂN TẠO (SONG NGỮ EN v2 12K / VI v3.1 15K)</h4>
           <div class="arch-chips-row">
-            <span class="arch-chip-item">🇻🇳 PhoBERT-base-v2 + PyVi (8.000 mẫu Pre-2022 • 99.08% Acc)</span>
-            <span class="arch-chip-item">🦅 Longformer-base-4096 (1024 context • 48.65% Weight)</span>
-            <span class="arch-chip-item">📘 BERT-base-uncased (512 context • 33.96% Weight)</span>
-            <span class="arch-chip-item">📕 RoBERTa-base (512 context • 17.38% Weight)</span>
-            <span class="arch-chip-item">🏆 Weighted Soft Voting EN (96.52% Accuracy)</span>
+            <span class="arch-chip-item">🇻🇳 PhoBERT-base-v2 + PyVi (v3.1 15.000 mẫu Pre-2022 • 22 nhóm • 98.58% Acc)</span>
+            <span class="arch-chip-item">🏆 Ensemble Stacking + Temp Scaling EN (12.000 mẫu Đa miền • 95.08% Acc)</span>
+            <span class="arch-chip-item">📘 BERT-base-uncased (512 context • 46.61% Weight)</span>
+            <span class="arch-chip-item">📕 RoBERTa-base (512 context • 37.50% Weight)</span>
+            <span class="arch-chip-item">🦅 Longformer-base-4096 (1024 Sliding-Window • 15.89% Weight)</span>
           </div>
         </div>
 
         <div style="margin-top: 32px;">
-          <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 14px;">Bảng Đối So Sánh Hiệu Năng Thực Nghiệm (Scientific Benchmarks)</h3>
+          <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 14px;">Bảng Đối So Sánh Hiệu Năng Thực Nghiệm (Scientific Benchmarks — Bản Nâng Cấp Đa Miền)</h3>
           <div class="table-wrapper">
             <table class="data-table">
               <thead>
@@ -778,64 +779,74 @@
               </thead>
               <tbody>
                 <tr>
-                  <td><b>BERT</b> (bert-base-uncased)</td>
+                  <td><b>BERT</b> (bert-base-uncased • EN v2 12K)</td>
                   <td>110M</td>
                   <td>512</td>
-                  <td>95.86%</td>
-                  <td>97.77%</td>
-                  <td>92.45%</td>
-                  <td>95.04%</td>
-                  <td>98.05%</td>
+                  <td>93.92%</td>
+                  <td>91.76%</td>
+                  <td>96.50%</td>
+                  <td>94.07%</td>
+                  <td>98.50%</td>
                 </tr>
                 <tr>
-                  <td><b>RoBERTa</b> (roberta-base)</td>
+                  <td><b>RoBERTa</b> (roberta-base • EN v2 12K)</td>
                   <td>125M</td>
                   <td>512</td>
-                  <td>95.02%</td>
-                  <td>94.59%</td>
-                  <td><b>93.75%</b></td>
-                  <td>94.17%</td>
-                  <td>98.48%</td>
+                  <td>92.33%</td>
+                  <td>88.72%</td>
+                  <td><b>97.00%</b></td>
+                  <td>92.68%</td>
+                  <td>96.70%</td>
                 </tr>
                 <tr>
-                  <td><b>Longformer</b> (allenai/longformer-4096)</td>
+                  <td><b>Longformer</b> (allenai/longformer-4096 • EN v2 12K)</td>
                   <td>149M</td>
                   <td><b>1024</b></td>
-                  <td>96.45%</td>
-                  <td>98.21%</td>
-                  <td>93.43%</td>
-                  <td>95.76%</td>
-                  <td><b>98.65%</b></td>
-                </tr>
-                <tr class="row-highlight-en">
-                  <td><b>Ensemble (Weighted Soft Voting)</b></td>
-                  <td><b>384M</b></td>
-                  <td><b>1024</b></td>
-                  <td><b>96.52%</b></td>
-                  <td><b>98.38%</b></td>
-                  <td>93.43%</td>
-                  <td><b>95.84%</b></td>
-                  <td>98.52%</td>
+                  <td>90.83%</td>
+                  <td>86.57%</td>
+                  <td>96.67%</td>
+                  <td>91.34%</td>
+                  <td>98.30%</td>
                 </tr>
                 <tr>
-                  <td><b>Cross-Domain TOEFL (Ngoại miền)</b></td>
+                  <td><b>Ensemble (Weighted Soft Voting • EN v2 12K)</b></td>
                   <td>384M</td>
                   <td>1024</td>
-                  <td><b>96.83%*</b></td>
-                  <td>--</td>
+                  <td>94.25%</td>
+                  <td>92.34%</td>
+                  <td>96.50%</td>
+                  <td>94.38%</td>
+                  <td>98.56%</td>
+                </tr>
+                <tr class="row-highlight-en">
+                  <td><b>Ensemble (Stacking + Temp Scaling • EN v2 12K)</b></td>
+                  <td><b>384M</b></td>
+                  <td><b>1024 (SW)</b></td>
+                  <td><b>95.08%</b></td>
+                  <td><b>93.98%</b></td>
+                  <td>96.33%</td>
+                  <td><b>95.14%</b></td>
+                  <td><b>98.60%</b></td>
+                </tr>
+                <tr>
+                  <td><b>Cross-Domain Zero-Shot TOEFL (252 Essays, th=0.5)</b></td>
+                  <td>384M</td>
+                  <td>1024</td>
+                  <td><b>83.33%</b></td>
+                  <td>75.00%</td>
                   <td><b>100.0%</b></td>
-                  <td><b>96.83%</b></td>
-                  <td><b>99.13%</b></td>
+                  <td><b>85.71%</b></td>
+                  <td><b>96.82%</b></td>
                 </tr>
                 <tr class="row-highlight-vi">
-                  <td><b>PhoBERT v2 (Tiếng Việt 🇻🇳 - 8K Pre-2022)</b></td>
+                  <td><b>PhoBERT v2 + PyVi (Tiếng Việt 🇻🇳 - v3.1 15K Pre-2022, 22 nhóm)</b></td>
                   <td>135M</td>
-                  <td>256</td>
-                  <td><b>99.08%</b></td>
-                  <td><b>98.52%</b></td>
-                  <td><b>99.67%</b></td>
-                  <td><b>99.09%</b></td>
-                  <td><b>99.91%</b></td>
+                  <td><b>256 (SW)</b></td>
+                  <td><b>98.58%</b></td>
+                  <td><b>97.89%</b></td>
+                  <td><b>99.29%</b></td>
+                  <td><b>98.59%</b></td>
+                  <td><b>99.89%</b></td>
                 </tr>
               </tbody>
             </table>
